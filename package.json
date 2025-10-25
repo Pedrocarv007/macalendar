@@ -1,0 +1,18 @@
+{
+  "name": "macalendar",
+  "version": "1.0.0",
+  "description": "Sistema de gestão para restaurantes MAC com calendário, gestão de colaboradores e templates",
+  "scripts": {
+    "dev": "python run.py",
+    "server": "python run.py", 
+    "install": "pip install -r requirements.txt",
+    "init-db": "flask db init",
+    "migrate": "flask db migrate",
+    "upgrade": "flask db upgrade",
+    "test": "pytest",
+    "lint": "flake8 app/ --max-line-length=120"
+  },
+  "keywords": ["restaurant", "management", "calendar", "employees", "flask", "python"],
+  "author": "MAC Restaurant Management",
+  "license": "MIT"
+}

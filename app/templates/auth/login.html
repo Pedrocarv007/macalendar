@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Login - MAC Calendar{% endblock %}
+
+{% block nav_links %}{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="container-fluid h-100">
+        <div class="row h-100 g-0">
+            <!-- Left Side - Branding -->
+            <div class="col-lg-6 d-none d-lg-flex auth-brand-side">
+                <div class="auth-brand-content">
+                    <div class="brand-logo">
+                        <i class="fas fa-calendar-alt"></i>
+                        <h1>MAC Calendar</h1>
+                    </div>
+                    <div class="brand-subtitle">
+                        <h3>Sistema de Gestão</h3>
+                        <p>Gerencie sua equipe, agenda e documentos em um só lugar</p>
+                    </div>
+                    <div class="brand-features">
+                        <div class="feature-item">
+                            <i class="fas fa-users"></i>
+                            <span>Gestão de Colaboradores</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="fas fa-calendar-check"></i>
+                            <span>Controle de Agenda</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="fas fa-file-alt"></i>
+                            <span>Geração de Documentos</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="fas fa-chart-line"></i>
+                            <span>Relatórios Inteligentes</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side - Login Form -->
+            <div class="col-lg-6 d-flex align-items-center justify-content-center auth-form-side">
+                <div class="auth-form-container">
+                    <!-- Mobile Logo -->
+                    <div class="mobile-logo d-lg-none text-center mb-4">
+                        <i class="fas fa-calendar-alt text-gradient"></i>
+                        <h2 class="text-gradient">MAC Calendar</h2>
+                    </div>
+
+                    <div class="auth-form-card">
+                        <div class="text-center mb-4">
+                            <h3 class="auth-title">Bem-vindo de volta</h3>
+                            <p class="auth-subtitle">Entre com suas credenciais para continuar</p>
+                        </div>
+
+                        <form id="loginForm" class="auth-form">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-envelope"></i>
+                                    </span>
+                                    <input 
+                                        type="email" 
+                                        class="form-control" 
+                                        id="email" 
+                                        name="email" 
+                                        placeholder="seu@email.com"
+                                        required
+                                        data-label="Email"
+                                    >
+                                </div>
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Senha</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-lock"></i>
+                                    </span>
+                                    <input 
+                                        type="password" 
+                                        class="form-control" 
+                                        id="password" 
+                                        name="password" 
+                                        placeholder="Sua senha"
+                                        required
+                                        data-label="Senha"
+                                    >
+                                    <button 
+                                        class="btn btn-outline-secondary" 
+                                        type="button" 
+                                        id="togglePassword"
+                                        aria-label="Mostrar/Ocultar senha"
+                                    >
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <div class="mb-3 d-flex justify-content-between align-items-center">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="rememberMe" name="remember">
+                                    <label class="form-check-label" for="rememberMe">
+                                        Lembrar-me
+                                    </label>
+                                </div>
+                                <a href="/auth/forgot-password" class="text-decoration-none">
+                                    Esqueceu a senha?
+                                </a>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
+                                <i class="fas fa-sign-in-alt me-2"></i>
+                                Entrar
+                            </button>
+
+                            <div class="text-center">
+                                <span class="text-muted">Não tem uma conta? </span>
+                                <a href="/auth/register" class="text-decoration-none">
+                                    Criar conta
+                                </a>
+                            </div>
+                        </form>
+
+                        <!-- Demo Credentials -->
+                        <div class="demo-credentials mt-4 p-3 bg-light rounded">
+                            <small class="text-muted d-block mb-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                <strong>Credenciais de demonstração:</strong>
+                            </small>
+                            <small class="text-muted">
+                                Email: <strong>admin@mac.com</strong><br>
+                                Senha: <strong>admin123</strong>
+                            </small>
+                            <button type="button" class="btn btn-outline-info btn-sm mt-2 w-100" onclick="demoLogin()">
+                                <i class="fas fa-flask me-1"></i>Login Demo
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="auth-footer">
+                        <div class="text-center">
+                            <small class="text-muted">
+                                © 2024 MAC Restaurantes. Todos os direitos reservados.
+                            </small>
+                        </div>
+                        <div class="text-center mt-2">
+                            <small>
+                                <a href="/privacy" class="text-muted text-decoration-none me-3">Privacidade</a>
+                                <a href="/terms" class="text-muted text-decoration-none me-3">Termos</a>
+                                <a href="/support" class="text-muted text-decoration-none">Suporte</a>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="auth-loading" class="loading-overlay" style="display: none;">
+    <div class="loading-content">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Carregando...</span>
+        </div>
+        <div class="loading-text mt-3">Entrando...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = document.getElementById('loginForm');
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+
+    // Password toggle functionality
+    togglePassword.addEventListener('click', function() {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        
+        const icon = this.querySelector('i');
+        icon.classList.toggle('fa-eye');
+        icon.classList.toggle('fa-eye-slash');
+    });
+
+    // Form handler
+    const formHandler = new FormHandler(loginForm, {
+        onSubmit: handleLogin,
+        validateOnInput: true
+    });
+
+    // Load saved email if remember me was checked
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    if (savedEmail) {
+        document.getElementById('email').value = savedEmail;
+        document.getElementById('rememberMe').checked = true;
+    }
+
+    async function handleLogin(formData) {
+        const loadingOverlay = document.getElementById('auth-loading');
+        
+        try {
+            loadingOverlay.style.display = 'flex';
+
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: formData.email,
+                    password: formData.password
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.access_token) {
+                // Store auth data
+                localStorage.setItem('mac_auth_token', data.access_token);
+                localStorage.setItem('mac_user_data', JSON.stringify(data.user));
+
+                // Handle remember me
+                if (formData.remember) {
+                    localStorage.setItem('rememberedEmail', formData.email);
+                } else {
+                    localStorage.removeItem('rememberedEmail');
+                }
+
+                // Success - redirect to dashboard
+                Utils.showToast('Login realizado com sucesso!', 'success');
+                
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, 1000);
+
+            } else {
+                throw new Error(data.error || 'Erro no login');
+            }
+
+        } catch (error) {
+            console.error('Login error:', error);
+            
+            let errorMessage = 'Erro ao fazer login. Tente novamente.';
+            
+            if (error.message.includes('Invalid credentials') || error.message.includes('Credenciais inválidas')) {
+                errorMessage = 'Email ou senha incorretos.';
+            } else if (error.message.includes('Account not verified')) {
+                errorMessage = 'Conta não verificada. Verifique seu email.';
+            } else if (error.message.includes('Account locked')) {
+                errorMessage = 'Conta bloqueada. Entre em contato com o suporte.';
+            }
+            
+            Utils.showAlert(errorMessage, 'error');
+            
+            // Clear password field on error
+            passwordInput.value = '';
+            passwordInput.focus();
+            
+        } finally {
+            loadingOverlay.style.display = 'none';
+        }
+    }
+
+    // Add enter key support for form submission
+    loginForm.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            loginForm.requestSubmit();
+        }
+    });
+
+    // Focus first input
+    document.getElementById('email').focus();
+
+    // Add loading animation to inputs
+    const inputs = loginForm.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('input-focused');
+        });
+        
+        input.addEventListener('blur', function() {
+            this.parentElement.classList.remove('input-focused');
+        });
+    });
+});
+
+// Demo login function
+function demoLogin() {
+    document.getElementById('email').value = 'admin@mac.com';
+    document.getElementById('password').value = 'admin123';
+    document.getElementById('loginForm').requestSubmit();
+}
+</script>
+{% endblock %}

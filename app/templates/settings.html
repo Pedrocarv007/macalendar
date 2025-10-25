@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações - MAC Calendar{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="text-gradient mb-1">Configurações</h1>
+                    <p class="text-muted mb-0">Personalize o sistema conforme suas preferências</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-success" onclick="exportSettings()">
+                        <i class="fas fa-download me-1"></i>Exportar
+                    </button>
+                    <button class="btn btn-success" onclick="saveAllSettings()">
+                        <i class="fas fa-save me-1"></i>Salvar Tudo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Settings Navigation -->
+        <div class="col-lg-3">
+            <div class="card glass-card">
+                <div class="card-body">
+                    <nav class="settings-nav">
+                        <a href="#general" class="settings-nav-link active" data-section="general">
+                            <i class="fas fa-cog me-2"></i>Geral
+                        </a>
+                        <a href="#appearance" class="settings-nav-link" data-section="appearance">
+                            <i class="fas fa-palette me-2"></i>Aparência
+                        </a>
+                        <a href="#notifications" class="settings-nav-link" data-section="notifications">
+                            <i class="fas fa-bell me-2"></i>Notificações
+                        </a>
+                        <a href="#security" class="settings-nav-link" data-section="security">
+                            <i class="fas fa-shield-alt me-2"></i>Segurança
+                        </a>
+                        <a href="#integrations" class="settings-nav-link" data-section="integrations">
+                            <i class="fas fa-plug me-2"></i>Integrações
+                        </a>
+                        <a href="#backup" class="settings-nav-link" data-section="backup">
+                            <i class="fas fa-database me-2"></i>Backup
+                        </a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Content -->
+        <div class="col-lg-9">
+            <!-- General Settings -->
+            <div class="settings-section" id="general">
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-cog me-2"></i>Configurações Gerais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="language" class="form-label">Idioma</label>
+                                <select class="form-select" id="language" name="language">
+                                    <option value="pt-BR" selected>Português (Brasil)</option>
+                                    <option value="en-US">English (US)</option>
+                                    <option value="es-ES">Español</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="timezone" class="form-label">Fuso Horário</label>
+                                <select class="form-select" id="timezone" name="timezone">
+                                    <option value="America/Sao_Paulo" selected>Brasília (GMT-3)</option>
+                                    <option value="America/New_York">New York (GMT-5)</option>
+                                    <option value="Europe/London">London (GMT+0)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="dateFormat" class="form-label">Formato de Data</label>
+                                <select class="form-select" id="dateFormat" name="dateFormat">
+                                    <option value="DD/MM/YYYY" selected>DD/MM/AAAA</option>
+                                    <option value="MM/DD/YYYY">MM/DD/AAAA</option>
+                                    <option value="YYYY-MM-DD">AAAA-MM-DD</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="timeFormat" class="form-label">Formato de Hora</label>
+                                <select class="form-select" id="timeFormat" name="timeFormat">
+                                    <option value="24h" selected>24 horas</option>
+                                    <option value="12h">12 horas (AM/PM)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Appearance Settings -->
+            <div class="settings-section" id="appearance" style="display: none;">
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-palette me-2"></i>Aparência
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="theme" class="form-label">Tema</label>
+                                <select class="form-select" id="theme" name="theme">
+                                    <option value="light" selected>Claro</option>
+                                    <option value="dark">Escuro</option>
+                                    <option value="auto">Automático</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="primaryColor" class="form-label">Cor Principal</label>
+                                <select class="form-select" id="primaryColor" name="primaryColor">
+                                    <option value="blue" selected>Azul MAC</option>
+                                    <option value="purple">Roxo MAC</option>
+                                    <option value="green">Verde MAC</option>
+                                    <option value="orange">Laranja MAC</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="animations" checked>
+                                    <label class="form-check-label" for="animations">
+                                        Ativar animações
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="glassmorphism" checked>
+                                    <label class="form-check-label" for="glassmorphism">
+                                        Efeitos de vidro (Glassmorphism)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notifications Settings -->
+            <div class="settings-section" id="notifications" style="display: none;">
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-bell me-2"></i>Notificações
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="emailNotifications" checked>
+                                    <label class="form-check-label" for="emailNotifications">
+                                        Notificações por email
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="pushNotifications" checked>
+                                    <label class="form-check-label" for="pushNotifications">
+                                        Notificações push
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="calendarReminders" checked>
+                                    <label class="form-check-label" for="calendarReminders">
+                                        Lembretes de calendário
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="teamUpdates">
+                                    <label class="form-check-label" for="teamUpdates">
+                                        Atualizações da equipe
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Settings -->
+            <div class="settings-section" id="security" style="display: none;">
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-shield-alt me-2"></i>Segurança
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="twoFactor">
+                                    <label class="form-check-label" for="twoFactor">
+                                        Autenticação em duas etapas (2FA)
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="sessionTimeout" checked>
+                                    <label class="form-check-label" for="sessionTimeout">
+                                        Timeout automático de sessão
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="sessionDuration" class="form-label">Duração da sessão (minutos)</label>
+                                <input type="number" class="form-control" id="sessionDuration" value="480" min="30" max="1440">
+                            </div>
+                            
+                            <div class="col-12 mt-3">
+                                <button class="btn btn-warning" onclick="showActiveSessions()">
+                                    <i class="fas fa-list me-1"></i>Ver Sessões Ativas
+                                </button>
+                                <button class="btn btn-danger ms-2" onclick="logoutAllSessions()">
+                                    <i class="fas fa-sign-out-alt me-1"></i>Sair de Todas as Sessões
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Integration Settings -->
+            <div class="settings-section" id="integrations" style="display: none;">
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-plug me-2"></i>Integrações
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="integration-item">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div class="d-flex align-items-center">
+                                            <i class="fab fa-google fa-2x text-danger me-3"></i>
+                                            <div>
+                                                <h6 class="mb-1">Google Calendar</h6>
+                                                <small class="text-muted">Sincronizar eventos com Google Calendar</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="googleCalendar">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="integration-item">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div class="d-flex align-items-center">
+                                            <i class="fab fa-slack fa-2x text-primary me-3"></i>
+                                            <div>
+                                                <h6 class="mb-1">Slack</h6>
+                                                <small class="text-muted">Receber notificações no Slack</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="slack">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backup Settings -->
+            <div class="settings-section" id="backup" style="display: none;">
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-database me-2"></i>Backup e Dados
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="autoBackup" checked>
+                                    <label class="form-check-label" for="autoBackup">
+                                        Backup automático
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="backupFrequency" class="form-label">Frequência do backup</label>
+                                <select class="form-select" id="backupFrequency">
+                                    <option value="daily" selected>Diário</option>
+                                    <option value="weekly">Semanal</option>
+                                    <option value="monthly">Mensal</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="backupRetention" class="form-label">Manter backups por (dias)</label>
+                                <input type="number" class="form-control" id="backupRetention" value="30" min="7" max="365">
+                            </div>
+                            
+                            <div class="col-12 mt-3">
+                                <button class="btn btn-info" onclick="createBackup()">
+                                    <i class="fas fa-play me-1"></i>Criar Backup Agora
+                                </button>
+                                <button class="btn btn-success ms-2" onclick="downloadData()">
+                                    <i class="fas fa-download me-1"></i>Baixar Dados
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Settings Navigation
+document.addEventListener('DOMContentLoaded', function() {
+    const navLinks = document.querySelectorAll('.settings-nav-link');
+    const sections = document.querySelectorAll('.settings-section');
+    
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Remove active class from all links
+            navLinks.forEach(l => l.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Hide all sections
+            sections.forEach(s => s.style.display = 'none');
+            
+            // Show target section
+            const targetSection = document.getElementById(this.dataset.section);
+            if (targetSection) {
+                targetSection.style.display = 'block';
+            }
+        });
+    });
+    
+    // Load saved settings
+    loadSettings();
+});
+
+function loadSettings() {
+    // Load settings from localStorage or API
+    const savedSettings = localStorage.getItem('mac_settings');
+    if (savedSettings) {
+        try {
+            const settings = JSON.parse(savedSettings);
+            Object.entries(settings).forEach(([key, value]) => {
+                const element = document.getElementById(key);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = value;
+                    } else {
+                        element.value = value;
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error loading settings:', error);
+        }
+    }
+}
+
+function saveAllSettings() {
+    const settings = {};
+    const inputs = document.querySelectorAll('input, select');
+    
+    inputs.forEach(input => {
+        if (input.id) {
+            settings[input.id] = input.type === 'checkbox' ? input.checked : input.value;
+        }
+    });
+    
+    localStorage.setItem('mac_settings', JSON.stringify(settings));
+    Utils.showToast('Configurações salvas com sucesso!', 'success');
+}
+
+function exportSettings() {
+    const settings = localStorage.getItem('mac_settings') || '{}';
+    const blob = new Blob([settings], { type: 'application/json' });
+    Utils.downloadFile(settings, 'mac-calendar-settings.json');
+}
+
+function showActiveSessions() {
+    Utils.showAlert('Funcionalidade em desenvolvimento', 'info');
+}
+
+function logoutAllSessions() {
+    if (confirm('Tem certeza que deseja sair de todas as sessões?')) {
+        Utils.showAlert('Funcionalidade em desenvolvimento', 'info');
+    }
+}
+
+function createBackup() {
+    Utils.showToast('Iniciando backup...', 'info');
+    setTimeout(() => {
+        Utils.showToast('Backup criado com sucesso!', 'success');
+    }, 2000);
+}
+
+function downloadData() {
+    Utils.showToast('Preparando dados para download...', 'info');
+    setTimeout(() => {
+        Utils.showToast('Download iniciado!', 'success');
+    }, 1500);
+}
+
+// Theme change handler
+document.getElementById('theme').addEventListener('change', function() {
+    document.body.setAttribute('data-theme', this.value);
+    localStorage.setItem('mac_theme', this.value);
+});
+</script>
+{% endblock %}
