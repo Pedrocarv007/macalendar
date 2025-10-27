@@ -156,11 +156,24 @@
     <!-- Initialize App -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Verificar autenticação em páginas protegidas
+            const protectedPaths = ['/dashboard', '/calendar', '/employees', '/restaurants', '/documents', '/profile', '/settings'];
+            const currentPath = window.location.pathname;
+            
+            if (protectedPaths.includes(currentPath) && !Utils.isAuthenticated()) {
+                // Redirecionar para login se não estiver autenticado
+                window.location.href = '/auth/login';
+                return;
+            }
+            
             // Load user info if authenticated
             if (Utils.isAuthenticated()) {
                 const user = Utils.getCurrentUser();
                 if (user) {
-                    document.getElementById('userName').textContent = user.name;
+                    const userNameElement = document.getElementById('userName');
+                    if (userNameElement) {
+                        userNameElement.textContent = user.name;
+                    }
                 }
             }
             

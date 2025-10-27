@@ -51,7 +51,7 @@ def login():
         }
         
         access_token = create_access_token(
-            identity=user.id,
+            identity=str(user.id),
             additional_claims=additional_claims
         )
         
@@ -71,7 +71,7 @@ def login():
 def register():
     """Registro de novo usuário (apenas para admins e RH)"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         current_user = User.query.get(current_user_id)
         
         if not current_user:
@@ -146,7 +146,7 @@ def register():
 def get_profile():
     """Obter perfil do usuário atual"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
         
         if not user:
@@ -164,7 +164,7 @@ def get_profile():
 def update_profile():
     """Atualizar perfil do usuário"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
         
         if not user:
@@ -211,7 +211,7 @@ def update_profile():
 def change_password():
     """Alterar senha do usuário"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
         
         if not user:

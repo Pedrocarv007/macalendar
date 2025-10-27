@@ -304,6 +304,118 @@ class Utils {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
     }
+
+    // Format file size
+    static formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Format currency in Brazilian format
+    static formatCurrency(amount) {
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        }).format(amount);
+    }
+
+    // Validate CPF
+    static validateCPF(cpf) {
+        cpf = cpf.replace(/[^\d]/g, '');
+        
+        if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) {
+            return false;
+        }
+        
+        let sum = 0;
+        for (let i = 0; i < 9; i++) {
+            sum += parseInt(cpf.charAt(i)) * (10 - i);
+        }
+        let checkDigit = 11 - (sum % 11);
+        if (checkDigit === 10 || checkDigit === 11) checkDigit = 0;
+        if (checkDigit !== parseInt(cpf.charAt(9))) return false;
+        
+        sum = 0;
+        for (let i = 0; i < 10; i++) {
+            sum += parseInt(cpf.charAt(i)) * (11 - i);
+        }
+        checkDigit = 11 - (sum % 11);
+        if (checkDigit === 10 || checkDigit === 11) checkDigit = 0;
+        
+        return checkDigit === parseInt(cpf.charAt(10));
+    }
+
+    // Validate CNPJ
+    static validateCNPJ(cnpj) {
+        cnpj = cnpj.replace(/[^\d]/g, '');
+        
+        if (cnpj.length !== 14) return false;
+        
+        // Validate first check digit
+        let sum = 0;
+        let weight = 2;
+        for (let i = 11; i >= 0; i--) {
+            sum += parseInt(cnpj.charAt(i)) * weight;
+            weight = weight === 9 ? 2 : weight + 1;
+        }
+        let checkDigit = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+        if (checkDigit !== parseInt(cnpj.charAt(12))) return false;
+        
+        // Validate second check digit
+        sum = 0;
+        weight = 2;
+        for (let i = 12; i >= 0; i--) {
+            sum += parseInt(cnpj.charAt(i)) * weight;
+            weight = weight === 9 ? 2 : weight + 1;
+        }
+        checkDigit = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+        
+        return checkDigit === parseInt(cnpj.charAt(13));
+    }
+
+    // Format phone number
+    static formatPhone(phone) {
+        phone = phone.replace(/[^\d]/g, '');
+        if (phone.length === 11) {
+            return phone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+        } else if (phone.length === 10) {
+            return phone.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+        }
+        return phone;
+    }
+
+    // Format CPF
+    static formatCPF(cpf) {
+        cpf = cpf.replace(/[^\d]/g, '');
+        return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+
+    // Format CNPJ
+    static formatCNPJ(cnpj) {
+        cnpj = cnpj.replace(/[^\d]/g, '');
+        return cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    }
+
+    // Debounce function for search inputs
+    static debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // Generate random ID
+    static generateId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
 }
 
 // API Classes

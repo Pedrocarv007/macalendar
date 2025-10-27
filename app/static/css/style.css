@@ -1,53 +1,61 @@
-/* MAC Calendar - Sistema Moderno de Design */
+/* MAC Calendar - Sistema McDonald's Portugal */
 
 :root {
-    /* Cores Principais MAC */
-    --mac-red: #FF3B30;
-    --mac-orange: #FF9500;
-    --mac-yellow: #FFCC00;
-    --mac-green: #34C759;
-    --mac-mint: #00C7BE;
-    --mac-teal: #30B0C7;
-    --mac-cyan: #32ADE6;
-    --mac-blue: #007AFF;
-    --mac-indigo: #5856D6;
-    --mac-purple: #AF52DE;
-    --mac-pink: #FF2D92;
-    --mac-brown: #A2845E;
+    /* McDonald's Portugal Colors */
+    --mc-red: #DA0018;
+    --mc-red-rgb: 218, 2, 14;
+    --mc-light-red: rgba(218, 2, 14, 0.1);
+    --mc-yellow: #FFCF00;
+    --mc-yellow-rgb: 255, 207, 0;
+    --mc-light-yellow: rgba(255, 207, 0, 0.1);
+    --mc-dark-red: #B8001F;
+    --mc-orange: #FF8C00;
+    --mc-green: #00A651;
+    --mc-dark-green: #008A43;
+    --mc-brown: #8B4513;
+    --mc-gray: #6C6C6C;
+    --mc-light-gray: #F5F5F5;
+    --mc-dark-gray: #2C2C2C;
+    
+    /* Cores Minimalistas Adicionais */
+    --mc-dark-green: #008542;
+    --mc-light-green: #E8F5E8;
+    --mc-light-yellow: #FFF9E6;
+    --mc-green-rgb: 0, 166, 81;
     
     /* RGB Values for Alpha Transparency */
-    --mac-blue-rgb: 0, 122, 255;
-    --mac-purple-rgb: 175, 82, 222;
-    --mac-green-rgb: 52, 199, 89;
+    --mc-red-rgb: 218, 2, 14;
+    --mc-yellow-rgb: 255, 199, 44;
+    --mc-orange-rgb: 255, 130, 0;
     
-    /* Tons de Cinza MAC */
-    --mac-gray: #8E8E93;
-    --mac-gray2: #AEAEB2;
-    --mac-gray3: #C7C7CC;
-    --mac-gray4: #D1D1D6;
-    --mac-gray5: #E5E5EA;
-    --mac-gray6: #F2F2F7;
+    /* Tons de Cinza McDonald's */
+    --mc-gray: #6C6C6C;
+    --mc-gray2: #8C8C8C;
+    --mc-gray3: #A8A8A8;
+    --mc-gray4: #C4C4C4;
+    --mc-gray5: #E0E0E0;
+    --mc-gray6: #F5F5F5;
     
     /* Cores de Sistema */
-    --mac-label: #000000;
-    --mac-secondary-label: #3C3C43;
-    --mac-tertiary-label: #3C3C43;
-    --mac-quaternary-label: #3C3C43;
-    --mac-separator: #C6C6C8;
-    --mac-tertiary-fill: #767680;
+    --mac-label: #2C2C2C;
+    --mac-secondary-label: #6C6C6C;
+    --mac-tertiary-label: #999999;
+    --mac-quaternary-label: #CCCCCC;
+    --mac-separator: #E0E0E0;
+    --mac-tertiary-fill: #C4C4C4;
     
     /* Backgrounds */
     --mac-system-bg: #FFFFFF;
-    --mac-secondary-bg: #F2F2F7;
-    --mac-tertiary-bg: #FFFFFF;
-    --mac-grouped-bg: #F2F2F7;
+    --mac-secondary-bg: #FFF8E1;
+    --mac-tertiary-bg: #FFFBF0;
+    --mac-grouped-bg: #F5F5F5;
     --mac-secondary-grouped-bg: #FFFFFF;
     
     /* Sombras e Elevações */
-    --shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.05);
-    --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.08);
-    --shadow-strong: 0 8px 30px rgba(0, 0, 0, 0.12);
-    --shadow-floating: 0 12px 40px rgba(0, 0, 0, 0.15);
+    --shadow-soft: 0 2px 10px rgba(218, 2, 14, 0.08);
+    --shadow-medium: 0 4px 20px rgba(218, 2, 14, 0.12);
+    --shadow-strong: 0 8px 30px rgba(218, 2, 14, 0.16);
+    --shadow-floating: 0 12px 40px rgba(218, 2, 14, 0.20);
     
     /* Bordas e Raios */
     --radius-xs: 4px;
@@ -56,6 +64,17 @@
     --radius-lg: 16px;
     --radius-xl: 20px;
     --radius-full: 50%;
+    
+    /* Alias para compatibilidade McDonald's */
+    --mac-blue: var(--mc-red);
+    --mac-blue-rgb: var(--mc-red-rgb);
+    --mac-green: var(--mc-green);
+    --mac-orange: var(--mc-orange);
+    --mac-red: var(--mc-red);
+    --mac-yellow: var(--mc-yellow);
+    --mac-gray: var(--mc-gray);
+    --mac-purple: var(--mc-dark-red);
+    --mac-brown: var(--mc-brown);
     
     /* Espaçamentos */
     --space-xs: 4px;
@@ -73,9 +92,9 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-    background: linear-gradient(135deg, var(--mac-gray6) 0%, var(--mac-secondary-bg) 100%);
-    color: var(--mac-label);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    background: linear-gradient(135deg, var(--mc-light-green) 0%, var(--mc-light-yellow) 100%);
+    color: var(--mc-dark-gray);
     line-height: 1.6;
     min-height: 100vh;
     margin: 0;
@@ -84,17 +103,17 @@ body {
 
 /* Navbar Moderno */
 .navbar {
-    background: rgba(255, 255, 255, 0.85) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
     backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--mac-gray5);
-    box-shadow: var(--shadow-soft);
+    border-bottom: 2px solid var(--mc-green);
+    box-shadow: 0 2px 10px rgba(0, 166, 81, 0.1);
     padding: var(--space-md) 0;
 }
 
 .navbar-brand {
     font-weight: 700;
     font-size: 1.75rem;
-    background: linear-gradient(135deg, var(--mac-blue), var(--mac-purple));
+    background: linear-gradient(135deg, var(--mc-green), var(--mc-yellow));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -104,7 +123,7 @@ body {
 }
 
 .navbar-brand i {
-    background: linear-gradient(135deg, var(--mac-blue), var(--mac-purple));
+    background: linear-gradient(135deg, var(--mc-green), var(--mc-yellow));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -114,9 +133,9 @@ body {
 /* Cards Modernos */
 .card {
     background: var(--mac-system-bg);
-    border: none;
+    border: 1px solid rgba(0, 166, 81, 0.2);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-medium);
+    box-shadow: 0 4px 20px rgba(0, 166, 81, 0.1);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     position: relative;
@@ -129,14 +148,15 @@ body {
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, var(--mac-blue), var(--mac-purple), var(--mac-pink));
+    background: linear-gradient(90deg, var(--mc-red), var(--mc-yellow), var(--mc-orange));
     opacity: 0;
     transition: opacity 0.3s ease;
 }
 
 .card:hover {
     transform: translateY(-4px);
-    box-shadow: var(--shadow-floating);
+    box-shadow: 0 8px 30px rgba(0, 166, 81, 0.15);
+    border-color: rgba(255, 207, 0, 0.4);
 }
 
 .card:hover::before {
@@ -186,33 +206,42 @@ body {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--mac-blue), var(--mac-indigo));
+    background: linear-gradient(135deg, var(--mc-green), var(--mc-dark-green));
     color: white;
-    box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+    box-shadow: 0 4px 15px rgba(0, 166, 81, 0.3);
+    border: none;
+    font-weight: 600;
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, #0056b3, #4c44c4);
+    background: linear-gradient(135deg, var(--mc-dark-green), var(--mc-green));
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4);
+    box-shadow: 0 6px 20px rgba(0, 166, 81, 0.4);
+    color: white;
 }
 
 .btn-success {
-    background: linear-gradient(135deg, var(--mac-green), var(--mac-mint));
+    background: linear-gradient(135deg, var(--mc-green), #0A5F0A);
     color: white;
-    box-shadow: 0 4px 15px rgba(52, 199, 89, 0.3);
+    box-shadow: 0 4px 15px rgba(15, 123, 15, 0.3);
+    border: none;
+    font-weight: 600;
 }
 
 .btn-warning {
-    background: linear-gradient(135deg, var(--mac-orange), var(--mac-yellow));
-    color: white;
-    box-shadow: 0 4px 15px rgba(255, 149, 0, 0.3);
+    background: linear-gradient(135deg, var(--mc-yellow), var(--mc-orange));
+    color: var(--mc-dark-gray);
+    box-shadow: 0 4px 15px rgba(255, 199, 44, 0.3);
+    border: none;
+    font-weight: 600;
 }
 
 .btn-danger {
-    background: linear-gradient(135deg, var(--mac-red), var(--mac-pink));
+    background: linear-gradient(135deg, var(--mc-dark-red), #8B0000);
     color: white;
-    box-shadow: 0 4px 15px rgba(255, 59, 48, 0.3);
+    box-shadow: 0 4px 15px rgba(184, 0, 31, 0.3);
+    border: none;
+    font-weight: 600;
 }
 
 .btn-secondary {
@@ -228,7 +257,7 @@ body {
 
 /* Formulários Modernos */
 .form-control {
-    border: 2px solid var(--mac-gray5);
+    border: 2px solid rgba(0, 166, 81, 0.3);
     border-radius: var(--radius-md);
     padding: var(--space-md);
     font-size: 1rem;
@@ -237,8 +266,8 @@ body {
 }
 
 .form-control:focus {
-    border-color: var(--mac-blue);
-    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+    border-color: var(--mc-green);
+    box-shadow: 0 0 0 3px rgba(0, 166, 81, 0.15);
     background: var(--mac-system-bg);
 }
 
@@ -288,7 +317,7 @@ body {
 
 /* Dashboard Stats Cards */
 .stats-card {
-    background: linear-gradient(135deg, var(--mac-blue), var(--mac-purple));
+    background: linear-gradient(135deg, var(--mc-green), var(--mc-dark-green));
     color: white;
     border-radius: var(--radius-xl);
     padding: var(--space-xl);
@@ -303,7 +332,7 @@ body {
     right: -50%;
     width: 100%;
     height: 100%;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(255, 207, 0, 0.2) 0%, transparent 70%);
     transform: rotate(45deg);
 }
 
@@ -325,28 +354,28 @@ body {
 }
 
 .stats-card.green {
-    background: linear-gradient(135deg, var(--mac-green), var(--mac-mint));
+    background: linear-gradient(135deg, var(--mc-green), var(--mc-green));
 }
 
 .stats-card.orange {
-    background: linear-gradient(135deg, var(--mac-orange), var(--mac-yellow));
+    background: linear-gradient(135deg, var(--mc-orange), var(--mc-yellow));
 }
 
 .stats-card.red {
-    background: linear-gradient(135deg, var(--mac-red), var(--mac-pink));
+    background: linear-gradient(135deg, var(--mc-red), var(--mc-dark-red));
 }
 
 /* Employee Cards */
 .employee-card {
     border-radius: var(--radius-lg);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 1px solid var(--mac-gray5);
+    border: 1px solid rgba(255, 207, 0, 0.3);
     background: var(--mac-system-bg);
 }
 
 .employee-card:hover {
     transform: translateY(-6px) scale(1.02);
-    box-shadow: var(--shadow-floating);
+    box-shadow: 0 8px 30px rgba(0, 166, 81, 0.2);
 }
 
 .employee-photo {
@@ -354,13 +383,13 @@ body {
     height: 80px;
     border-radius: var(--radius-full);
     object-fit: cover;
-    border: 3px solid var(--mac-blue);
+    border: 3px solid var(--mc-yellow);
     box-shadow: var(--shadow-medium);
     transition: all 0.3s ease;
 }
 
 .employee-card:hover .employee-photo {
-    border-color: var(--mac-purple);
+    border-color: var(--mc-red);
     transform: scale(1.1);
 }
 
@@ -405,9 +434,10 @@ body {
 .calendar-container {
     background: var(--mac-system-bg);
     border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-medium);
+    box-shadow: 0 4px 20px rgba(218, 2, 14, 0.15);
     padding: var(--space-xl);
     margin-bottom: var(--space-xl);
+    border: 1px solid rgba(255, 199, 44, 0.2);
 }
 
 /* FullCalendar Customization */
@@ -420,17 +450,18 @@ body {
 }
 
 .fc-button-primary {
-    background: var(--mac-blue) !important;
+    background: var(--mc-red) !important;
     border: none !important;
     border-radius: var(--radius-sm) !important;
 }
 
 .fc-button-primary:hover {
-    background: var(--mac-indigo) !important;
+    background: var(--mc-dark-red) !important;
 }
 
 .fc-today-button {
-    background: var(--mac-green) !important;
+    background: var(--mc-yellow) !important;
+    color: black !important;
 }
 
 /* Navigation */
@@ -442,7 +473,7 @@ body {
 }
 
 .nav-pills .nav-link.active {
-    background: linear-gradient(135deg, var(--mac-blue), var(--mac-purple));
+    background: linear-gradient(135deg, var(--mc-green), var(--mc-dark-green));
     color: white;
 }
 
@@ -513,14 +544,15 @@ body {
 
 /* Utilities */
 .text-gradient {
-    background: linear-gradient(135deg, var(--mac-blue), var(--mac-purple));
+    background: linear-gradient(135deg, var(--mc-red), var(--mc-yellow));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    font-weight: 700;
 }
 
 .bg-gradient-primary {
-    background: linear-gradient(135deg, var(--mac-blue), var(--mac-purple));
+    background: linear-gradient(135deg, var(--mc-red), var(--mc-yellow));
 }
 
 .bg-gradient-success {
@@ -537,9 +569,9 @@ body {
 
 /* Glass Effect */
 .glass {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 199, 44, 0.15);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(218, 2, 14, 0.2);
 }
 
 /* Responsive */
@@ -781,14 +813,14 @@ body {
 }
 
 .auth-form .form-control:focus {
-    box-shadow: 0 0 0 3px rgba(var(--mac-blue-rgb), 0.1);
-    border-color: var(--mac-blue);
+    box-shadow: 0 0 0 3px rgba(0, 166, 81, 0.15);
+    border-color: var(--mc-green);
     background: white;
 }
 
 .auth-form .input-group.input-focused .input-group-text {
-    background: rgba(var(--mac-blue-rgb), 0.15);
-    border-color: var(--mac-blue);
+    background: rgba(0, 166, 81, 0.15);
+    border-color: var(--mc-green);
 }
 
 .auth-form .btn-primary {
@@ -974,15 +1006,15 @@ body {
 }
 
 .settings-nav-link:hover {
-    background: rgba(var(--mac-blue-rgb), 0.05);
-    color: var(--mac-blue);
+    background: rgba(218, 2, 14, 0.05);
+    color: var(--mc-red);
     transform: translateX(4px);
 }
 
 .settings-nav-link.active {
-    background: rgba(var(--mac-blue-rgb), 0.1);
-    color: var(--mac-blue);
-    border-color: rgba(var(--mac-blue-rgb), 0.2);
+    background: rgba(218, 2, 14, 0.1);
+    color: var(--mc-red);
+    border-color: rgba(218, 2, 14, 0.2);
     font-weight: 600;
 }
 
@@ -1002,4 +1034,255 @@ body {
 .integration-item:hover {
     background: rgba(var(--mac-blue-rgb), 0.02);
     border-color: rgba(var(--mac-blue-rgb), 0.2);
+}
+
+/* Calendar Styles */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: rgba(255, 199, 44, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.day-header {
+    background: var(--mc-red);
+    color: white;
+    text-align: center;
+    padding: 10px;
+    font-weight: 700;
+    font-size: 0.875rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.calendar-day {
+    background: white;
+    min-height: 100px;
+    padding: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    position: relative;
+}
+
+.calendar-day:hover {
+    background: var(--mc-light-yellow);
+}
+
+.calendar-day.today {
+    background: var(--mc-light-yellow);
+    border: 2px solid var(--mc-red);
+    box-shadow: 0 0 0 1px var(--mc-yellow);
+}
+
+.calendar-day.other-month {
+    color: #999;
+    background: rgba(255, 199, 44, 0.05);
+}
+
+.day-number {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.day-events {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.event {
+    background: var(--mc-red);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+}
+
+.event-meeting { background: var(--mc-red); }
+.event-training { background: var(--mc-green); }
+.event-event { background: var(--mc-orange); }
+.event-urgent { background: var(--mc-dark-red); }
+
+.event-item {
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.8);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.event-item:hover {
+    background: rgba(255, 255, 255, 1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.event-item.small {
+    padding: 8px;
+    font-size: 0.875rem;
+}
+
+.event-time {
+    font-weight: 700;
+    color: var(--mc-red);
+}
+
+.event-title {
+    margin: 4px 0;
+    font-weight: 500;
+}
+
+.event-date {
+    font-size: 0.75rem;
+    color: #666;
+    margin-bottom: 2px;
+}
+
+.category-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.category-item:last-child {
+    border-bottom: none;
+}
+
+.category-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+/* Employee/Restaurant/Document Cards */
+.employee-card,
+.restaurant-card,
+.document-card {
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.employee-card:hover,
+.restaurant-card:hover,
+.document-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.stats-card {
+    border: none;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    transition: all 0.2s;
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.stats-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.stats-number {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--mc-text-primary);
+    line-height: 1;
+}
+
+.stats-label {
+    font-size: 0.875rem;
+    color: var(--mc-text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Document Icons */
+.document-icon {
+    opacity: 0.8;
+}
+
+.document-card .document-icon {
+    transition: all 0.2s;
+}
+
+.document-card:hover .document-icon {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* Week and Day View Placeholders */
+.week-view,
+.day-view {
+    background: rgba(255,255,255,0.8);
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+/* Filter Improvements */
+.input-group-text {
+    background: rgba(255,255,255,0.8);
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+.form-control,
+.form-select {
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+.form-control:focus,
+.form-select:focus {
+    background: rgba(255,255,255,1);
+    border-color: var(--mc-green);
+    box-shadow: 0 0 0 0.2rem rgba(0, 166, 81, 0.25);
+}
+
+/* Responsive Calendar */
+@media (max-width: 768px) {
+    .calendar-day {
+        min-height: 60px;
+        padding: 4px;
+    }
+    
+    .day-number {
+        font-size: 0.875rem;
+    }
+    
+    .event {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+    
+    .stats-number {
+        font-size: 1.5rem;
+    }
+    
+    .stats-icon {
+        width: 45px;
+        height: 45px;
+        font-size: 1.2rem;
+    }
 }

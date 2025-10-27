@@ -23,6 +23,8 @@ def init_security(app):
             public_routes = [
                 '/api/auth/login',
                 '/api/auth/register',
+                '/api',
+                '/api/health',
                 '/',
                 '/health'
             ]

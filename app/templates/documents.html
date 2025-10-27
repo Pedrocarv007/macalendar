@@ -1,0 +1,746 @@
+{% extends "base.html" %}
+
+{% block title %}Documentos - MAC Calendar{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="text-gradient mb-1">Documentos</h1>
+                    <p class="text-muted mb-0">Gerencie arquivos e documentos importantes</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" onclick="bulkDownload()">
+                        <i class="fas fa-download me-1"></i>Download em Lote
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#documentModal">
+                        <i class="fas fa-plus me-1"></i>Novo Documento
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="card stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stats-icon bg-primary">
+                            <i class="fas fa-file"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="stats-number" id="totalDocuments">0</div>
+                            <div class="stats-label">Total</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stats-icon bg-success">
+                            <i class="fas fa-file-pdf"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="stats-number" id="pdfCount">0</div>
+                            <div class="stats-label">PDFs</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stats-icon bg-warning">
+                            <i class="fas fa-file-image"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="stats-number" id="imageCount">0</div>
+                            <div class="stats-label">Imagens</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stats-icon bg-info">
+                            <i class="fas fa-hdd"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="stats-number" id="totalSize">0 MB</div>
+                            <div class="stats-label">Tamanho Total</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters and Search -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card glass-card">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label for="searchDocument" class="form-label">Buscar</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="searchDocument" 
+                                       placeholder="Nome do arquivo ou descrição..." oninput="filterDocuments()">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <label for="filterType" class="form-label">Tipo</label>
+                            <select class="form-select" id="filterType" onchange="filterDocuments()">
+                                <option value="">Todos</option>
+                                <option value="pdf">PDF</option>
+                                <option value="doc">Documento</option>
+                                <option value="image">Imagem</option>
+                                <option value="spreadsheet">Planilha</option>
+                                <option value="other">Outros</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <label for="filterCategory" class="form-label">Categoria</label>
+                            <select class="form-select" id="filterCategory" onchange="filterDocuments()">
+                                <option value="">Todas</option>
+                                <option value="Contratos">Contratos</option>
+                                <option value="Relatórios">Relatórios</option>
+                                <option value="Certificados">Certificados</option>
+                                <option value="Manuais">Manuais</option>
+                                <option value="Fotos">Fotos</option>
+                                <option value="Outros">Outros</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <label for="sortBy" class="form-label">Ordenar por</label>
+                            <select class="form-select" id="sortBy" onchange="sortDocuments()">
+                                <option value="name">Nome</option>
+                                <option value="upload_date">Data de Upload</option>
+                                <option value="size">Tamanho</option>
+                                <option value="type">Tipo</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                                <i class="fas fa-times me-1"></i>Limpar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card glass-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-folder me-2"></i>Arquivos
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary" onclick="toggleView('grid')" id="gridViewBtn">
+                                <i class="fas fa-th"></i>
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="toggleView('list')" id="listViewBtn">
+                                <i class="fas fa-list"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Loading -->
+                    <div id="documentsLoading" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Carregando documentos...</p>
+                    </div>
+                    
+                    <!-- List View -->
+                    <div id="documentsList" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>
+                                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                                        </th>
+                                        <th>Nome</th>
+                                        <th>Tipo</th>
+                                        <th>Categoria</th>
+                                        <th>Tamanho</th>
+                                        <th>Data Upload</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="documentsTableBody">
+                                    <!-- Documents will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Grid View -->
+                    <div id="documentsGrid" style="display: none;">
+                        <div class="row g-4" id="documentsGridContainer">
+                            <!-- Document cards will be loaded here -->
+                        </div>
+                    </div>
+                    
+                    <!-- No Results -->
+                    <div id="noDocuments" class="text-center py-5" style="display: none;">
+                        <i class="fas fa-file-slash text-muted" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-muted">Nenhum documento encontrado</h5>
+                        <p class="text-muted">Faça upload de arquivos ou ajuste os filtros de busca.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Document Modal -->
+<div class="modal fade" id="documentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="documentModalTitle">Novo Documento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="documentForm" enctype="multipart/form-data">
+                    <input type="hidden" id="documentId" name="documentId">
+                    
+                    <div class="mb-3">
+                        <label for="documentFile" class="form-label">Arquivo *</label>
+                        <input type="file" class="form-control" id="documentFile" name="file" 
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif" required>
+                        <div class="form-text">Formatos aceitos: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG, JPEG, GIF</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="documentName" class="form-label">Nome do Documento</label>
+                        <input type="text" class="form-control" id="documentName" name="name" 
+                               placeholder="Deixe em branco para usar o nome do arquivo">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="documentCategory" class="form-label">Categoria *</label>
+                        <select class="form-select" id="documentCategory" name="category" required>
+                            <option value="">Selecione...</option>
+                            <option value="Contratos">Contratos</option>
+                            <option value="Relatórios">Relatórios</option>
+                            <option value="Certificados">Certificados</option>
+                            <option value="Manuais">Manuais</option>
+                            <option value="Fotos">Fotos</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="documentDescription" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="documentDescription" name="description" rows="3" 
+                                  placeholder="Descreva o conteúdo do documento..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="documentTags" class="form-label">Tags</label>
+                        <input type="text" class="form-control" id="documentTags" name="tags" 
+                               placeholder="Digite tags separadas por vírgula">
+                        <div class="form-text">Ex: contrato, 2024, importante</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="documentPublic" name="is_public">
+                            <label class="form-check-label" for="documentPublic">
+                                Documento público (visível para todos os usuários)
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="deleteDocumentBtn" style="display: none;" onclick="deleteDocument()">
+                    <i class="fas fa-trash me-1"></i>Excluir
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveDocument()">
+                    <i class="fas fa-upload me-1"></i>Upload
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="previewModalTitle">Visualizar Documento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="previewContent">
+                    <!-- Preview content will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" id="downloadPreviewBtn">
+                    <i class="fas fa-download me-1"></i>Download
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let documents = [];
+let filteredDocuments = [];
+let currentView = 'list';
+let selectedDocuments = new Set();
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadDocuments();
+});
+
+async function loadDocuments() {
+    const loading = document.getElementById('documentsLoading');
+    loading.style.display = 'block';
+    
+    try {
+        documents = await Utils.makeRequest('/documents');
+        filteredDocuments = [...documents];
+        renderDocuments();
+        updateStats();
+    } catch (error) {
+        console.error('Erro ao carregar documentos:', error);
+        Utils.showAlert('Erro ao carregar documentos', 'error');
+    } finally {
+        loading.style.display = 'none';
+    }
+}
+
+function renderDocuments() {
+    const listContainer = document.getElementById('documentsList');
+    const gridContainer = document.getElementById('documentsGrid');
+    const noResults = document.getElementById('noDocuments');
+    
+    if (filteredDocuments.length === 0) {
+        listContainer.style.display = 'none';
+        gridContainer.style.display = 'none';
+        noResults.style.display = 'block';
+        return;
+    }
+    
+    noResults.style.display = 'none';
+    
+    if (currentView === 'list') {
+        renderListView();
+        listContainer.style.display = 'block';
+        gridContainer.style.display = 'none';
+    } else {
+        renderGridView();
+        listContainer.style.display = 'none';
+        gridContainer.style.display = 'block';
+    }
+}
+
+function renderListView() {
+    const tbody = document.getElementById('documentsTableBody');
+    tbody.innerHTML = filteredDocuments.map(doc => `
+        <tr>
+            <td>
+                <input type="checkbox" class="document-checkbox" value="${doc.id}" 
+                       onchange="toggleDocumentSelection(${doc.id}, this.checked)">
+            </td>
+            <td>
+                <div class="d-flex align-items-center">
+                    <i class="fas ${getFileIcon(doc.type)} me-2 text-${getFileColor(doc.type)}"></i>
+                    <div>
+                        <strong>${doc.name}</strong>
+                        ${doc.description ? `<br><small class="text-muted">${doc.description.substring(0, 50)}${doc.description.length > 50 ? '...' : ''}</small>` : ''}
+                    </div>
+                </div>
+            </td>
+            <td>
+                <span class="badge bg-${getFileColor(doc.type)}">${getFileTypeLabel(doc.type)}</span>
+            </td>
+            <td>${doc.category}</td>
+            <td>${formatFileSize(doc.size)}</td>
+            <td>
+                <small>${formatDate(new Date(doc.upload_date))}</small>
+            </td>
+            <td>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-sm btn-outline-primary" onclick="previewDocument(${doc.id})" title="Visualizar">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" onclick="downloadDocument(${doc.id})" title="Download">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" onclick="editDocument(${doc.id})" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="confirmDeleteDocument(${doc.id})" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderGridView() {
+    const container = document.getElementById('documentsGridContainer');
+    container.innerHTML = filteredDocuments.map(doc => `
+        <div class="col-md-6 col-lg-4 col-xl-3">
+            <div class="card document-card">
+                <div class="card-body text-center">
+                    <div class="document-icon mb-3">
+                        <i class="fas ${getFileIcon(doc.type)} text-${getFileColor(doc.type)}" style="font-size: 3rem;"></i>
+                    </div>
+                    
+                    <h6 class="card-title" title="${doc.name}">${doc.name.substring(0, 20)}${doc.name.length > 20 ? '...' : ''}</h6>
+                    
+                    <div class="mb-2">
+                        <span class="badge bg-${getFileColor(doc.type)}">${getFileTypeLabel(doc.type)}</span>
+                        <span class="badge bg-secondary">${doc.category}</span>
+                    </div>
+                    
+                    <div class="text-muted small mb-3">
+                        <div>${formatFileSize(doc.size)}</div>
+                        <div>${formatDate(new Date(doc.upload_date))}</div>
+                    </div>
+                    
+                    ${doc.description ? `<p class="text-muted small">${doc.description.substring(0, 80)}${doc.description.length > 80 ? '...' : ''}</p>` : ''}
+                </div>
+                <div class="card-footer">
+                    <div class="btn-group w-100" role="group">
+                        <button class="btn btn-sm btn-outline-primary" onclick="previewDocument(${doc.id})" title="Visualizar">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="downloadDocument(${doc.id})" title="Download">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" onclick="editDocument(${doc.id})" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function toggleView(view) {
+    currentView = view;
+    
+    document.getElementById('listViewBtn').className = view === 'list' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
+    document.getElementById('gridViewBtn').className = view === 'grid' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
+    
+    renderDocuments();
+}
+
+function filterDocuments() {
+    const search = document.getElementById('searchDocument').value.toLowerCase();
+    const type = document.getElementById('filterType').value;
+    const category = document.getElementById('filterCategory').value;
+    
+    filteredDocuments = documents.filter(doc => {
+        const matchesSearch = !search || 
+            doc.name.toLowerCase().includes(search) ||
+            (doc.description && doc.description.toLowerCase().includes(search));
+        
+        const matchesType = !type || getFileTypeCategory(doc.type) === type;
+        const matchesCategory = !category || doc.category === category;
+        
+        return matchesSearch && matchesType && matchesCategory;
+    });
+    
+    renderDocuments();
+}
+
+function sortDocuments() {
+    const sortBy = document.getElementById('sortBy').value;
+    
+    filteredDocuments.sort((a, b) => {
+        if (sortBy === 'name') {
+            return a.name.localeCompare(b.name);
+        } else if (sortBy === 'upload_date') {
+            return new Date(b.upload_date) - new Date(a.upload_date);
+        } else if (sortBy === 'size') {
+            return b.size - a.size;
+        } else if (sortBy === 'type') {
+            return a.type.localeCompare(b.type);
+        }
+        return 0;
+    });
+    
+    renderDocuments();
+}
+
+function clearFilters() {
+    document.getElementById('searchDocument').value = '';
+    document.getElementById('filterType').value = '';
+    document.getElementById('filterCategory').value = '';
+    document.getElementById('sortBy').value = 'name';
+    
+    filteredDocuments = [...documents];
+    renderDocuments();
+}
+
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.document-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+        toggleDocumentSelection(parseInt(checkbox.value), checkbox.checked);
+    });
+}
+
+function toggleDocumentSelection(docId, selected) {
+    if (selected) {
+        selectedDocuments.add(docId);
+    } else {
+        selectedDocuments.delete(docId);
+    }
+    
+    // Update select all checkbox
+    const checkboxes = document.querySelectorAll('.document-checkbox');
+    const selectAll = document.getElementById('selectAll');
+    selectAll.checked = checkboxes.length > 0 && selectedDocuments.size === checkboxes.length;
+}
+
+async function saveDocument() {
+    const form = document.getElementById('documentForm');
+    const formData = new FormData(form);
+    
+    // Add is_public boolean
+    formData.set('is_public', document.getElementById('documentPublic').checked);
+    
+    try {
+        const documentId = formData.get('documentId');
+        const url = documentId ? `/documents/${documentId}` : '/documents';
+        const method = documentId ? 'PUT' : 'POST';
+        
+        await Utils.makeRequest(url, {
+            method: method,
+            body: formData,
+            headers: {} // Let browser set content-type for FormData
+        });
+        
+        Utils.showToast(documentId ? 'Documento atualizado!' : 'Documento enviado!', 'success');
+        
+        // Close modal and refresh
+        bootstrap.Modal.getInstance(document.getElementById('documentModal')).hide();
+        form.reset();
+        document.getElementById('deleteDocumentBtn').style.display = 'none';
+        document.getElementById('documentModalTitle').textContent = 'Novo Documento';
+        
+        loadDocuments();
+        
+    } catch (error) {
+        Utils.showAlert('Erro ao salvar documento: ' + error.message, 'error');
+    }
+}
+
+function previewDocument(id) {
+    const doc = documents.find(d => d.id === id);
+    if (!doc) return;
+    
+    document.getElementById('previewModalTitle').textContent = doc.name;
+    document.getElementById('downloadPreviewBtn').onclick = () => downloadDocument(id);
+    
+    const content = document.getElementById('previewContent');
+    
+    if (doc.type.startsWith('image/')) {
+        content.innerHTML = `<img src="/api/documents/${id}/preview" class="img-fluid" alt="${doc.name}">`;
+    } else if (doc.type === 'application/pdf') {
+        content.innerHTML = `<embed src="/api/documents/${id}/preview" type="application/pdf" width="100%" height="500px">`;
+    } else {
+        content.innerHTML = `
+            <div class="text-center py-5">
+                <i class="fas ${getFileIcon(doc.type)} text-${getFileColor(doc.type)}" style="font-size: 5rem;"></i>
+                <h5 class="mt-3">${doc.name}</h5>
+                <p class="text-muted">Visualização não disponível para este tipo de arquivo</p>
+                <button class="btn btn-primary" onclick="downloadDocument(${id})">
+                    <i class="fas fa-download me-1"></i>Download
+                </button>
+            </div>
+        `;
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    modal.show();
+}
+
+function downloadDocument(id) {
+    window.open(`/api/documents/${id}/download`, '_blank');
+}
+
+function editDocument(id) {
+    const doc = documents.find(d => d.id === id);
+    if (!doc) return;
+    
+    document.getElementById('documentModalTitle').textContent = 'Editar Documento';
+    document.getElementById('documentId').value = doc.id;
+    document.getElementById('documentName').value = doc.name;
+    document.getElementById('documentCategory').value = doc.category;
+    document.getElementById('documentDescription').value = doc.description || '';
+    document.getElementById('documentTags').value = doc.tags || '';
+    document.getElementById('documentPublic').checked = doc.is_public;
+    
+    // Hide file input for editing
+    document.getElementById('documentFile').style.display = 'none';
+    document.getElementById('documentFile').required = false;
+    
+    document.getElementById('deleteDocumentBtn').style.display = 'inline-block';
+    
+    const modal = new bootstrap.Modal(document.getElementById('documentModal'));
+    modal.show();
+}
+
+async function deleteDocument() {
+    const documentId = document.getElementById('documentId').value;
+    await deleteDocumentById(documentId);
+    bootstrap.Modal.getInstance(document.getElementById('documentModal')).hide();
+}
+
+function confirmDeleteDocument(id) {
+    const doc = documents.find(d => d.id === id);
+    if (!doc) return;
+    
+    if (confirm(`Tem certeza que deseja excluir o documento ${doc.name}?`)) {
+        deleteDocumentById(id);
+    }
+}
+
+async function deleteDocumentById(id) {
+    try {
+        await Utils.makeRequest(`/documents/${id}`, {
+            method: 'DELETE'
+        });
+        
+        Utils.showToast('Documento excluído!', 'success');
+        loadDocuments();
+        
+    } catch (error) {
+        Utils.showAlert('Erro ao excluir documento: ' + error.message, 'error');
+    }
+}
+
+function bulkDownload() {
+    if (selectedDocuments.size === 0) {
+        Utils.showAlert('Selecione pelo menos um documento', 'warning');
+        return;
+    }
+    
+    const ids = Array.from(selectedDocuments);
+    const url = `/api/documents/bulk-download?ids=${ids.join(',')}`;
+    window.open(url, '_blank');
+}
+
+function updateStats() {
+    document.getElementById('totalDocuments').textContent = documents.length;
+    
+    const pdfCount = documents.filter(d => d.type === 'application/pdf').length;
+    document.getElementById('pdfCount').textContent = pdfCount;
+    
+    const imageCount = documents.filter(d => d.type.startsWith('image/')).length;
+    document.getElementById('imageCount').textContent = imageCount;
+    
+    const totalSize = documents.reduce((total, d) => total + (d.size || 0), 0);
+    document.getElementById('totalSize').textContent = formatFileSize(totalSize);
+}
+
+// Utility functions
+function getFileIcon(mimeType) {
+    if (mimeType.startsWith('image/')) return 'fa-file-image';
+    if (mimeType === 'application/pdf') return 'fa-file-pdf';
+    if (mimeType.includes('word') || mimeType.includes('document')) return 'fa-file-word';
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'fa-file-excel';
+    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'fa-file-powerpoint';
+    return 'fa-file';
+}
+
+function getFileColor(mimeType) {
+    if (mimeType.startsWith('image/')) return 'warning';
+    if (mimeType === 'application/pdf') return 'danger';
+    if (mimeType.includes('word') || mimeType.includes('document')) return 'primary';
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'success';
+    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'info';
+    return 'secondary';
+}
+
+function getFileTypeLabel(mimeType) {
+    if (mimeType.startsWith('image/')) return 'Imagem';
+    if (mimeType === 'application/pdf') return 'PDF';
+    if (mimeType.includes('word') || mimeType.includes('document')) return 'Documento';
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'Planilha';
+    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'Apresentação';
+    return 'Arquivo';
+}
+
+function getFileTypeCategory(mimeType) {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType === 'application/pdf') return 'pdf';
+    if (mimeType.includes('word') || mimeType.includes('document')) return 'doc';
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'spreadsheet';
+    return 'other';
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function formatDate(date) {
+    return date.toLocaleDateString('pt-BR');
+}
+
+// Reset modal when closed
+document.getElementById('documentModal').addEventListener('hidden.bs.modal', function() {
+    const form = document.getElementById('documentForm');
+    form.reset();
+    document.getElementById('deleteDocumentBtn').style.display = 'none';
+    document.getElementById('documentModalTitle').textContent = 'Novo Documento';
+    document.getElementById('documentFile').style.display = 'block';
+    document.getElementById('documentFile').required = true;
+});
+</script>
+{% endblock %}

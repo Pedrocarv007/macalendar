@@ -1,0 +1,641 @@
+{% extends "base.html" %}
+
+{% block title %}Colaboradores - MAC Calendar{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="text-gradient mb-1">Colaboradores</h1>
+                    <p class="text-muted mb-0">Gerencie sua equipe e informações dos funcionários</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" onclick="exportEmployees()">
+                        <i class="fas fa-download me-1"></i>Exportar
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#employeeModal">
+                        <i class="fas fa-plus me-1"></i>Novo Colaborador
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="card stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stats-icon bg-primary">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="stats-number" id="totalEmployees">0</div>
+                            <div class="stats-label">Total</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stats-icon bg-success">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="stats-number" id="activeEmployees">0</div>
+                            <div class="stats-label">Ativos</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stats-icon bg-warning">
+                            <i class="fas fa-birthday-cake"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="stats-number" id="birthdaysThisMonth">0</div>
+                            <div class="stats-label">Aniversários</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stats-icon bg-info">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="stats-number" id="newThisMonth">0</div>
+                            <div class="stats-label">Novos</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters and Search -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card glass-card">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label for="searchEmployee" class="form-label">Buscar</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="searchEmployee" 
+                                       placeholder="Nome, email ou cargo..." oninput="filterEmployees()">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <label for="filterDepartment" class="form-label">Departamento</label>
+                            <select class="form-select" id="filterDepartment" onchange="filterEmployees()">
+                                <option value="">Todos</option>
+                                <option value="Administração">Administração</option>
+                                <option value="Cozinha">Cozinha</option>
+                                <option value="Atendimento">Atendimento</option>
+                                <option value="Limpeza">Limpeza</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <label for="filterStatus" class="form-label">Status</label>
+                            <select class="form-select" id="filterStatus" onchange="filterEmployees()">
+                                <option value="">Todos</option>
+                                <option value="true">Ativo</option>
+                                <option value="false">Inativo</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <label for="sortBy" class="form-label">Ordenar por</label>
+                            <select class="form-select" id="sortBy" onchange="sortEmployees()">
+                                <option value="name">Nome</option>
+                                <option value="department">Departamento</option>
+                                <option value="hire_date">Data de Contratação</option>
+                                <option value="birth_date">Aniversário</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                                <i class="fas fa-times me-1"></i>Limpar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employees List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card glass-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-list me-2"></i>Lista de Colaboradores
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary" onclick="toggleView('grid')" id="gridViewBtn">
+                                <i class="fas fa-th"></i>
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="toggleView('list')" id="listViewBtn">
+                                <i class="fas fa-list"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Loading -->
+                    <div id="employeesLoading" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Carregando colaboradores...</p>
+                    </div>
+                    
+                    <!-- List View -->
+                    <div id="employeesList" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Foto</th>
+                                        <th>Nome</th>
+                                        <th>Cargo</th>
+                                        <th>Departamento</th>
+                                        <th>Telefone</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="employeesTableBody">
+                                    <!-- Employees will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Grid View -->
+                    <div id="employeesGrid" style="display: none;">
+                        <div class="row g-4" id="employeesGridContainer">
+                            <!-- Employee cards will be loaded here -->
+                        </div>
+                    </div>
+                    
+                    <!-- No Results -->
+                    <div id="noEmployees" class="text-center py-5" style="display: none;">
+                        <i class="fas fa-users-slash text-muted" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-muted">Nenhum colaborador encontrado</h5>
+                        <p class="text-muted">Tente ajustar os filtros ou adicione novos colaboradores.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Employee Modal -->
+<div class="modal fade" id="employeeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="employeeModalTitle">Novo Colaborador</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="employeeForm">
+                    <input type="hidden" id="employeeId" name="employeeId">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="employeeName" class="form-label">Nome Completo *</label>
+                            <input type="text" class="form-control" id="employeeName" name="name" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="employeeEmail" class="form-label">Email *</label>
+                            <input type="email" class="form-control" id="employeeEmail" name="email" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="employeePhone" class="form-label">Telefone</label>
+                            <input type="tel" class="form-control" id="employeePhone" name="phone" 
+                                   placeholder="(11) 99999-9999">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="employeeCpf" class="form-label">CPF</label>
+                            <input type="text" class="form-control" id="employeeCpf" name="cpf" 
+                                   placeholder="000.000.000-00">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="employeePosition" class="form-label">Cargo *</label>
+                            <input type="text" class="form-control" id="employeePosition" name="position" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="employeeDepartment" class="form-label">Departamento *</label>
+                            <select class="form-select" id="employeeDepartment" name="department" required>
+                                <option value="">Selecione...</option>
+                                <option value="Administração">Administração</option>
+                                <option value="Cozinha">Cozinha</option>
+                                <option value="Atendimento">Atendimento</option>
+                                <option value="Limpeza">Limpeza</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="employeeSalary" class="form-label">Salário</label>
+                            <input type="number" class="form-control" id="employeeSalary" name="salary" 
+                                   step="0.01" placeholder="0.00">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="employeeHireDate" class="form-label">Data de Contratação *</label>
+                            <input type="date" class="form-control" id="employeeHireDate" name="hire_date" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="employeeBirthDate" class="form-label">Data de Nascimento</label>
+                            <input type="date" class="form-control" id="employeeBirthDate" name="birth_date">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="employeeActive" name="is_active" checked>
+                                <label class="form-check-label" for="employeeActive">
+                                    Colaborador ativo
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label for="employeeAddress" class="form-label">Endereço</label>
+                            <textarea class="form-control" id="employeeAddress" name="address" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label for="employeeNotes" class="form-label">Observações</label>
+                            <textarea class="form-control" id="employeeNotes" name="notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="deleteEmployeeBtn" style="display: none;" onclick="deleteEmployee()">
+                    <i class="fas fa-trash me-1"></i>Excluir
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveEmployee()">
+                    <i class="fas fa-save me-1"></i>Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let employees = [];
+let filteredEmployees = [];
+let currentView = 'list';
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadEmployees();
+    loadStats();
+});
+
+async function loadEmployees() {
+    const loading = document.getElementById('employeesLoading');
+    loading.style.display = 'block';
+    
+    try {
+        employees = await Utils.makeRequest('/employees');
+        filteredEmployees = [...employees];
+        renderEmployees();
+        updateStats();
+    } catch (error) {
+        console.error('Erro ao carregar colaboradores:', error);
+        Utils.showAlert('Erro ao carregar colaboradores', 'error');
+    } finally {
+        loading.style.display = 'none';
+    }
+}
+
+function renderEmployees() {
+    const listContainer = document.getElementById('employeesList');
+    const gridContainer = document.getElementById('employeesGrid');
+    const noResults = document.getElementById('noEmployees');
+    
+    if (filteredEmployees.length === 0) {
+        listContainer.style.display = 'none';
+        gridContainer.style.display = 'none';
+        noResults.style.display = 'block';
+        return;
+    }
+    
+    noResults.style.display = 'none';
+    
+    if (currentView === 'list') {
+        renderListView();
+        listContainer.style.display = 'block';
+        gridContainer.style.display = 'none';
+    } else {
+        renderGridView();
+        listContainer.style.display = 'none';
+        gridContainer.style.display = 'block';
+    }
+}
+
+function renderListView() {
+    const tbody = document.getElementById('employeesTableBody');
+    tbody.innerHTML = filteredEmployees.map(employee => `
+        <tr onclick="editEmployee(${employee.id})" style="cursor: pointer;">
+            <td>
+                <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(employee.name)}&size=40&background=007AFF&color=fff" 
+                     alt="${employee.name}" class="rounded-circle" width="40" height="40">
+            </td>
+            <td>
+                <div>
+                    <strong>${employee.name}</strong>
+                    <br><small class="text-muted">${employee.email}</small>
+                </div>
+            </td>
+            <td>${employee.position}</td>
+            <td>${employee.department}</td>
+            <td>${employee.phone || '-'}</td>
+            <td>
+                <span class="badge bg-${employee.is_active ? 'success' : 'secondary'}">
+                    ${employee.is_active ? 'Ativo' : 'Inativo'}
+                </span>
+            </td>
+            <td>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); editEmployee(${employee.id})">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); confirmDeleteEmployee(${employee.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderGridView() {
+    const container = document.getElementById('employeesGridContainer');
+    container.innerHTML = filteredEmployees.map(employee => `
+        <div class="col-md-6 col-lg-4">
+            <div class="card employee-card" onclick="editEmployee(${employee.id})">
+                <div class="card-body text-center">
+                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(employee.name)}&size=80&background=007AFF&color=fff" 
+                         alt="${employee.name}" class="rounded-circle mb-3" width="80" height="80">
+                    <h6 class="card-title">${employee.name}</h6>
+                    <p class="text-muted small mb-1">${employee.position}</p>
+                    <p class="text-muted small mb-2">${employee.department}</p>
+                    <span class="badge bg-${employee.is_active ? 'success' : 'secondary'} mb-2">
+                        ${employee.is_active ? 'Ativo' : 'Inativo'}
+                    </span>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <i class="fas fa-envelope me-1"></i>${employee.email}<br>
+                            <i class="fas fa-phone me-1"></i>${employee.phone || 'Não informado'}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function toggleView(view) {
+    currentView = view;
+    
+    document.getElementById('listViewBtn').className = view === 'list' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
+    document.getElementById('gridViewBtn').className = view === 'grid' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
+    
+    renderEmployees();
+}
+
+function filterEmployees() {
+    const search = document.getElementById('searchEmployee').value.toLowerCase();
+    const department = document.getElementById('filterDepartment').value;
+    const status = document.getElementById('filterStatus').value;
+    
+    filteredEmployees = employees.filter(employee => {
+        const matchesSearch = !search || 
+            employee.name.toLowerCase().includes(search) ||
+            employee.email.toLowerCase().includes(search) ||
+            employee.position.toLowerCase().includes(search);
+        
+        const matchesDepartment = !department || employee.department === department;
+        const matchesStatus = status === '' || employee.is_active.toString() === status;
+        
+        return matchesSearch && matchesDepartment && matchesStatus;
+    });
+    
+    renderEmployees();
+}
+
+function sortEmployees() {
+    const sortBy = document.getElementById('sortBy').value;
+    
+    filteredEmployees.sort((a, b) => {
+        if (sortBy === 'name') {
+            return a.name.localeCompare(b.name);
+        } else if (sortBy === 'department') {
+            return a.department.localeCompare(b.department);
+        } else if (sortBy === 'hire_date') {
+            return new Date(a.hire_date) - new Date(b.hire_date);
+        } else if (sortBy === 'birth_date') {
+            return new Date(a.birth_date || '1900-01-01') - new Date(b.birth_date || '1900-01-01');
+        }
+        return 0;
+    });
+    
+    renderEmployees();
+}
+
+function clearFilters() {
+    document.getElementById('searchEmployee').value = '';
+    document.getElementById('filterDepartment').value = '';
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('sortBy').value = 'name';
+    
+    filteredEmployees = [...employees];
+    renderEmployees();
+}
+
+function editEmployee(id) {
+    const employee = employees.find(e => e.id === id);
+    if (!employee) return;
+    
+    document.getElementById('employeeModalTitle').textContent = 'Editar Colaborador';
+    document.getElementById('employeeId').value = employee.id;
+    document.getElementById('employeeName').value = employee.name;
+    document.getElementById('employeeEmail').value = employee.email;
+    document.getElementById('employeePhone').value = employee.phone || '';
+    document.getElementById('employeeCpf').value = employee.cpf || '';
+    document.getElementById('employeePosition').value = employee.position;
+    document.getElementById('employeeDepartment').value = employee.department;
+    document.getElementById('employeeSalary').value = employee.salary || '';
+    document.getElementById('employeeHireDate').value = employee.hire_date;
+    document.getElementById('employeeBirthDate').value = employee.birth_date || '';
+    document.getElementById('employeeActive').checked = employee.is_active;
+    document.getElementById('employeeAddress').value = employee.address || '';
+    document.getElementById('employeeNotes').value = employee.notes || '';
+    
+    document.getElementById('deleteEmployeeBtn').style.display = 'inline-block';
+    
+    const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+    modal.show();
+}
+
+async function saveEmployee() {
+    const form = document.getElementById('employeeForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    // Convert checkbox to boolean
+    data.is_active = document.getElementById('employeeActive').checked;
+    
+    try {
+        const employeeId = data.employeeId;
+        const url = employeeId ? `/employees/${employeeId}` : '/employees';
+        const method = employeeId ? 'PUT' : 'POST';
+        
+        await Utils.makeRequest(url, {
+            method: method,
+            body: JSON.stringify(data)
+        });
+        
+        Utils.showToast(employeeId ? 'Colaborador atualizado!' : 'Colaborador criado!', 'success');
+        
+        // Close modal and refresh
+        bootstrap.Modal.getInstance(document.getElementById('employeeModal')).hide();
+        form.reset();
+        document.getElementById('deleteEmployeeBtn').style.display = 'none';
+        document.getElementById('employeeModalTitle').textContent = 'Novo Colaborador';
+        
+        loadEmployees();
+        
+    } catch (error) {
+        Utils.showAlert('Erro ao salvar colaborador: ' + error.message, 'error');
+    }
+}
+
+function confirmDeleteEmployee(id) {
+    const employee = employees.find(e => e.id === id);
+    if (!employee) return;
+    
+    if (confirm(`Tem certeza que deseja excluir o colaborador ${employee.name}?`)) {
+        deleteEmployeeById(id);
+    }
+}
+
+async function deleteEmployee() {
+    const employeeId = document.getElementById('employeeId').value;
+    await deleteEmployeeById(employeeId);
+    bootstrap.Modal.getInstance(document.getElementById('employeeModal')).hide();
+}
+
+async function deleteEmployeeById(id) {
+    try {
+        await Utils.makeRequest(`/employees/${id}`, {
+            method: 'DELETE'
+        });
+        
+        Utils.showToast('Colaborador excluído!', 'success');
+        loadEmployees();
+        
+    } catch (error) {
+        Utils.showAlert('Erro ao excluir colaborador: ' + error.message, 'error');
+    }
+}
+
+function updateStats() {
+    document.getElementById('totalEmployees').textContent = employees.length;
+    document.getElementById('activeEmployees').textContent = employees.filter(e => e.is_active).length;
+    
+    // Count birthdays this month
+    const currentMonth = new Date().getMonth();
+    const birthdays = employees.filter(e => {
+        if (!e.birth_date) return false;
+        return new Date(e.birth_date).getMonth() === currentMonth;
+    }).length;
+    document.getElementById('birthdaysThisMonth').textContent = birthdays;
+    
+    // Count new employees this month
+    const currentYear = new Date().getFullYear();
+    const newEmployees = employees.filter(e => {
+        const hireDate = new Date(e.hire_date);
+        return hireDate.getMonth() === currentMonth && hireDate.getFullYear() === currentYear;
+    }).length;
+    document.getElementById('newThisMonth').textContent = newEmployees;
+}
+
+function exportEmployees() {
+    const data = employees.map(emp => ({
+        Nome: emp.name,
+        Email: emp.email,
+        Telefone: emp.phone,
+        CPF: emp.cpf,
+        Cargo: emp.position,
+        Departamento: emp.department,
+        Salário: emp.salary,
+        'Data Contratação': emp.hire_date,
+        'Data Nascimento': emp.birth_date,
+        Status: emp.is_active ? 'Ativo' : 'Inativo'
+    }));
+    
+    const csv = convertToCSV(data);
+    Utils.downloadFile(csv, 'colaboradores.csv', 'text/csv');
+}
+
+function convertToCSV(data) {
+    if (!data.length) return '';
+    
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+        headers.join(','),
+        ...data.map(row => headers.map(header => `"${row[header] || ''}"`).join(','))
+    ].join('\n');
+    
+    return csvContent;
+}
+
+// Reset modal when closed
+document.getElementById('employeeModal').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('employeeForm').reset();
+    document.getElementById('deleteEmployeeBtn').style.display = 'none';
+    document.getElementById('employeeModalTitle').textContent = 'Novo Colaborador';
+});
+</script>
+{% endblock %}

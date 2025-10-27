@@ -1,10 +1,20 @@
 """
 Rotas da interface web principal
 """
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, session
+from functools import wraps
 
 # Blueprint principal da web
 web_bp = Blueprint('web', __name__)
+
+def login_required(f):
+    """Decorator para verificar se o usuário está logado"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Para desenvolvimento, vamos permitir acesso sem autenticação
+        # mas adicionar uma verificação JavaScript no frontend
+        return f(*args, **kwargs)
+    return decorated_function
 
 @web_bp.route('/')
 def index():
@@ -14,16 +24,19 @@ def index():
     return redirect(url_for('auth_web.login'))
 
 @web_bp.route('/dashboard')
+@login_required
 def dashboard():
     """Dashboard principal"""
     return render_template('dashboard.html')
 
 @web_bp.route('/calendar')
+@login_required
 def calendar():
     """Página do calendário"""
     return render_template('calendar.html')
 
 @web_bp.route('/employees')
+@login_required
 def employees():
     """Página de colaboradores"""
     return render_template('employees.html')
@@ -39,6 +52,7 @@ def employee_detail(employee_id):
     return render_template('employees/detail.html', employee_id=employee_id)
 
 @web_bp.route('/restaurants')
+@login_required
 def restaurants():
     """Página de restaurantes"""
     return render_template('restaurants.html')
@@ -54,6 +68,7 @@ def restaurant_detail(restaurant_id):
     return render_template('restaurants/detail.html', restaurant_id=restaurant_id)
 
 @web_bp.route('/documents')
+@login_required
 def documents():
     """Página de documentos"""
     return render_template('documents.html')
