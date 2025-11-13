@@ -2,24 +2,17 @@
 Rotas da interface web principal
 """
 from flask import Blueprint, render_template, request, redirect, url_for, session
-from functools import wraps
+from app.middleware.security import login_required, web_role_required
 
 # Blueprint principal da web
 web_bp = Blueprint('web', __name__)
-
-def login_required(f):
-    """Decorator para verificar se o usuário está logado"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Para desenvolvimento, vamos permitir acesso sem autenticação
-        # mas adicionar uma verificação JavaScript no frontend
-        return f(*args, **kwargs)
-    return decorated_function
 
 @web_bp.route('/')
 def index():
     """Página inicial - redireciona para login ou dashboard"""
     # Se o usuário estiver autenticado, vai para dashboard
+    if 'user_id' in session:
+        return redirect(url_for('web.dashboard'))
     # Senão, vai para login
     return redirect(url_for('auth_web.login'))
 

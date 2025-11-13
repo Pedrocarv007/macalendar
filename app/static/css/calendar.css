@@ -1,0 +1,192 @@
+/* ========================================
+   MAC Calendar - Estilos do Calendário
+   Grid de calendário, eventos e visualizações
+   ======================================== */
+
+/* ========== Calendar Container ========== */
+.calendar-container {
+    background: var(--mac-system-bg);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 20px rgba(218, 2, 14, 0.15);
+    padding: var(--space-xl);
+    margin-bottom: var(--space-xl);
+    border: 1px solid rgba(255, 199, 44, 0.2);
+}
+
+/* ========== Calendar Grid ========== */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: rgba(255, 199, 44, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.day-header {
+    background: var(--mc-red);
+    color: white;
+    text-align: center;
+    padding: 10px;
+    font-weight: 700;
+    font-size: 0.875rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.calendar-day {
+    background: white;
+    min-height: 100px;
+    padding: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    position: relative;
+}
+
+.calendar-day:hover {
+    background: var(--mc-light-yellow);
+}
+
+.calendar-day.today {
+    background: var(--mc-light-yellow);
+    border: 2px solid var(--mc-red);
+    box-shadow: 0 0 0 1px var(--mc-yellow);
+}
+
+.calendar-day.other-month {
+    color: #999;
+    background: rgba(255, 199, 44, 0.05);
+}
+
+.day-number {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.day-events {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* ========== Events ========== */
+.event {
+    background: var(--mc-red);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+}
+
+.event-meeting { background: var(--mc-red); }
+.event-training { background: var(--mc-green); }
+.event-event { background: var(--mc-orange); }
+.event-urgent { background: var(--mc-dark-red); }
+
+.event-item {
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.8);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.event-item:hover {
+    background: rgba(255, 255, 255, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.event-item.small {
+    padding: 8px;
+    font-size: 0.875rem;
+}
+
+.event-time {
+    font-weight: 700;
+    color: var(--mc-red);
+}
+
+.event-title {
+    margin: 4px 0;
+    font-weight: 500;
+}
+
+.event-date {
+    font-size: 0.75rem;
+    color: #666;
+    margin-bottom: 2px;
+}
+
+/* ========== Categories ========== */
+.category-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.category-item:last-child {
+    border-bottom: none;
+}
+
+.category-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+/* ========== FullCalendar Customization ========== */
+.fc-event {
+    border-radius: var(--radius-sm) !important;
+    border: none !important;
+    padding: 2px 6px !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+}
+
+.fc-button-primary {
+    background: var(--mc-red) !important;
+    border: none !important;
+    border-radius: var(--radius-sm) !important;
+}
+
+.fc-button-primary:hover {
+    background: var(--mc-dark-red) !important;
+}
+
+.fc-today-button {
+    background: var(--mc-yellow) !important;
+    color: black !important;
+}
+
+/* ========== Week and Day Views ========== */
+.week-view,
+.day-view {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+/* ========== Responsive Calendar ========== */
+@media (max-width: 768px) {
+    .calendar-day {
+        min-height: 60px;
+        padding: 4px;
+    }
+    
+    .day-number {
+        font-size: 0.875rem;
+    }
+    
+    .event {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+}

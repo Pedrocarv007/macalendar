@@ -1,0 +1,30 @@
+/* ========================================
+   MAC Calendar - Estilos de Documentos
+   Cards e ícones de documentos
+   ======================================== */
+
+/* ========== Document Cards ========== */
+.document-card {
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.document-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* ========== Document Icons ========== */
+.document-icon {
+    opacity: 0.8;
+}
+
+.document-card .document-icon {
+    transition: all 0.2s;
+}
+
+.document-card:hover .document-icon {
+    opacity: 1;
+    transform: scale(1.1);
+}

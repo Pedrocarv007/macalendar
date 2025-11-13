@@ -39,6 +39,10 @@ class Config:
     SESSION_PERMANENT = False
     SESSION_USE_SIGNER = True
     SESSION_KEY_PREFIX = 'mac-calendar:'
+    PERMANENT_SESSION_LIFETIME = timedelta(days=31)  # Duração quando "lembrar-me" está ativo
+    SESSION_COOKIE_SECURE = False  # True apenas em produção com HTTPS
+    SESSION_COOKIE_HTTPONLY = True  # Previne acesso via JavaScript
+    SESSION_COOKIE_SAMESITE = 'Lax'  # Proteção contra CSRF
     
     # Configurações de email
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')

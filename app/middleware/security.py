@@ -1,7 +1,7 @@
 """
 Middleware de segurança e validações
 """
-from flask import request, jsonify, g
+from flask import request, jsonify, g, session, redirect, url_for, flash
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_jwt
 from functools import wraps
 import re
@@ -105,14 +105,28 @@ def validate_phone(phone):
 
 def validate_password_strength(password):
     """Validar força da senha"""
-    if len(password) < 6:
-        return False, "Senha deve ter pelo menos 6 caracteres"
+    if len(password) < 8:
+        return False, "Senha deve ter pelo menos 8 caracteres"
     
-    if not re.search(r'[a-zA-Z]', password):
-        return False, "Senha deve conter pelo menos uma letra"
+    if not re.search(r'[a-z]', password):
+        return False, "Senha deve conter pelo menos uma letra minúscula"
+    
+    if not re.search(r'[A-Z]', password):
+        return False, "Senha deve conter pelo menos uma letra maiúscula"
     
     if not re.search(r'\d', password):
         return False, "Senha deve conter pelo menos um número"
+    
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]', password):
+        return False, "Senha deve conter pelo menos um caractere especial"
+    
+    # Verificar senhas comuns
+    common_passwords = [
+        'password', '12345678', 'qwerty123', 'admin123', 
+        'password123', 'abc123456', 'senha123', 'Senha123'
+    ]
+    if password.lower() in [p.lower() for p in common_passwords]:
+        return False, "Senha muito comum. Escolha uma senha mais forte"
     
     return True, "Senha válida"
 
@@ -133,3 +147,31 @@ def allowed_file(filename, allowed_extensions):
     """Verificar se extensão do arquivo é permitida"""
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in allowed_extensions
+
+def login_required(f):
+    """Decorator para rotas web que precisam de autenticação"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Por favor, faça login para acessar esta página.', 'warning')
+            return redirect(url_for('auth_web.login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def web_role_required(*allowed_roles):
+    """Decorator para verificar permissões por role em rotas web"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user_id' not in session:
+                flash('Por favor, faça login para acessar esta página.', 'warning')
+                return redirect(url_for('auth_web.login', next=request.url))
+            
+            user_role = session.get('user_role')
+            if user_role not in allowed_roles:
+                flash('Você não tem permissão para acessar esta página.', 'danger')
+                return redirect(url_for('web.dashboard'))
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator

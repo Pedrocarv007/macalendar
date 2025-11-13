@@ -1,0 +1,107 @@
+/* ========================================
+   MAC Calendar - Configurações e Variáveis CSS
+   Sistema McDonald's Portugal
+   ======================================== */
+
+:root {
+    /* ========== Cores McDonald's Portugal ========== */
+    --mc-red: #DA0018;
+    --mc-red-rgb: 218, 2, 14;
+    --mc-light-red: rgba(218, 2, 14, 0.1);
+    --mc-yellow: #FFCF00;
+    --mc-yellow-rgb: 255, 207, 0;
+    --mc-light-yellow: rgba(255, 207, 0, 0.1);
+    --mc-dark-red: #B8001F;
+    --mc-orange: #FF8C00;
+    --mc-green: #00A651;
+    --mc-dark-green: #008A43;
+    --mc-brown: #8B4513;
+    --mc-gray: #6C6C6C;
+    --mc-light-gray: #F5F5F5;
+    --mc-dark-gray: #2C2C2C;
+    
+    /* ========== Cores Minimalistas Adicionais ========== */
+    --mc-dark-green: #008542;
+    --mc-light-green: #E8F5E8;
+    --mc-light-yellow: #FFF9E6;
+    --mc-green-rgb: 0, 166, 81;
+    
+    /* ========== RGB Values for Alpha Transparency ========== */
+    --mc-red-rgb: 218, 2, 14;
+    --mc-yellow-rgb: 255, 199, 44;
+    --mc-orange-rgb: 255, 130, 0;
+    
+    /* ========== Tons de Cinza McDonald's ========== */
+    --mc-gray: #6C6C6C;
+    --mc-gray2: #8C8C8C;
+    --mc-gray3: #A8A8A8;
+    --mc-gray4: #C4C4C4;
+    --mc-gray5: #E0E0E0;
+    --mc-gray6: #F5F5F5;
+    
+    /* ========== Cores de Sistema ========== */
+    --mac-label: #2C2C2C;
+    --mac-secondary-label: #6C6C6C;
+    --mac-tertiary-label: #999999;
+    --mac-quaternary-label: #CCCCCC;
+    --mac-separator: #E0E0E0;
+    --mac-tertiary-fill: #C4C4C4;
+    
+    /* ========== Backgrounds ========== */
+    --mac-system-bg: #FFFFFF;
+    --mac-secondary-bg: #FFF8E1;
+    --mac-tertiary-bg: #FFFBF0;
+    --mac-grouped-bg: #F5F5F5;
+    --mac-secondary-grouped-bg: #FFFFFF;
+    
+    /* ========== Sombras e Elevações ========== */
+    --shadow-soft: 0 2px 10px rgba(218, 2, 14, 0.08);
+    --shadow-medium: 0 4px 20px rgba(218, 2, 14, 0.12);
+    --shadow-strong: 0 8px 30px rgba(218, 2, 14, 0.16);
+    --shadow-floating: 0 12px 40px rgba(218, 2, 14, 0.20);
+    
+    /* ========== Bordas e Raios ========== */
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-full: 50%;
+    
+    /* ========== Alias para compatibilidade McDonald's ========== */
+    --mac-blue: var(--mc-red);
+    --mac-blue-rgb: var(--mc-red-rgb);
+    --mac-green: var(--mc-green);
+    --mac-orange: var(--mc-orange);
+    --mac-red: var(--mc-red);
+    --mac-yellow: var(--mc-yellow);
+    --mac-gray: var(--mc-gray);
+    --mac-purple: var(--mc-dark-red);
+    --mac-brown: var(--mc-brown);
+    
+    /* ========== Espaçamentos ========== */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+    --space-3xl: 64px;
+}
+
+/* ========== Animações Globais ========== */
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    60% { transform: translateY(-5px); }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes authBackgroundAnimation {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(2deg); }
+}

@@ -1,0 +1,54 @@
+/* ========================================
+   MAC Calendar - Estilos de Configurações
+   Navegação e opções de configurações
+   ======================================== */
+
+/* ========== Settings Navigation ========== */
+.settings-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.settings-nav-link {
+    display: flex;
+    align-items: center;
+    padding: 0.875rem 1rem;
+    color: var(--mac-secondary-label);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+}
+
+.settings-nav-link:hover {
+    background: rgba(218, 2, 14, 0.05);
+    color: var(--mc-red);
+    transform: translateX(4px);
+}
+
+.settings-nav-link.active {
+    background: rgba(218, 2, 14, 0.1);
+    color: var(--mc-red);
+    border-color: rgba(218, 2, 14, 0.2);
+    font-weight: 600;
+}
+
+.settings-nav-link i {
+    width: 20px;
+    text-align: center;
+}
+
+/* ========== Integration Items ========== */
+.integration-item {
+    padding: 1rem;
+    border: 1px solid var(--mac-separator);
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.integration-item:hover {
+    background: rgba(var(--mac-blue-rgb), 0.02);
+    border-color: rgba(var(--mac-blue-rgb), 0.2);
+}

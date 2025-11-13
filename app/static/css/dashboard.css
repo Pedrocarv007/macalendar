@@ -1,0 +1,133 @@
+/* ========================================
+   MAC Calendar - Estilos do Dashboard
+   Cards de estatísticas e visualizações
+   ======================================== */
+
+/* ========== Dashboard Stats Cards ========== */
+.stats-card {
+    background: linear-gradient(135deg, var(--mc-green), var(--mc-dark-green));
+    color: white;
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
+    position: relative;
+    overflow: hidden;
+    border: none;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    transition: all 0.2s;
+}
+
+.stats-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(255, 207, 0, 0.2) 0%, transparent 70%);
+    transform: rotate(45deg);
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.stats-card .stats-icon {
+    font-size: 3rem;
+    opacity: 0.8;
+    margin-bottom: var(--space-md);
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.stats-card .stats-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: var(--space-xs);
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--mc-text-primary);
+    line-height: 1;
+}
+
+.stats-card .stats-label {
+    font-size: 1rem;
+    opacity: 0.9;
+    font-size: 0.875rem;
+    color: var(--mc-text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stats-card.green {
+    background: linear-gradient(135deg, var(--mc-green), var(--mc-green));
+}
+
+.stats-card.orange {
+    background: linear-gradient(135deg, var(--mc-orange), var(--mc-yellow));
+}
+
+.stats-card.red {
+    background: linear-gradient(135deg, var(--mc-red), var(--mc-dark-red));
+}
+
+/* ========== Birthday Alerts ========== */
+.birthday-alert {
+    background: linear-gradient(135deg, var(--mac-pink), var(--mac-purple));
+    color: white;
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-lg);
+    position: relative;
+    overflow: hidden;
+}
+
+.birthday-alert::before {
+    content: '🎉';
+    position: absolute;
+    top: var(--space-md);
+    right: var(--space-md);
+    font-size: 2rem;
+    animation: bounce 2s infinite;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 768px) {
+    .stats-card {
+        padding: var(--space-lg);
+    }
+    
+    .stats-card .stats-number {
+        font-size: 2rem;
+    }
+    
+    .stats-card .stats-number {
+        font-size: 1.5rem;
+    }
+    
+    .stats-card .stats-icon {
+        width: 45px;
+        height: 45px;
+        font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .stats-card .stats-icon {
+        font-size: 2rem;
+    }
+    
+    .stats-card .stats-number {
+        font-size: 1.75rem;
+    }
+}

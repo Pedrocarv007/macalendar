@@ -1,0 +1,56 @@
+/* ========================================
+   MAC Calendar - Estilos de Funcionários
+   Cards e visualizações de funcionários
+   ======================================== */
+
+/* ========== Employee Cards ========== */
+.employee-card {
+    border-radius: var(--radius-lg);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(255, 207, 0, 0.3);
+    background: var(--mac-system-bg);
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.employee-card:hover {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 8px 30px rgba(0, 166, 81, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.employee-photo {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-full);
+    object-fit: cover;
+    border: 3px solid var(--mc-yellow);
+    box-shadow: var(--shadow-medium);
+    transition: all 0.3s ease;
+}
+
+.employee-card:hover .employee-photo {
+    border-color: var(--mc-red);
+    transform: scale(1.1);
+}
+
+.employee-name {
+    font-weight: 700;
+    color: var(--mac-label);
+    margin-bottom: var(--space-xs);
+}
+
+.employee-position {
+    color: var(--mac-secondary-label);
+    font-size: 0.9rem;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 768px) {
+    .employee-photo {
+        width: 60px;
+        height: 60px;
+    }
+}

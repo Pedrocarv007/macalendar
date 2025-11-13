@@ -421,17 +421,28 @@ class Utils {
 // API Classes
 class AuthAPI {
     static async login(credentials) {
-        const response = await Utils.makeRequest('/auth/login', {
+        // Use API endpoint instead of web endpoint
+        const response = await fetch(API_BASE_URL + '/auth/login', {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(credentials)
         });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Erro ao fazer login');
+        }
+
+        const data = await response.json();
         
-        if (response.access_token) {
-            localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, response.access_token);
-            localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user));
+        if (data.access_token) {
+            localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.access_token);
+            localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(data.user));
         }
         
-        return response;
+        return data;
     }
 
     static async register(userData) {

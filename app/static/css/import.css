@@ -1,0 +1,20 @@
+/* ========================================
+   MAC Calendar - Import Principal
+   Importa todos os arquivos CSS do sistema
+   ======================================== */
+
+/* Configurações e Variáveis */
+@import url('config.css');
+
+/* Estilos Base */
+@import url('base.css');
+
+/* Estilos por Página */
+@import url('auth.css');
+@import url('dashboard.css');
+@import url('calendar.css');
+@import url('employees.css');
+@import url('restaurants.css');
+@import url('documents.css');
+@import url('profile.css');
+@import url('settings.css');
