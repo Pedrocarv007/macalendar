@@ -321,7 +321,6 @@ let currentView = 'list';
 
 document.addEventListener('DOMContentLoaded', function() {
     loadRestaurants();
-    loadStats();
 });
 
 async function loadRestaurants() {
@@ -329,7 +328,10 @@ async function loadRestaurants() {
     loading.style.display = 'block';
     
     try {
-        restaurants = await Utils.makeRequest('/restaurants');
+        const response = await fetch('/api/restaurants');
+        if (!response.ok) throw new Error('Erro ao carregar');
+        const data = await response.json();
+        restaurants = data.restaurants || [];
         filteredRestaurants = [...restaurants];
         renderRestaurants();
         updateStats();
@@ -547,13 +549,16 @@ async function saveRestaurant() {
     
     try {
         const restaurantId = data.restaurantId;
-        const url = restaurantId ? `/restaurants/${restaurantId}` : '/restaurants';
+        const url = restaurantId ? `/api/restaurants/${restaurantId}` : '/api/restaurants';
         const method = restaurantId ? 'PUT' : 'POST';
         
-        await Utils.makeRequest(url, {
+        const response = await fetch(url, {
             method: method,
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
         });
+        
+        if (!response.ok) throw new Error('Erro ao salvar');
         
         Utils.showToast(restaurantId ? 'Restaurante atualizado!' : 'Restaurante criado!', 'success');
         
@@ -587,9 +592,11 @@ async function deleteRestaurant() {
 
 async function deleteRestaurantById(id) {
     try {
-        await Utils.makeRequest(`/restaurants/${id}`, {
+        const response = await fetch(`/api/restaurants/${id}`, {
             method: 'DELETE'
         });
+        
+        if (!response.ok) throw new Error('Erro ao excluir');
         
         Utils.showToast('Restaurante excluído!', 'success');
         loadRestaurants();

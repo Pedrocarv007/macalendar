@@ -165,25 +165,14 @@
                         </div>
                     </div>
                     
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <label for="category" class="form-label">Categoria</label>
-                            <select class="form-select" id="category" name="category">
-                                <option value="meeting">Reunião</option>
-                                <option value="training">Treinamento</option>
-                                <option value="event">Evento</option>
-                                <option value="urgent">Urgente</option>
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label for="priority" class="form-label">Prioridade</label>
-                            <select class="form-select" id="priority" name="priority">
-                                <option value="low">Baixa</option>
-                                <option value="medium" selected>Média</option>
-                                <option value="high">Alta</option>
-                            </select>
-                        </div>
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Categoria</label>
+                        <select class="form-select" id="category" name="category">
+                            <option value="meeting">Reunião</option>
+                            <option value="training">Treinamento</option>
+                            <option value="event">Evento</option>
+                            <option value="urgent">Urgente</option>
+                        </select>
                     </div>
                     
                     <div class="mb-3">
@@ -224,6 +213,7 @@
 let currentDate = new Date();
 let events = [];
 let viewType = 'month';
+const userRestaurantId = {{ current_user.restaurant_id if current_user and current_user.restaurant_id else 'null' }};
 
 document.addEventListener('DOMContentLoaded', function() {
     initCalendar();
@@ -235,6 +225,18 @@ document.addEventListener('DOMContentLoaded', function() {
             viewType = this.id.replace('View', '');
             renderCalendar();
         });
+    });
+    
+    // Reset modal quando abrir para novo evento
+    const eventModal = document.getElementById('eventModal');
+    eventModal.addEventListener('show.bs.modal', function(event) {
+        // Se não foi acionado pelo botão de editar, resetar o formulário
+        if (!event.relatedTarget || event.relatedTarget.getAttribute('data-bs-toggle') === 'modal') {
+            document.getElementById('eventForm').reset();
+            document.getElementById('eventId').value = '';
+            document.getElementById('deleteEventBtn').style.display = 'none';
+            document.getElementById('eventModalTitle').textContent = 'Novo Evento';
+        }
     });
 });
 
@@ -304,7 +306,7 @@ function createDayCell(date, currentMonth) {
     cell.addEventListener('click', () => selectDate(date));
     
     // Add events for this day
-    const dayEvents = events.filter(event => isSameDay(new Date(event.date), date));
+    const dayEvents = events.filter(event => isSameDay(new Date(event.start), date));
     const eventsContainer = cell.querySelector('.day-events');
     
     dayEvents.forEach(event => {
@@ -382,9 +384,11 @@ function editEvent(event) {
     document.getElementById('eventId').value = event.id;
     document.getElementById('title').value = event.title;
     document.getElementById('description').value = event.description || '';
-    document.getElementById('startDate').value = formatDateTimeLocal(new Date(event.date));
-    document.getElementById('category').value = event.category || 'meeting';
-    document.getElementById('priority').value = event.priority || 'medium';
+    document.getElementById('startDate').value = formatDateTimeLocal(new Date(event.start));
+    document.getElementById('endDate').value = formatDateTimeLocal(new Date(event.end));
+    document.getElementById('category').value = event.extendedProps?.event_type || 'meeting';
+    document.getElementById('allDay').checked = event.allDay || false;
+    document.getElementById('recurring').checked = event.extendedProps?.is_recurring || false;
     
     document.getElementById('deleteEventBtn').style.display = 'inline-block';
     
@@ -399,22 +403,25 @@ async function saveEvent() {
     
     try {
         const eventId = data.eventId;
-        const url = eventId ? `/calendar/events/${eventId}` : '/calendar/events';
+        const url = eventId ? `/api/calendar/events/${eventId}` : '/api/calendar/events';
         const method = eventId ? 'PUT' : 'POST';
         
-        const response = await Utils.makeRequest(url, {
+        const response = await fetch(url, {
             method: method,
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 title: data.title,
                 description: data.description,
-                date: data.startDate,
+                start_date: data.startDate,
                 end_date: data.endDate,
-                category: data.category,
-                priority: data.priority,
-                all_day: data.allDay === 'on',
-                recurring: data.recurring === 'on'
+                event_type: data.category || 'meeting',
+                restaurant_id: userRestaurantId,
+                is_all_day: data.allDay === 'on',
+                is_recurring: data.recurring === 'on'
             })
         });
+        
+        if (!response.ok) throw new Error('Erro ao salvar');
         
         Utils.showToast(eventId ? 'Evento atualizado!' : 'Evento criado!', 'success');
         
@@ -439,9 +446,11 @@ async function deleteEvent() {
     }
     
     try {
-        await Utils.makeRequest(`/calendar/events/${eventId}`, {
+        const response = await fetch(`/api/calendar/events/${eventId}`, {
             method: 'DELETE'
         });
+        
+        if (!response.ok) throw new Error('Erro ao excluir');
         
         Utils.showToast('Evento excluído!', 'success');
         
@@ -456,7 +465,10 @@ async function deleteEvent() {
 
 async function loadEvents() {
     try {
-        events = await Utils.makeRequest('/calendar/events');
+        const response = await fetch('/api/calendar/events');
+        if (!response.ok) throw new Error('Erro ao carregar');
+        const data = await response.json();
+        events = data.events || [];
         renderCalendar();
         renderTodayEvents();
         renderUpcomingEvents();
@@ -469,7 +481,7 @@ async function loadEvents() {
 function renderTodayEvents() {
     const container = document.getElementById('todayEvents');
     const today = new Date();
-    const todayEvents = events.filter(event => isSameDay(new Date(event.date), today));
+    const todayEvents = events.filter(event => isSameDay(new Date(event.start), today));
     
     if (todayEvents.length === 0) {
         container.innerHTML = `
@@ -483,9 +495,9 @@ function renderTodayEvents() {
     
     container.innerHTML = todayEvents.map(event => `
         <div class="event-item" onclick="editEvent(${JSON.stringify(event).replace(/"/g, '&quot;')})">
-            <div class="event-time">${formatTime(new Date(event.date))}</div>
+            <div class="event-time">${formatTime(new Date(event.start))}</div>
             <div class="event-title">${event.title}</div>
-            <div class="event-category badge bg-${getCategoryColor(event.category)}">${event.category || 'Geral'}</div>
+            <div class="event-category badge bg-${getCategoryColor(event.extendedProps?.event_type)}">${event.extendedProps?.event_type || 'Geral'}</div>
         </div>
     `).join('');
 }
@@ -494,8 +506,8 @@ function renderUpcomingEvents() {
     const container = document.getElementById('upcomingEvents');
     const today = new Date();
     const upcomingEvents = events
-        .filter(event => new Date(event.date) > today)
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .filter(event => new Date(event.start) > today)
+        .sort((a, b) => new Date(a.start) - new Date(b.start))
         .slice(0, 5);
     
     if (upcomingEvents.length === 0) {
@@ -505,7 +517,7 @@ function renderUpcomingEvents() {
     
     container.innerHTML = upcomingEvents.map(event => `
         <div class="event-item small" onclick="editEvent(${JSON.stringify(event).replace(/"/g, '&quot;')})">
-            <div class="event-date">${formatDate(new Date(event.date))}</div>
+            <div class="event-date">${formatDate(new Date(event.start))}</div>
             <div class="event-title">${event.title}</div>
         </div>
     `).join('');

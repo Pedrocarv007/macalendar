@@ -53,7 +53,7 @@ class Config:
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@mac.com')
     
     # Configurações de timezone
-    TIMEZONE = 'America/Sao_Paulo'
+    TIMEZONE = 'Europe/Lisbon'
     
     # Configurações de logging
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')

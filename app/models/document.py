@@ -15,14 +15,27 @@ class Document(db.Model):
     template_name = db.Column(db.String(100), nullable=False)
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
     restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurants.id'), nullable=False)
-    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
     content = db.Column(db.Text, nullable=True)  # Conteúdo específico (como texto do elogio)
     filename = db.Column(db.String(255), nullable=True)
     file_path = db.Column(db.String(500), nullable=True)
     file_size = db.Column(db.Integer, nullable=True)  # Tamanho em bytes
-    status = db.Column(db.String(20), default='draft', nullable=False)  # draft, generated, sent
+    description = db.Column(db.Text, nullable=True)
+    tags = db.Column(db.String(500), nullable=True)
+    is_public = db.Column(db.Boolean, default=False, nullable=False)
+    status = db.Column(db.String(20), default='draft', nullable=False)  # draft, generated, sent, uploaded
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relacionamentos
+    employee_ref = db.relationship('Employee', foreign_keys=[employee_id], overlaps='documents')
+    creator = db.relationship('Employee', foreign_keys=[created_by], overlaps='created_documents')
+    # Restaurant relationship is auto-created by Restaurant.documents backref
+    
+    @property
+    def employee(self):
+        """Get employee for backward compatibility"""
+        return self.employee_ref
     
     @property
     def file_exists(self):
@@ -56,6 +69,9 @@ class Document(db.Model):
             'file_path': self.file_path,
             'file_size': self.file_size,
             'file_size_mb': self.file_size_mb,
+            'description': self.description,
+            'tags': self.tags,
+            'is_public': self.is_public,
             'status': self.status,
             'file_exists': self.file_exists,
             'created_at': self.created_at.isoformat(),

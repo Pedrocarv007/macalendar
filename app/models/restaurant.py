@@ -13,15 +13,14 @@ class Restaurant(db.Model):
     address = db.Column(db.String(200), nullable=True)
     phone = db.Column(db.String(20), nullable=True)
     email = db.Column(db.String(120), nullable=True)
-    manager_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relacionamentos
-    manager = db.relationship('User', foreign_keys=[manager_id], post_update=True)
-    users = db.relationship('User', foreign_keys='User.restaurant_id', lazy=True)
-    employees = db.relationship('Employee', backref='restaurant', lazy=True, cascade='all, delete-orphan')
+    manager = db.relationship('Employee', foreign_keys=[manager_id], backref='managed_restaurants', uselist=False)
+    employees = db.relationship('Employee', foreign_keys='Employee.restaurant_id', backref='restaurant', lazy=True)
     events = db.relationship('CalendarEvent', backref='restaurant', lazy=True, cascade='all, delete-orphan')
     documents = db.relationship('Document', backref='restaurant', lazy=True, cascade='all, delete-orphan')
     
@@ -35,6 +34,7 @@ class Restaurant(db.Model):
             'email': self.email,
             'manager_id': self.manager_id,
             'manager_name': self.manager.name if self.manager else None,
+            'manager_email': self.manager.email if self.manager else None,
             'is_active': self.is_active,
             'employees_count': len([e for e in self.employees if e.is_active]),
             'created_at': self.created_at.isoformat(),

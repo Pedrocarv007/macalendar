@@ -15,7 +15,7 @@ class CalendarEvent(db.Model):
     end_date = db.Column(db.DateTime, nullable=False, index=True)
     event_type = db.Column(db.String(50), nullable=False, index=True)  # meeting, birthday, holiday, shift, training, etc.
     restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurants.id'), nullable=True)
-    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=True)
     is_all_day = db.Column(db.Boolean, default=False, nullable=False)
     color = db.Column(db.String(7), default='#3788d8', nullable=False)  # Cor do evento em hex
@@ -24,6 +24,11 @@ class CalendarEvent(db.Model):
     recurrence_rule = db.Column(db.String(500), nullable=True)  # Regra de recorrência (RRULE)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relacionamentos
+    employee_ref = db.relationship('Employee', foreign_keys=[employee_id], overlaps='events')
+    creator = db.relationship('Employee', foreign_keys=[created_by], overlaps='created_events')
+    # Restaurant relationship is auto-created by Restaurant.calendar_events backref
     
     @property
     def duration_minutes(self):
@@ -40,6 +45,11 @@ class CalendarEvent(db.Model):
         """Verifica se o evento é hoje"""
         today = datetime.utcnow().date()
         return self.start_date.date() <= today <= self.end_date.date()
+    
+    @property
+    def employee(self):
+        """Get employee for backward compatibility"""
+        return self.employee_ref
     
     def to_dict(self):
         """Converter para dicionário (formato FullCalendar)"""

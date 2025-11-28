@@ -2,7 +2,7 @@
 Inicialização da aplicação Flask para MAC Calendar
 Sistema de gestão para restaurantes com calendário e gestão de colaboradores
 """
-from flask import Flask
+from flask import Flask, session
 from flask_cors import CORS
 
 def create_app(config_name=None):
@@ -22,6 +22,20 @@ def create_app(config_name=None):
     # Configurar CORS
     CORS(app, origins=['http://localhost:3000', 'http://127.0.0.1:3000'])
     
+    @app.context_processor
+    def inject_current_user():
+        if 'user_id' in session:
+            return {
+                'current_user': {
+                    'id': session.get('user_id'),
+                    'name': session.get('user_name'),
+                    'email': session.get('user_email'),
+                    'role': session.get('user_role'),
+                    'restaurant_id': session.get('restaurant_id')
+                }
+            }
+        return {'current_user': None}
+
     # Registrar middlewares
     from app.middleware.security import init_security
     init_security(app)

@@ -244,40 +244,35 @@
                         <div class="col-md-6">
                             <label for="employeePhone" class="form-label">Telefone</label>
                             <input type="tel" class="form-control" id="employeePhone" name="phone" 
-                                   placeholder="(11) 99999-9999">
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label for="employeeCpf" class="form-label">CPF</label>
-                            <input type="text" class="form-control" id="employeeCpf" name="cpf" 
-                                   placeholder="000.000.000-00">
+                                   placeholder="+351 912 345 678">
                         </div>
                         
                         <div class="col-md-6">
                             <label for="employeePosition" class="form-label">Cargo *</label>
-                            <input type="text" class="form-control" id="employeePosition" name="position" required>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label for="employeeDepartment" class="form-label">Departamento *</label>
-                            <select class="form-select" id="employeeDepartment" name="department" required>
+                            <select class="form-select" id="employeePosition" name="position" required onchange="syncPositionToDepartment()">
                                 <option value="">Selecione...</option>
-                                <option value="Administração">Administração</option>
-                                <option value="Cozinha">Cozinha</option>
-                                <option value="Atendimento">Atendimento</option>
-                                <option value="Limpeza">Limpeza</option>
+                                <option value="RH">Recursos Humanos</option>
+                                <option value="Gerente_loja">Gerente de Loja</option>
+                                <option value="Sub_gerente">Sub Gerente</option>
+                                <option value="Gerente_turno">Gerente de Turno</option>
+                                <option value="colaborador">Colaborador</option>
+                                <option value="treinador">Treinador</option>
+                                <option value="RP">Relações Públicas</option>
                             </select>
                         </div>
                         
                         <div class="col-md-6">
-                            <label for="employeeSalary" class="form-label">Salário</label>
-                            <input type="number" class="form-control" id="employeeSalary" name="salary" 
-                                   step="0.01" placeholder="0.00">
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label for="employeeHireDate" class="form-label">Data de Contratação *</label>
-                            <input type="date" class="form-control" id="employeeHireDate" name="hire_date" required>
+                            <label for="employeeDepartment" class="form-label">Departamento *</label>
+                            <select class="form-select" id="employeeDepartment" name="department" required onchange="syncDepartmentToPosition()">
+                                <option value="">Selecione...</option>
+                                <option value="RH">Recursos Humanos</option>
+                                <option value="Gerente_loja">Gerente de Loja</option>
+                                <option value="Sub_gerente">Sub Gerente</option>
+                                <option value="Gerente_turno">Gerente de Turno</option>
+                                <option value="colaborador">Colaborador</option>
+                                <option value="treinador">Treinador</option>
+                                <option value="RP">Relações Públicas</option>
+                            </select>
                         </div>
                         
                         <div class="col-md-6">
@@ -286,7 +281,8 @@
                         </div>
                         
                         <div class="col-md-6">
-                            <div class="form-check form-switch mt-4">
+                            <label class="form-label">Status</label>
+                            <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="employeeActive" name="is_active" checked>
                                 <label class="form-check-label" for="employeeActive">
                                     Colaborador ativo
@@ -328,7 +324,6 @@ let currentView = 'list';
 
 document.addEventListener('DOMContentLoaded', function() {
     loadEmployees();
-    loadStats();
 });
 
 async function loadEmployees() {
@@ -336,14 +331,17 @@ async function loadEmployees() {
     loading.style.display = 'block';
     
     try {
-        employees = await Utils.makeRequest('/employees');
+        const response = await fetch('/api/employees');
+        if (!response.ok) throw new Error('Erro ao carregar');
+        const data = await response.json();
+        employees = data.employees || [];
         filteredEmployees = [...employees];
         renderEmployees();
         updateStats();
     } catch (error) {
         console.error('Erro ao carregar colaboradores:', error);
         Utils.showAlert('Erro ao carregar colaboradores', 'error');
-    } finally {
+    } finally{
         loading.style.display = 'none';
     }
 }
@@ -502,11 +500,8 @@ function editEmployee(id) {
     document.getElementById('employeeName').value = employee.name;
     document.getElementById('employeeEmail').value = employee.email;
     document.getElementById('employeePhone').value = employee.phone || '';
-    document.getElementById('employeeCpf').value = employee.cpf || '';
     document.getElementById('employeePosition').value = employee.position;
     document.getElementById('employeeDepartment').value = employee.department;
-    document.getElementById('employeeSalary').value = employee.salary || '';
-    document.getElementById('employeeHireDate').value = employee.hire_date;
     document.getElementById('employeeBirthDate').value = employee.birth_date || '';
     document.getElementById('employeeActive').checked = employee.is_active;
     document.getElementById('employeeAddress').value = employee.address || '';
@@ -519,35 +514,59 @@ function editEmployee(id) {
 }
 
 async function saveEmployee() {
-    const form = document.getElementById('employeeForm');
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData);
-    
-    // Convert checkbox to boolean
-    data.is_active = document.getElementById('employeeActive').checked;
-    
     try {
-        const employeeId = data.employeeId;
-        const url = employeeId ? `/employees/${employeeId}` : '/employees';
-        const method = employeeId ? 'PUT' : 'POST';
+        const form = document.getElementById('employeeForm');
+        const formData = new FormData(form);
+        const employeeId = document.getElementById('employeeId').value;
         
-        await Utils.makeRequest(url, {
-            method: method,
-            body: JSON.stringify(data)
-        });
+        // Preparar dados
+        const data = {
+            name: formData.get('name'),
+            email: formData.get('email'),
+            phone: formData.get('phone'),
+            position: formData.get('position'),
+            department: formData.get('department'),
+            birth_date: formData.get('birth_date'),
+            address: formData.get('address'),
+            notes: formData.get('notes'),
+            is_active: document.getElementById('employeeActive').checked,
+            restaurant_id: {{ current_user.restaurant_id if current_user and current_user.restaurant_id else 'null' }}
+        };
         
-        Utils.showToast(employeeId ? 'Colaborador atualizado!' : 'Colaborador criado!', 'success');
+        let response;
+        if (employeeId) {
+            // Atualizar colaborador existente
+            response = await fetch(`/api/employees/${employeeId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+        } else {
+            // Criar novo colaborador
+            response = await fetch('/api/employees', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+        }
         
-        // Close modal and refresh
-        bootstrap.Modal.getInstance(document.getElementById('employeeModal')).hide();
-        form.reset();
-        document.getElementById('deleteEmployeeBtn').style.display = 'none';
-        document.getElementById('employeeModalTitle').textContent = 'Novo Colaborador';
+        const result = await response.json();
         
-        loadEmployees();
+        if (response.ok) {
+            showAlert(result.message || 'Colaborador salvo com sucesso!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('employeeModal')).hide();
+            loadEmployees();
+        } else {
+            showAlert(result.error || 'Erro ao salvar colaborador', 'danger');
+        }
         
     } catch (error) {
-        Utils.showAlert('Erro ao salvar colaborador: ' + error.message, 'error');
+        console.error('Erro ao salvar colaborador:', error);
+        showAlert('Erro ao salvar colaborador', 'danger');
     }
 }
 
@@ -568,9 +587,11 @@ async function deleteEmployee() {
 
 async function deleteEmployeeById(id) {
     try {
-        await Utils.makeRequest(`/employees/${id}`, {
+        const response = await fetch(`/api/employees/${id}`, {
             method: 'DELETE'
         });
+        
+        if (!response.ok) throw new Error('Erro ao excluir');
         
         Utils.showToast('Colaborador excluído!', 'success');
         loadEmployees();
@@ -581,24 +602,10 @@ async function deleteEmployeeById(id) {
 }
 
 function updateStats() {
-    document.getElementById('totalEmployees').textContent = employees.length;
-    document.getElementById('activeEmployees').textContent = employees.filter(e => e.is_active).length;
-    
-    // Count birthdays this month
-    const currentMonth = new Date().getMonth();
-    const birthdays = employees.filter(e => {
-        if (!e.birth_date) return false;
-        return new Date(e.birth_date).getMonth() === currentMonth;
-    }).length;
-    document.getElementById('birthdaysThisMonth').textContent = birthdays;
-    
-    // Count new employees this month
-    const currentYear = new Date().getFullYear();
-    const newEmployees = employees.filter(e => {
-        const hireDate = new Date(e.hire_date);
-        return hireDate.getMonth() === currentMonth && hireDate.getFullYear() === currentYear;
-    }).length;
-    document.getElementById('newThisMonth').textContent = newEmployees;
+    // Usa a função global do StatsManager
+    if (window.MacCalendar && window.MacCalendar.StatsManager) {
+        window.MacCalendar.StatsManager.updateEmployeeStats(employees);
+    }
 }
 
 function exportEmployees() {
@@ -606,11 +613,8 @@ function exportEmployees() {
         Nome: emp.name,
         Email: emp.email,
         Telefone: emp.phone,
-        CPF: emp.cpf,
         Cargo: emp.position,
         Departamento: emp.department,
-        Salário: emp.salary,
-        'Data Contratação': emp.hire_date,
         'Data Nascimento': emp.birth_date,
         Status: emp.is_active ? 'Ativo' : 'Inativo'
     }));
@@ -637,5 +641,21 @@ document.getElementById('employeeModal').addEventListener('hidden.bs.modal', fun
     document.getElementById('deleteEmployeeBtn').style.display = 'none';
     document.getElementById('employeeModalTitle').textContent = 'Novo Colaborador';
 });
+
+function syncPositionToDepartment() {
+    const position = document.getElementById('employeePosition');
+    const department = document.getElementById('employeeDepartment');
+    
+    // Sincroniza o valor do cargo para o departamento
+    department.value = position.value;
+}
+
+function syncDepartmentToPosition() {
+    const position = document.getElementById('employeePosition');
+    const department = document.getElementById('employeeDepartment');
+    
+    // Sincroniza o valor do departamento para o cargo
+    position.value = department.value;
+}
 </script>
 {% endblock %}

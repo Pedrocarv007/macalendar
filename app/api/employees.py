@@ -1,8 +1,8 @@
 """
 Rotas da API de Colaboradores
 """
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask import Blueprint, request, jsonify, g
+from flask_jwt_extended import get_jwt_identity, get_jwt
 from werkzeug.utils import secure_filename
 from datetime import datetime, date
 import os
@@ -10,20 +10,20 @@ from PIL import Image
 from app.extensions.database import db
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
-from app.middleware.security import role_required, allowed_file
+from app.middleware.security import api_login_required, role_required, allowed_file
 
 employees_bp = Blueprint('employees', __name__)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 @employees_bp.route('', methods=['GET'])
-@jwt_required()
+@api_login_required
 def get_employees():
     """Obter lista de colaboradores"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        # Usar dados de g (setados pelo decorator)
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         # Parâmetros de filtro
         restaurant_id = request.args.get('restaurant_id', type=int)
@@ -57,23 +57,27 @@ def get_employees():
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @employees_bp.route('', methods=['POST'])
-@jwt_required()
+@api_login_required
 @role_required('admin', 'rh', 'manager')
 def create_employee():
     """Criar novo colaborador"""
     try:
-        current_user_id = get_jwt_identity()
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        current_user_id = g.get('current_user_id')
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         data = request.get_json()
         
+                # DEBUG: Ver o que está sendo enviado
+        print("DEBUG - Dados recebidos:", data)
+        print("DEBUG - User role:", user_role)
+        print("DEBUG - User restaurant_id:", user_restaurant_id)
+
         if not data:
             return jsonify({'error': 'Dados não fornecidos'}), 400
         
         # Validar dados obrigatórios
-        required_fields = ['name', 'position', 'birth_date', 'hire_date', 'restaurant_id']
+        required_fields = ['name', 'position', 'birth_date', 'restaurant_id']
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'error': f'{field} é obrigatório'}), 400
@@ -88,19 +92,26 @@ def create_employee():
         if not restaurant:
             return jsonify({'error': 'Restaurante não encontrado'}), 404
         
-        # Converter datas
         try:
             birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
-            hire_date = datetime.strptime(data['hire_date'], '%Y-%m-%d').date()
         except ValueError:
             return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
         
+        # Converter hire_date apenas se fornecido (agora é opcional)
+        hire_date = None
+        if data.get('hire_date'):
+            try:
+                hire_date = datetime.strptime(data['hire_date'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'error': 'Formato de data de contratação inválido. Use YYYY-MM-DD'}), 400
         # Criar colaborador
         employee = Employee(
             name=data['name'],
             email=data.get('email'),
             phone=data.get('phone'),
             position=data['position'],
+            department=data.get('department'),
+            address=data.get('address'),
             birth_date=birth_date,
             hire_date=hire_date,
             restaurant_id=restaurant_id,
@@ -117,17 +128,19 @@ def create_employee():
         
     except Exception as e:
         db.session.rollback()
+        print(f"DEBUG - Erro ao criar colaborador: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @employees_bp.route('/<int:employee_id>', methods=['PUT'])
-@jwt_required()
+@api_login_required
 @role_required('admin', 'rh', 'manager')
 def update_employee(employee_id):
     """Atualizar colaborador"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         employee = Employee.query.get(employee_id)
         if not employee:
@@ -152,6 +165,10 @@ def update_employee(employee_id):
             employee.phone = data['phone']
         if 'position' in data:
             employee.position = data['position']
+        if 'department' in data:
+            employee.department = data['department']
+        if 'address' in data:
+            employee.address = data['address']
         if 'birth_date' in data:
             employee.birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
         if 'hire_date' in data:
@@ -174,14 +191,13 @@ def update_employee(employee_id):
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @employees_bp.route('/<int:employee_id>/photo', methods=['POST'])
-@jwt_required()
+@api_login_required
 @role_required('admin', 'rh', 'manager')
 def upload_photo(employee_id):
     """Upload de foto do colaborador"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         employee = Employee.query.get(employee_id)
         if not employee:
@@ -245,14 +261,13 @@ def upload_photo(employee_id):
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @employees_bp.route('/<int:employee_id>', methods=['DELETE'])
-@jwt_required()
+@api_login_required
 @role_required('admin', 'rh')
 def delete_employee(employee_id):
     """Deletar colaborador (soft delete)"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         employee = Employee.query.get(employee_id)
         if not employee:
@@ -274,13 +289,12 @@ def delete_employee(employee_id):
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @employees_bp.route('/birthdays-this-month', methods=['GET'])
-@jwt_required()
+@api_login_required
 def get_birthdays_this_month():
     """Obter aniversariantes do mês"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         current_month = datetime.now().month
         

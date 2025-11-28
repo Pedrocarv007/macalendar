@@ -376,13 +376,14 @@ class Utils {
         return checkDigit === parseInt(cnpj.charAt(13));
     }
 
-    // Format phone number
+    // Format phone number (Portugal)
     static formatPhone(phone) {
         phone = phone.replace(/[^\d]/g, '');
-        if (phone.length === 11) {
-            return phone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-        } else if (phone.length === 10) {
-            return phone.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+        // Formato português: +351 912 345 678 (9 dígitos)
+        if (phone.startsWith('351') && phone.length === 12) {
+            return phone.replace(/(\d{3})(\d{3})(\d{3})(\d{3})/, '+$1 $2 $3 $4');
+        } else if (phone.length === 9) {
+            return phone.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
         }
         return phone;
     }
@@ -653,12 +654,13 @@ class FormHandler {
             }
         }
 
-        // Phone validation
+        // Phone validation (Portugal)
         if (field.type === 'tel' && value) {
-            const phoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
-            if (!phoneRegex.test(value)) {
+            // Aceita: +351 912 345 678, 912 345 678, 912345678
+            const phoneRegex = /^(\+351\s?)?\d{3}\s?\d{3}\s?\d{3}$/;
+            if (!phoneRegex.test(value.replace(/\s+/g, ' '))) {
                 isValid = false;
-                message = 'Telefone inválido (ex: (11) 99999-9999)';
+                message = 'Telefone inválido (ex: +351 912 345 678 ou 912 345 678)';
             }
         }
 
@@ -848,6 +850,144 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Statistics Manager - Global para todas as páginas
+class StatsManager {
+    static updateEmployeeStats(employees) {
+        document.getElementById('totalEmployees').textContent = employees.length;
+        document.getElementById('activeEmployees').textContent = employees.filter(e => e.is_active).length;
+        
+        // Aniversários este mês
+        const currentMonth = new Date().getMonth();
+        const birthdays = employees.filter(e => {
+            if (!e.birth_date) return false;
+            return new Date(e.birth_date).getMonth() === currentMonth;
+        }).length;
+        document.getElementById('birthdaysThisMonth').textContent = birthdays;
+        
+        // Novos colaboradores este mês
+        const currentYear = new Date().getFullYear();
+        const newEmployees = employees.filter(e => {
+            if (!e.created_at) return false;
+            const createdDate = new Date(e.created_at);
+            return createdDate.getMonth() === currentMonth && createdDate.getFullYear() === currentYear;
+        }).length;
+        document.getElementById('newThisMonth').textContent = newEmployees;
+    }
+
+    static updateRestaurantStats(restaurants) {
+        const totalElement = document.getElementById('totalRestaurants');
+        const activeElement = document.getElementById('activeRestaurants');
+        const topPerformingElement = document.getElementById('topPerforming');
+        const newThisMonthElement = document.getElementById('newRestaurantsThisMonth');
+        
+        if (totalElement) totalElement.textContent = restaurants.length;
+        if (activeElement) activeElement.textContent = restaurants.filter(r => r.is_active).length;
+        
+        // Novos restaurantes este mês
+        if (newThisMonthElement) {
+            const currentMonth = new Date().getMonth();
+            const currentYear = new Date().getFullYear();
+            const newRestaurants = restaurants.filter(r => {
+                if (!r.created_at) return false;
+                const createdDate = new Date(r.created_at);
+                return createdDate.getMonth() === currentMonth && createdDate.getFullYear() === currentYear;
+            }).length;
+            newThisMonthElement.textContent = newRestaurants;
+        }
+        
+        // Top performing (pode ser baseado em número de funcionários ou outros critérios)
+        if (topPerformingElement) {
+            topPerformingElement.textContent = restaurants.filter(r => r.is_active).length;
+        }
+    }
+
+    static updateDocumentStats(documents) {
+        const totalElement = document.getElementById('totalDocuments');
+        const pendingElement = document.getElementById('pendingDocuments');
+        const thisMonthElement = document.getElementById('documentsThisMonth');
+        const expiringElement = document.getElementById('expiringDocuments');
+        
+        if (totalElement) totalElement.textContent = documents.length;
+        
+        // Documentos pendentes (exemplo: baseado em status)
+        if (pendingElement) {
+            const pending = documents.filter(d => d.status === 'pending' || !d.status).length;
+            pendingElement.textContent = pending;
+        }
+        
+        // Documentos criados este mês
+        if (thisMonthElement) {
+            const currentMonth = new Date().getMonth();
+            const currentYear = new Date().getFullYear();
+            const thisMonth = documents.filter(d => {
+                if (!d.created_at) return false;
+                const createdDate = new Date(d.created_at);
+                return createdDate.getMonth() === currentMonth && createdDate.getFullYear() === currentYear;
+            }).length;
+            thisMonthElement.textContent = thisMonth;
+        }
+        
+        // Documentos expirando (se houver campo de expiração)
+        if (expiringElement) {
+            const now = new Date();
+            const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+            const expiring = documents.filter(d => {
+                if (!d.expiry_date) return false;
+                const expiryDate = new Date(d.expiry_date);
+                return expiryDate >= now && expiryDate <= thirtyDaysFromNow;
+            }).length;
+            expiringElement.textContent = expiring;
+        }
+    }
+
+    static updateCalendarStats(events) {
+        const totalElement = document.getElementById('totalEvents');
+        const todayElement = document.getElementById('todayEvents');
+        const thisWeekElement = document.getElementById('thisWeekEvents');
+        const thisMonthElement = document.getElementById('thisMonthEvents');
+        
+        if (totalElement) totalElement.textContent = events.length;
+        
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        // Eventos hoje
+        if (todayElement) {
+            const todayEvents = events.filter(e => {
+                const eventDate = new Date(e.start || e.start_date);
+                const eventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                return eventDay.getTime() === today.getTime();
+            }).length;
+            todayElement.textContent = todayEvents;
+        }
+        
+        // Eventos esta semana
+        if (thisWeekElement) {
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay());
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 7);
+            
+            const thisWeek = events.filter(e => {
+                const eventDate = new Date(e.start || e.start_date);
+                return eventDate >= weekStart && eventDate < weekEnd;
+            }).length;
+            thisWeekElement.textContent = thisWeek;
+        }
+        
+        // Eventos este mês
+        if (thisMonthElement) {
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            const thisMonth = events.filter(e => {
+                const eventDate = new Date(e.start || e.start_date);
+                return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear;
+            }).length;
+            thisMonthElement.textContent = thisMonth;
+        }
+    }
+}
+
 // Export for global access
 window.MacCalendar = {
     Utils,
@@ -858,5 +998,6 @@ window.MacCalendar = {
     DocumentAPI,
     FormHandler,
     LoadingManager,
+    StatsManager,
     appState
 };

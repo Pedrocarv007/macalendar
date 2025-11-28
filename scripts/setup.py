@@ -10,9 +10,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app import create_app
 from app.extensions.database import db
-from app.models.user import User
-from app.models.restaurant import Restaurant
 from app.models.employee import Employee
+from app.models.restaurant import Restaurant
 from datetime import date
 
 def create_sample_data():
@@ -24,26 +23,31 @@ def create_sample_data():
     restaurant = Restaurant(
         name="MAC Central",
         address="Rua Principal, 123 - Centro",
-        phone="(11) 99999-9999",
+        phone="(351) 937308306",
         email="central@mac.com"
     )
     db.session.add(restaurant)
     db.session.commit()
     
     # Criar usuário admin
-    admin = User(
+    admin = Employee(
         email="admin@mac.com",
         name="Administrador",
+        position="Administrator",
+        birth_date=date(1990, 1, 1),
         role="admin",
-        department="TI"
+        department="TI",
+        restaurant_id=restaurant.id
     )
     admin.set_password("admin123")
     db.session.add(admin)
     
     # Criar usuário RH
-    rh_user = User(
+    rh_user = Employee(
         email="rh@mac.com",
-        name="Recursos Humanos", 
+        name="Recursos Humanos",
+        position="Human Resources",
+        birth_date=date(1991, 2, 1),
         role="rh",
         department="RH",
         restaurant_id=restaurant.id
@@ -52,9 +56,11 @@ def create_sample_data():
     db.session.add(rh_user)
     
     # Criar gerente
-    manager = User(
+    manager = Employee(
         email="gerente@mac.com",
         name="João Gerente",
+        position="Manager",
+        birth_date=date(1985, 3, 1),
         role="manager",
         department="Gerência",
         restaurant_id=restaurant.id
@@ -128,8 +134,8 @@ def setup_database():
         db.create_all()
         
         # Verificar se já existem dados
-        if User.query.first():
-            print("⚠️  Banco de dados já contém dados.")
+        if Employee.query.first():
+            print("\u26a0️  Banco de dados já contém dados.")
             response = input("Deseja recriar os dados de exemplo? (s/N): ")
             if response.lower() != 's':
                 print("❌ Operação cancelada.")

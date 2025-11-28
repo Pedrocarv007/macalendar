@@ -25,6 +25,163 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-light sticky-top">
+        <div class="container-fluid">
+            <!-- Brand/Logo -->
+            <a class="navbar-brand" href="{{ url_for('web.index') }}">
+                <i class="fas fa-calendar-alt"></i>
+                MC Calendar
+            </a>
+            
+            <!-- Mobile Toggle Button -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <!-- Navigation Links -->
+            <div class="collapse navbar-collapse" id="navbarNav">
+                {% if current_user %}
+                <!-- Links para usuários autenticados -->
+                <ul class="navbar-nav me-auto">
+                    <!-- Dashboard - Todos -->
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'web.dashboard' }}" href="{{ url_for('web.dashboard') }}">
+                            <i class="fas fa-home me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    
+                    <!-- Calendário - Todos -->
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'web.calendar' }}" href="{{ url_for('web.calendar') }}">
+                            <i class="fas fa-calendar me-1"></i>Calendário
+                        </a>
+                    </li>
+                    
+                    <!-- Colaboradores - Todos -->
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if 'employees' in request.endpoint }}" href="{{ url_for('web.employees') }}">
+                            <i class="fas fa-users me-1"></i>Colaboradores
+                        </a>
+                    </li>
+                    
+                    <!-- Restaurantes - Admin, RH, Marketing -->
+                    {% if session.user_role in ['admin', 'rh', 'marketing'] %}
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if 'restaurants' in request.endpoint }}" href="{{ url_for('web.restaurants') }}">
+                            <i class="fas fa-store me-1"></i>Restaurantes
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    <!-- Documentos - Todos -->
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if 'documents' in request.endpoint }}" href="{{ url_for('web.documents') }}">
+                            <i class="fas fa-file-alt me-1"></i>Documentos
+                        </a>
+                    </li>
+                    
+                    <!-- Menu Administrativo - Apenas Admin -->
+                    {% if session.user_role == 'admin' %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-cog me-1"></i>Administração
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="adminDropdown">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('web.settings') }}">
+                                    <i class="fas fa-sliders-h me-2"></i>Configurações do Sistema
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="/api">
+                                    <i class="fas fa-code me-2"></i>API Documentation
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="/api/health">
+                                    <i class="fas fa-heartbeat me-2"></i>Status do Sistema
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                </ul>
+                
+                <!-- User Menu (Right Side) -->
+                <ul class="navbar-nav ms-auto">
+                    <!-- Notificações -->
+                    <li  class="nav-item dropdown">
+                        <a class="nav-link position-relative" href="#" id="notificationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="margin-right: 20px;">
+                            <i class="fas fa-bell"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
+                                0
+                            </span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown" style="min-width: 300px;">
+                            <li class="dropdown-header">Notificações</li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item text-muted text-center py-3" href="#">
+                                    <i class="fas fa-inbox me-2"></i>Nenhuma notificação
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <!-- User Profile Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <div class="d-flex align-items-center">
+                                <div class="user-avatar me-2">
+                                    <i class="fas fa-user-circle fa-lg"></i>
+                                </div>
+                                <div class="d-none d-lg-block">
+                                    <div class="user-name" style="font-weight: 600; font-size: 0.9rem;">
+                                        {{ session.user_name }}
+                                    </div>
+                                    <div class="user-role" style="font-size: 0.75rem; color: var(--mac-secondary-label);">
+                                        {{ session.user_role|title }}
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li class="dropdown-header">
+                                <strong>{{ session.user_name }}</strong>
+                                <br>
+                                <small class="text-muted">{{ session.user_email }}</small>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('web.profile') }}">
+                                    <i class="fas fa-user me-2"></i>Meu Perfil
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('web.settings') }}">
+                                    <i class="fas fa-cog me-2"></i>Configurações
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="#">
+                                    <i class="fas fa-question-circle me-2"></i>Ajuda
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item text-danger" href="{{ url_for('auth_web.logout') }}">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Sair
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
     <!-- Alert Container -->
     <div id="alert-container" class="container mt-3"></div>
 
@@ -51,12 +208,32 @@
         {% block content %}{% endblock %}
     </main>
 
+   
 
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     
+    <!-- Page Specific Scripts -->
+    {% block scripts %}{% endblock %}
 
+    <!-- Initialize Tooltips and Other Bootstrap Components -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
 
+            // Initialize popovers
+            var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+            var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+                return new bootstrap.Popover(popoverTriggerEl);
+            });
+        });
+    </script>
 </body>
 </html>

@@ -263,6 +263,9 @@
                         </select>
                     </div>
                     
+                    <!-- Hidden field for employee_id (auto-populated from logged-in user) -->
+                    <input type="hidden" id="documentEmployee" name="employee_id">
+                    
                     <div class="mb-3">
                         <label for="documentDescription" class="form-label">Descrição</label>
                         <textarea class="form-control" id="documentDescription" name="description" rows="3" 
@@ -273,7 +276,7 @@
                         <label for="documentTags" class="form-label">Tags</label>
                         <input type="text" class="form-control" id="documentTags" name="tags" 
                                placeholder="Digite tags separadas por vírgula">
-                        <div class="form-text">Ex: contrato, 2024, importante</div>
+                        <div class="form-text">Ex: contrato, 2025, importante</div>
                     </div>
                     
                     <div class="mb-3">
@@ -332,14 +335,34 @@ let selectedDocuments = new Set();
 
 document.addEventListener('DOMContentLoaded', function() {
     loadDocuments();
+    loadCurrentEmployeeId();
 });
+
+async function loadCurrentEmployeeId() {
+    try {
+        // Obter o employee_id do usuário logado via sessão
+        const currentUserResponse = await fetch('/api/auth/current-user');
+        const currentUser = await currentUserResponse.json();
+        const currentEmployeeId = currentUser.employee_id;
+        
+        // Preencher o campo hidden com o employee_id do user logado
+        document.getElementById('documentEmployee').value = currentEmployeeId;
+        
+        console.log('DEBUG - Employee ID carregado:', currentEmployeeId);
+    } catch (error) {
+        console.error('Erro ao carregar dados do colaborador:', error);
+    }
+}
 
 async function loadDocuments() {
     const loading = document.getElementById('documentsLoading');
     loading.style.display = 'block';
     
     try {
-        documents = await Utils.makeRequest('/documents');
+        const response = await fetch('/api/documents');
+        if (!response.ok) throw new Error('Erro ao carregar');
+        const data = await response.json();
+        documents = data.documents || [];
         filteredDocuments = [...documents];
         renderDocuments();
         updateStats();
@@ -386,20 +409,20 @@ function renderListView() {
             </td>
             <td>
                 <div class="d-flex align-items-center">
-                    <i class="fas ${getFileIcon(doc.type)} me-2 text-${getFileColor(doc.type)}"></i>
+                    <i class="fas ${getFileIcon(doc.filename)} me-2 text-${getFileColor(doc.filename)}"></i>
                     <div>
-                        <strong>${doc.name}</strong>
+                        <strong>${doc.title}</strong>
                         ${doc.description ? `<br><small class="text-muted">${doc.description.substring(0, 50)}${doc.description.length > 50 ? '...' : ''}</small>` : ''}
                     </div>
                 </div>
             </td>
             <td>
-                <span class="badge bg-${getFileColor(doc.type)}">${getFileTypeLabel(doc.type)}</span>
+                <span class="badge bg-${getFileColor(doc.filename)}">${getFileTypeLabel(doc.filename)}</span>
             </td>
-            <td>${doc.category}</td>
-            <td>${formatFileSize(doc.size)}</td>
+            <td>${doc.document_type}</td>
+            <td>${formatFileSize(doc.file_size)}</td>
             <td>
-                <small>${formatDate(new Date(doc.upload_date))}</small>
+                <small>${formatDate(new Date(doc.created_at))}</small>
             </td>
             <td>
                 <div class="btn-group" role="group">
@@ -428,19 +451,19 @@ function renderGridView() {
             <div class="card document-card">
                 <div class="card-body text-center">
                     <div class="document-icon mb-3">
-                        <i class="fas ${getFileIcon(doc.type)} text-${getFileColor(doc.type)}" style="font-size: 3rem;"></i>
+                        <i class="fas ${getFileIcon(doc.filename)} text-${getFileColor(doc.filename)}" style="font-size: 3rem;"></i>
                     </div>
                     
-                    <h6 class="card-title" title="${doc.name}">${doc.name.substring(0, 20)}${doc.name.length > 20 ? '...' : ''}</h6>
+                    <h6 class="card-title" title="${doc.title}">${doc.title.substring(0, 20)}${doc.title.length > 20 ? '...' : ''}</h6>
                     
                     <div class="mb-2">
-                        <span class="badge bg-${getFileColor(doc.type)}">${getFileTypeLabel(doc.type)}</span>
-                        <span class="badge bg-secondary">${doc.category}</span>
+                        <span class="badge bg-${getFileColor(doc.filename)}">${getFileTypeLabel(doc.filename)}</span>
+                        <span class="badge bg-secondary">${doc.document_type}</span>
                     </div>
                     
                     <div class="text-muted small mb-3">
-                        <div>${formatFileSize(doc.size)}</div>
-                        <div>${formatDate(new Date(doc.upload_date))}</div>
+                        <div>${formatFileSize(doc.file_size)}</div>
+                        <div>${formatDate(new Date(doc.created_at))}</div>
                     </div>
                     
                     ${doc.description ? `<p class="text-muted small">${doc.description.substring(0, 80)}${doc.description.length > 80 ? '...' : ''}</p>` : ''}
@@ -479,11 +502,11 @@ function filterDocuments() {
     
     filteredDocuments = documents.filter(doc => {
         const matchesSearch = !search || 
-            doc.name.toLowerCase().includes(search) ||
+            doc.title.toLowerCase().includes(search) ||
             (doc.description && doc.description.toLowerCase().includes(search));
         
-        const matchesType = !type || getFileTypeCategory(doc.type) === type;
-        const matchesCategory = !category || doc.category === category;
+        const matchesType = !type || getFileTypeCategory(doc.document_type) === type;
+        const matchesCategory = !category || doc.document_type === category;
         
         return matchesSearch && matchesType && matchesCategory;
     });
@@ -495,14 +518,14 @@ function sortDocuments() {
     const sortBy = document.getElementById('sortBy').value;
     
     filteredDocuments.sort((a, b) => {
-        if (sortBy === 'name') {
-            return a.name.localeCompare(b.name);
-        } else if (sortBy === 'upload_date') {
-            return new Date(b.upload_date) - new Date(a.upload_date);
-        } else if (sortBy === 'size') {
-            return b.size - a.size;
-        } else if (sortBy === 'type') {
-            return a.type.localeCompare(b.type);
+        if (sortBy === 'title') {
+            return a.title.localeCompare(b.title);
+        } else if (sortBy === 'created_at') {
+            return new Date(b.created_at) - new Date(a.created_at);
+        } else if (sortBy === 'file_size') {
+            return b.file_size - a.file_size;
+        } else if (sortBy === 'document_type') {
+            return a.document_type.localeCompare(b.document_type);
         }
         return 0;
     });
@@ -547,19 +570,39 @@ async function saveDocument() {
     const form = document.getElementById('documentForm');
     const formData = new FormData(form);
     
-    // Add is_public boolean
+    // Validar se arquivo foi selecionado (para novo documento)
+    const documentId = document.getElementById('documentId').value;
+    const file = document.getElementById('documentFile').files[0];
+    const employeeId = document.getElementById('documentEmployee').value;
+    
+    if (!documentId && !file) {
+        Utils.showAlert('Por favor, selecione um arquivo', 'error');
+        return;
+    }
+    
+    // Validar se employee_id foi preenchido
+    if (!employeeId) {
+        Utils.showAlert('Erro: Colaborador não foi carregado. Tente novamente.', 'error');
+        return;
+    }
+    
+    // Adicionar restaurant_id
+    formData.set('restaurant_id', {{ current_user.restaurant_id if current_user and current_user.restaurant_id else 'null' }});
     formData.set('is_public', document.getElementById('documentPublic').checked);
     
     try {
-        const documentId = formData.get('documentId');
-        const url = documentId ? `/documents/${documentId}` : '/documents';
+        const url = documentId ? `/api/documents/${documentId}` : '/api/documents';
         const method = documentId ? 'PUT' : 'POST';
         
-        await Utils.makeRequest(url, {
+        const response = await fetch(url, {
             method: method,
-            body: formData,
-            headers: {} // Let browser set content-type for FormData
+            body: formData  // Usar FormData diretamente, NÃO JSON
         });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao salvar');
+        }
         
         Utils.showToast(documentId ? 'Documento atualizado!' : 'Documento enviado!', 'success');
         
@@ -649,9 +692,11 @@ function confirmDeleteDocument(id) {
 
 async function deleteDocumentById(id) {
     try {
-        await Utils.makeRequest(`/documents/${id}`, {
+        const response = await fetch(`/api/documents/${id}`, {
             method: 'DELETE'
         });
+        
+        if (!response.ok) throw new Error('Erro ao excluir');
         
         Utils.showToast('Documento excluído!', 'success');
         loadDocuments();
@@ -675,49 +720,63 @@ function bulkDownload() {
 function updateStats() {
     document.getElementById('totalDocuments').textContent = documents.length;
     
-    const pdfCount = documents.filter(d => d.type === 'application/pdf').length;
+    const pdfCount = documents.filter(d => d.filename && d.filename.toLowerCase().endsWith('.pdf')).length;
     document.getElementById('pdfCount').textContent = pdfCount;
     
-    const imageCount = documents.filter(d => d.type.startsWith('image/')).length;
+    const imageCount = documents.filter(d => d.filename && /\.(jpg|jpeg|png|gif|webp)$/i.test(d.filename)).length;
     document.getElementById('imageCount').textContent = imageCount;
     
-    const totalSize = documents.reduce((total, d) => total + (d.size || 0), 0);
+    const totalSize = documents.reduce((total, d) => total + (d.file_size || 0), 0);
     document.getElementById('totalSize').textContent = formatFileSize(totalSize);
 }
 
-// Utility functions
-function getFileIcon(mimeType) {
-    if (mimeType.startsWith('image/')) return 'fa-file-image';
-    if (mimeType === 'application/pdf') return 'fa-file-pdf';
-    if (mimeType.includes('word') || mimeType.includes('document')) return 'fa-file-word';
-    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'fa-file-excel';
-    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'fa-file-powerpoint';
+// Utility functions - adapted to work with filename
+function getFileIcon(filename) {
+    if (!filename) return 'fa-file';
+    const ext = filename.toLowerCase().split('.').pop();
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return 'fa-file-image';
+    if (ext === 'pdf') return 'fa-file-pdf';
+    if (['doc', 'docx', 'txt'].includes(ext)) return 'fa-file-word';
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'fa-file-excel';
+    if (['ppt', 'pptx'].includes(ext)) return 'fa-file-powerpoint';
+    if (['zip', 'rar', '7z'].includes(ext)) return 'fa-file-archive';
     return 'fa-file';
 }
 
-function getFileColor(mimeType) {
-    if (mimeType.startsWith('image/')) return 'warning';
-    if (mimeType === 'application/pdf') return 'danger';
-    if (mimeType.includes('word') || mimeType.includes('document')) return 'primary';
-    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'success';
-    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'info';
+function getFileColor(filename) {
+    if (!filename) return 'secondary';
+    const ext = filename.toLowerCase().split('.').pop();
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return 'warning';
+    if (ext === 'pdf') return 'danger';
+    if (['doc', 'docx', 'txt'].includes(ext)) return 'primary';
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'success';
+    if (['ppt', 'pptx'].includes(ext)) return 'info';
     return 'secondary';
 }
 
-function getFileTypeLabel(mimeType) {
-    if (mimeType.startsWith('image/')) return 'Imagem';
-    if (mimeType === 'application/pdf') return 'PDF';
-    if (mimeType.includes('word') || mimeType.includes('document')) return 'Documento';
-    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'Planilha';
-    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'Apresentação';
+function getFileTypeLabel(filename) {
+    if (!filename) return 'Arquivo';
+    const ext = filename.toLowerCase().split('.').pop();
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return 'Imagem';
+    if (ext === 'pdf') return 'PDF';
+    if (['doc', 'docx', 'txt'].includes(ext)) return 'Documento';
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'Planilha';
+    if (['ppt', 'pptx'].includes(ext)) return 'Apresentação';
+    if (['zip', 'rar', '7z'].includes(ext)) return 'Compactado';
     return 'Arquivo';
 }
 
-function getFileTypeCategory(mimeType) {
-    if (mimeType.startsWith('image/')) return 'image';
-    if (mimeType === 'application/pdf') return 'pdf';
-    if (mimeType.includes('word') || mimeType.includes('document')) return 'doc';
-    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'spreadsheet';
+function getFileTypeCategory(filename) {
+    if (!filename) return 'other';
+    const ext = filename.toLowerCase().split('.').pop();
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return 'image';
+    if (ext === 'pdf') return 'pdf';
+    if (['doc', 'docx', 'txt'].includes(ext)) return 'doc';
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'spreadsheet';
     return 'other';
 }
 
@@ -734,6 +793,11 @@ function formatDate(date) {
 }
 
 // Reset modal when closed
+document.getElementById('documentModal').addEventListener('shown.bs.modal', function() {
+    // Carregar employee_id quando modal abrir
+    loadCurrentEmployeeId();
+});
+
 document.getElementById('documentModal').addEventListener('hidden.bs.modal', function() {
     const form = document.getElementById('documentForm');
     form.reset();

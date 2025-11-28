@@ -30,18 +30,57 @@ def init_security(app):
             ]
             
             if request.path not in public_routes:
+                # Tentar autenticação por sessão primeiro
+                if 'user_id' in session:
+                    g.current_user_id = session.get('user_id')
+                    g.current_user_role = session.get('user_role')
+                    return  # Sessão válida, continuar
+                
+                # Se não tiver sessão, tentar JWT
                 try:
                     verify_jwt_in_request()
                     g.current_user_id = get_jwt_identity()
                     g.current_user_claims = get_jwt()
                 except Exception as e:
-                    return jsonify({'error': 'Token inválido ou expirado'}), 401
+                    return jsonify({'error': 'Autenticação necessária'}), 401
+
+def api_login_required(f):
+    """Decorator para rotas API que aceita JWT ou Session"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Tentar autenticação por sessão primeiro
+        if 'user_id' in session:
+            g.current_user_id = session.get('user_id')
+            g.current_user_role = session.get('user_role')
+            g.current_user_restaurant_id = session.get('restaurant_id')
+            return f(*args, **kwargs)
+        
+        # Se não tiver sessão, tentar JWT
+        try:
+            verify_jwt_in_request()
+            g.current_user_id = get_jwt_identity()
+            claims = get_jwt()
+            g.current_user_role = claims.get('role')
+            g.current_user_restaurant_id = claims.get('restaurant_id')
+            return f(*args, **kwargs)
+        except Exception as e:
+            return jsonify({'error': 'Autenticação necessária'}), 401
+    
+    return decorated_function
 
 def role_required(*allowed_roles):
-    """Decorator para verificar permissões por role"""
+    """Decorator para verificar permissões por role (funciona com JWT ou Session)"""
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
+            # Tentar sessão primeiro
+            if 'user_id' in session:
+                user_role = session.get('user_role')
+                if user_role not in allowed_roles:
+                    return jsonify({'error': 'Permissão insuficiente'}), 403
+                return f(*args, **kwargs)
+            
+            # Tentar JWT
             try:
                 verify_jwt_in_request()
                 claims = get_jwt()

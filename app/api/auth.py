@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, create_access_token, get_jwt_identity, get_jwt
 from datetime import datetime
 from app.extensions.database import db
-from app.models.user import User
+from app.models.employee import Employee
 from app.models.restaurant import Restaurant
 from app.middleware.security import validate_email, validate_password_strength, role_required
 
@@ -29,35 +29,35 @@ def login():
         if not validate_email(email):
             return jsonify({'error': 'Formato de email inválido'}), 400
         
-        # Buscar usuário
-        user = User.query.filter_by(email=email).first()
+        # Buscar employee (agora funciona como user também)
+        employee = Employee.query.filter_by(email=email).first()
         
-        if not user or not user.check_password(password):
+        if not employee or not employee.check_password(password):
             return jsonify({'error': 'Credenciais inválidas'}), 401
         
-        if not user.is_active:
+        if not employee.is_active:
             return jsonify({'error': 'Conta inativa. Entre em contato com o administrador'}), 401
         
         # Atualizar último login
-        user.last_login = datetime.utcnow()
+        employee.last_login = datetime.utcnow()
         db.session.commit()
         
         # Criar token de acesso
         additional_claims = {
-            'role': user.role,
-            'restaurant_id': user.restaurant_id,
-            'department': user.department,
-            'name': user.name
+            'role': employee.role,
+            'restaurant_id': employee.restaurant_id,
+            'department': employee.department,
+            'name': employee.name
         }
         
         access_token = create_access_token(
-            identity=str(user.id),
+            identity=str(employee.id),
             additional_claims=additional_claims
         )
         
         return jsonify({
             'access_token': access_token,
-            'user': user.to_dict(),
+            'user': employee.to_dict(),
             'message': 'Login realizado com sucesso'
         }), 200
         
@@ -72,7 +72,7 @@ def register():
     """Registro de novo usuário (apenas para admins e RH)"""
     try:
         current_user_id = int(get_jwt_identity())
-        current_user = User.query.get(current_user_id)
+        current_user = Employee.query.get(current_user_id)
         
         if not current_user:
             return jsonify({'error': 'Usuário atual não encontrado'}), 404
@@ -106,7 +106,7 @@ def register():
             return jsonify({'error': f'Role inválido. Deve ser um de: {", ".join(valid_roles)}'}), 400
         
         # Verificar se email já existe
-        if User.query.filter_by(email=email).first():
+        if Employee.query.filter_by(email=email).first():
             return jsonify({'error': 'Email já cadastrado'}), 409
         
         # Verificar restaurante se fornecido
@@ -119,22 +119,24 @@ def register():
             if not restaurant.is_active:
                 return jsonify({'error': 'Restaurante inativo'}), 400
         
-        # Criar novo usuário
-        new_user = User(
+        # Criar novo employee (agora funciona como user também)
+        new_employee = Employee(
             email=email,
             name=name,
             role=role,
             department=data.get('department'),
-            restaurant_id=restaurant_id
+            restaurant_id=restaurant_id or 1,  # Default restaurant
+            position=name,  # Usar nome como posição
+            birth_date=datetime.utcnow().date()  # Data padrão
         )
-        new_user.set_password(password)
+        new_employee.set_password(password)
         
-        db.session.add(new_user)
+        db.session.add(new_employee)
         db.session.commit()
         
         return jsonify({
             'message': 'Usuário criado com sucesso',
-            'user': new_user.to_dict()
+            'user': new_employee.to_dict()
         }), 201
         
     except Exception as e:
@@ -147,14 +149,52 @@ def get_profile():
     """Obter perfil do usuário atual"""
     try:
         current_user_id = int(get_jwt_identity())
-        user = User.query.get(current_user_id)
+        employee = Employee.query.get(current_user_id)
         
-        if not user:
+        if not employee:
             return jsonify({'error': 'Usuário não encontrado'}), 404
         
         return jsonify({
-            'user': user.to_dict()
+            'user': employee.to_dict()
         }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+@auth_bp.route('/me', methods=['GET'])
+@jwt_required()
+def get_current_user():
+    """Obter dados do usuário logado (agora employee direto)"""
+    try:
+        current_user_id = int(get_jwt_identity())
+        employee = Employee.query.get(current_user_id)
+        
+        if not employee:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+        
+        return jsonify(employee.to_dict()), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+@auth_bp.route('/current-user', methods=['GET'])
+def get_current_user_web():
+    """Obter dados do usuário logado via sessão (para aplicação web)"""
+    try:
+        from flask import session
+        
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'Não autenticado'}), 401
+        
+        employee = Employee.query.get(user_id)
+        if not employee:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+        
+        return jsonify(employee.to_dict()), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
         
     except Exception as e:
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
@@ -165,9 +205,9 @@ def update_profile():
     """Atualizar perfil do usuário"""
     try:
         current_user_id = int(get_jwt_identity())
-        user = User.query.get(current_user_id)
+        employee = Employee.query.get(current_user_id)
         
-        if not user:
+        if not employee:
             return jsonify({'error': 'Usuário não encontrado'}), 404
         
         data = request.get_json()
@@ -180,7 +220,7 @@ def update_profile():
             name = data['name'].strip()
             if not name:
                 return jsonify({'error': 'Nome não pode estar vazio'}), 400
-            user.name = name
+            employee.name = name
         
         if 'email' in data:
             email = data['email'].strip().lower()
@@ -188,18 +228,18 @@ def update_profile():
                 return jsonify({'error': 'Formato de email inválido'}), 400
             
             # Verificar se email já existe (exceto o próprio usuário)
-            existing_user = User.query.filter_by(email=email).first()
-            if existing_user and existing_user.id != user.id:
+            existing_employee = Employee.query.filter_by(email=email).first()
+            if existing_employee and existing_employee.id != employee.id:
                 return jsonify({'error': 'Email já cadastrado'}), 409
             
-            user.email = email
+            employee.email = email
         
-        user.updated_at = datetime.utcnow()
+        employee.updated_at = datetime.utcnow()
         db.session.commit()
         
         return jsonify({
             'message': 'Perfil atualizado com sucesso',
-            'user': user.to_dict()
+            'user': employee.to_dict()
         }), 200
         
     except Exception as e:
@@ -212,9 +252,9 @@ def change_password():
     """Alterar senha do usuário"""
     try:
         current_user_id = int(get_jwt_identity())
-        user = User.query.get(current_user_id)
+        employee = Employee.query.get(current_user_id)
         
-        if not user:
+        if not employee:
             return jsonify({'error': 'Usuário não encontrado'}), 404
         
         data = request.get_json()
@@ -228,15 +268,15 @@ def change_password():
         if not current_password or not new_password:
             return jsonify({'error': 'Senha atual e nova senha são obrigatórias'}), 400
         
-        if not user.check_password(current_password):
+        if not employee.check_password(current_password):
             return jsonify({'error': 'Senha atual incorreta'}), 400
         
         is_valid, message = validate_password_strength(new_password)
         if not is_valid:
             return jsonify({'error': message}), 400
         
-        user.set_password(new_password)
-        user.updated_at = datetime.utcnow()
+        employee.set_password(new_password)
+        employee.updated_at = datetime.utcnow()
         db.session.commit()
         
         return jsonify({
@@ -251,7 +291,7 @@ def change_password():
 @jwt_required()
 @role_required('admin', 'rh')
 def list_users():
-    """Listar usuários (apenas admin e RH)"""
+    """Listar usuários/employees (apenas admin e RH)"""
     try:
         claims = get_jwt()
         user_role = claims.get('role')
@@ -262,26 +302,26 @@ def list_users():
         role = request.args.get('role')
         is_active = request.args.get('is_active', 'true').lower() == 'true'
         
-        # Query base
-        query = User.query
+        # Query base - agora usando Employee
+        query = Employee.query
         
         # Filtros
         if is_active is not None:
-            query = query.filter(User.is_active == is_active)
+            query = query.filter(Employee.is_active == is_active)
         
         if role:
-            query = query.filter(User.role == role)
+            query = query.filter(Employee.role == role)
         
         if restaurant_id:
-            query = query.filter(User.restaurant_id == restaurant_id)
+            query = query.filter(Employee.restaurant_id == restaurant_id)
         elif user_role == 'rh' and user_restaurant_id:
-            # RH só vê usuários do próprio restaurante
-            query = query.filter(User.restaurant_id == user_restaurant_id)
+            # RH só vê employees do próprio restaurante
+            query = query.filter(Employee.restaurant_id == user_restaurant_id)
         
-        users = query.all()
+        employees = query.all()
         
         return jsonify({
-            'users': [user.to_dict() for user in users]
+            'users': [employee.to_dict() for employee in employees]
         }), 200
         
     except Exception as e:

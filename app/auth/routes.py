@@ -4,7 +4,7 @@ Rotas de autenticação web (interface HTML)
 from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify
 from flask_jwt_extended import create_access_token
 from datetime import datetime
-from app.models.user import User
+from app.models.employee import Employee
 from app.middleware.security import validate_email
 from app.extensions.database import db
 
@@ -34,43 +34,43 @@ def login():
                 flash('Formato de email inválido', 'danger')
                 return render_template('auth/login.html')
             
-            # Buscar usuário no banco de dados
-            user = User.query.filter_by(email=email).first()
+            # Buscar employee no banco de dados (agora funciona como user)
+            employee = Employee.query.filter_by(email=email).first()
             
             # Verificar credenciais usando o método seguro do modelo
-            if not user or not user.check_password(password):
+            if not employee or not employee.check_password(password):
                 flash('Email ou senha incorretos', 'danger')
                 return render_template('auth/login.html')
             
-            # Verificar se usuário está ativo
-            if not user.is_active:
+            # Verificar se employee/usuário está ativo
+            if not employee.is_active:
                 flash('Conta inativa. Entre em contato com o administrador', 'warning')
                 return render_template('auth/login.html')
             
             # Atualizar último login
-            user.last_login = datetime.utcnow()
+            employee.last_login = datetime.utcnow()
             db.session.commit()
             
             # Criar token JWT para sessão
             additional_claims = {
-                'role': user.role,
-                'restaurant_id': user.restaurant_id,
-                'department': user.department,
-                'name': user.name
+                'role': employee.role,
+                'restaurant_id': employee.restaurant_id,
+                'department': employee.department,
+                'name': employee.name
             }
             
             access_token = create_access_token(
-                identity=str(user.id),
+                identity=str(employee.id),
                 additional_claims=additional_claims
             )
             
             # Armazenar token e dados do usuário na sessão
             session['access_token'] = access_token
-            session['user_id'] = user.id
-            session['user_name'] = user.name
-            session['user_role'] = user.role
-            session['user_email'] = user.email
-            session['restaurant_id'] = user.restaurant_id
+            session['user_id'] = employee.id
+            session['user_name'] = employee.name
+            session['user_role'] = employee.role
+            session['user_email'] = employee.email
+            session['restaurant_id'] = employee.restaurant_id
             
             # Configurar sessão permanente se "lembrar-me" estiver marcado
             if remember:

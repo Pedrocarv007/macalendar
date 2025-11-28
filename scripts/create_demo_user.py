@@ -2,7 +2,7 @@
 Script para criar usuário demo
 """
 from app import create_app
-from app.models.user import User
+from app.models.employee import Employee
 from app.extensions.database import db
 
 def create_demo_user():
@@ -11,16 +11,16 @@ def create_demo_user():
     
     with app.app_context():
         # Verificar se usuário demo já existe
-        demo_user = User.query.filter_by(email='demo@mac.com').first()
+        demo_employee = Employee.query.filter_by(email='demo@mac.com').first()
         
-        if demo_user:
+        if demo_employee:
             print("⚠️  Usuário demo já existe!")
-            print(f"Email: {demo_user.email}")
+            print(f"Email: {demo_employee.email}")
             print(f"Senha: demo123")
             return
         
         # Criar usuário demo
-        demo = User(
+        demo = Employee(
             email="demo@mac.com",
             name="Usuário Demo",
             role="employee",

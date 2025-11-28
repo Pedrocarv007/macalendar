@@ -1,26 +1,25 @@
 """
 Rotas da API de Documentos
 """
-from flask import Blueprint, request, jsonify, send_file
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask import Blueprint, request, jsonify, send_file, g
+from flask_jwt_extended import get_jwt_identity, get_jwt
 from datetime import datetime
 import os
 from app.extensions.database import db
 from app.models.document import Document
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
-from app.middleware.security import role_required
+from app.middleware.security import api_login_required, role_required
 
 documents_bp = Blueprint('documents', __name__)
 
 @documents_bp.route('', methods=['GET'])
-@jwt_required()
+@api_login_required
 def get_documents():
     """Obter lista de documentos"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         # Parâmetros de filtro
         restaurant_id = request.args.get('restaurant_id', type=int)
@@ -60,23 +59,123 @@ def get_documents():
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @documents_bp.route('', methods=['POST'])
-@jwt_required()
+@api_login_required
 @role_required('admin', 'rh', 'manager')
 def create_document():
-    """Criar novo documento"""
+    """Criar novo documento com upload de arquivo"""
     try:
-        current_user_id = get_jwt_identity()
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        from flask import session
         
-        data = request.get_json()
+        current_user_id = g.get('current_user_id')
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
-        if not data:
-            return jsonify({'error': 'Dados não fornecidos'}), 400
+        # Obter dados do usuário logado (agora é um employee)
+        current_user = Employee.query.get(current_user_id)
         
-        # Validar dados obrigatórios
-        required_fields = ['title', 'document_type', 'template_name', 'employee_id', 'restaurant_id']
+        # Validar arquivo
+        if 'file' not in request.files:
+            return jsonify({'error': 'Nenhum arquivo foi enviado'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'Arquivo não selecionado'}), 400
+        
+        # Dados do formulário
+        name = request.form.get('name') or file.filename
+        category = request.form.get('category')
+        employee_id = request.form.get('employee_id', type=int)
+        description = request.form.get('description')
+        tags = request.form.get('tags')
+        restaurant_id = request.form.get('restaurant_id', type=int)
+        is_public = request.form.get('is_public') == 'true'
+        
+        print("DEBUG - Arquivo:", file.filename)
+        print("DEBUG - Nome:", name)
+        print("DEBUG - Categoria:", category)
+        print("DEBUG - Employee ID fornecido:", employee_id)
+        print("DEBUG - Restaurant ID:", restaurant_id)
+        print("DEBUG - User logado ID:", current_user_id)
+        print("DEBUG - User logado é employee:", current_user.id if current_user else None)
+        
+        if not restaurant_id:
+            return jsonify({'error': 'Restaurant ID é obrigatório'}), 400
+        
+        if not category:
+            return jsonify({'error': 'Categoria é obrigatória'}), 400
+        
+        # Se employee_id não foi fornecido, usar o do user logado (que agora é o employee)
+        if not employee_id:
+            if current_user:
+                employee_id = current_user.id
+                print(f"DEBUG - Usando employee_id do user logado: {employee_id}")
+            else:
+                return jsonify({'error': 'Colaborador é obrigatório e usuário não encontrado'}), 400
+        
+        # Verificar se colaborador existe
+        employee = Employee.query.get(employee_id)
+        if not employee:
+            return jsonify({'error': 'Colaborador não encontrado'}), 404
+        
+        # Verificar se colaborador pertence ao restaurante
+        if employee.restaurant_id != restaurant_id:
+            return jsonify({'error': 'Colaborador não pertence a este restaurante'}), 400
+        
+        # Verificar permissões
+        if user_role not in ['admin', 'rh'] and restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada para este restaurante'}), 403
+        
+        # Verificar se restaurante existe
+        restaurant = Restaurant.query.get(restaurant_id)
+        if not restaurant:
+            return jsonify({'error': 'Restaurante não encontrado'}), 404
+        
+        # Criar diretório de upload se não existir
+        upload_folder = os.path.join('uploads', 'documents', str(restaurant_id))
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        # Gerar nome de arquivo seguro
+        from werkzeug.utils import secure_filename
+        filename = secure_filename(f"{int(datetime.now().timestamp())}_{file.filename}")
+        file_path = os.path.join(upload_folder, filename)
+        
+        # Salvar arquivo
+        file.save(file_path)
+        
+        # Obter tamanho do arquivo
+        file_size = os.path.getsize(file_path)
+        
+        # Criar documento no banco de dados
+        document = Document(
+            title=name,
+            document_type=category,
+            template_name=category,
+            filename=filename,
+            file_path=file_path,
+            file_size=file_size,
+            restaurant_id=restaurant_id,
+            employee_id=employee_id,
+            created_by=current_user_id,
+            description=description,
+            tags=tags,
+            is_public=is_public,
+            status='uploaded'
+        )
+        
+        db.session.add(document)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Documento enviado com sucesso',
+            'document': document.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"DEBUG - Erro ao criar documento: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'error': f'{field} é obrigatório'}), 400
@@ -122,17 +221,17 @@ def create_document():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+        return print({'error': f'Erro interno: {str(e)}'}), 500
 
 @documents_bp.route('/<int:document_id>', methods=['PUT'])
-@jwt_required()
+@api_login_required
 @role_required('admin', 'rh', 'manager')
 def update_document(document_id):
     """Atualizar documento"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        # claims via g
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         document = Document.query.get(document_id)
         if not document:
@@ -173,14 +272,14 @@ def update_document(document_id):
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @documents_bp.route('/<int:document_id>', methods=['DELETE'])
-@jwt_required()
+@api_login_required
 @role_required('admin', 'rh')
 def delete_document(document_id):
     """Deletar documento"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        # claims via g
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         document = Document.query.get(document_id)
         if not document:
@@ -207,13 +306,13 @@ def delete_document(document_id):
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @documents_bp.route('/<int:document_id>/download', methods=['GET'])
-@jwt_required()
+@api_login_required
 def download_document(document_id):
     """Download do documento"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        # claims via g
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         document = Document.query.get(document_id)
         if not document:
@@ -238,7 +337,7 @@ def download_document(document_id):
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @documents_bp.route('/templates', methods=['GET'])
-@jwt_required()
+@api_login_required
 def get_templates():
     """Obter lista de templates disponíveis"""
     try:
@@ -280,15 +379,15 @@ def get_templates():
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @documents_bp.route('/generate', methods=['POST'])
-@jwt_required()
+@api_login_required
 @role_required('admin', 'rh', 'manager')
 def generate_document():
     """Gerar documento PDF usando template"""
     try:
-        current_user_id = get_jwt_identity()
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        current_user_id = g.get('current_user_id')
+        # claims via g
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         data = request.get_json()
         

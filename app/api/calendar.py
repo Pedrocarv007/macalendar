@@ -1,25 +1,25 @@
 """
 Rotas da API do Calendário
 """
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask import Blueprint, request, jsonify, g
+from flask_jwt_extended import get_jwt_identity, get_jwt
 from datetime import datetime, date
 from app.extensions.database import db
 from app.models.calendar_event import CalendarEvent
 from app.models.employee import Employee
-from app.middleware.security import role_required
+from app.middleware.security import api_login_required, role_required
 
 calendar_bp = Blueprint('calendar', __name__)
 
 @calendar_bp.route('/events', methods=['GET'])
-@jwt_required()
+@api_login_required
 def get_events():
     """Obter eventos do calendário"""
     try:
-        current_user_id = get_jwt_identity()
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        current_user_id = g.get('current_user_id')
+        # claims via g
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         # Parâmetros de data
         start_date = request.args.get('start')
@@ -58,14 +58,14 @@ def get_events():
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @calendar_bp.route('/events', methods=['POST'])
-@jwt_required()
+@api_login_required
 def create_event():
     """Criar novo evento"""
     try:
-        current_user_id = get_jwt_identity()
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        current_user_id = g.get('current_user_id')
+        # claims via g
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         data = request.get_json()
         
@@ -119,14 +119,14 @@ def create_event():
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @calendar_bp.route('/events/<int:event_id>', methods=['PUT'])
-@jwt_required()
+@api_login_required
 def update_event(event_id):
     """Atualizar evento"""
     try:
-        current_user_id = get_jwt_identity()
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        current_user_id = g.get('current_user_id')
+        # claims via g
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         event = CalendarEvent.query.get(event_id)
         if not event:
@@ -175,14 +175,14 @@ def update_event(event_id):
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @calendar_bp.route('/events/<int:event_id>', methods=['DELETE'])
-@jwt_required()
+@api_login_required
 def delete_event(event_id):
     """Deletar evento"""
     try:
-        current_user_id = get_jwt_identity()
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        current_user_id = g.get('current_user_id')
+        # claims via g
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         event = CalendarEvent.query.get(event_id)
         if not event:
@@ -203,13 +203,13 @@ def delete_event(event_id):
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @calendar_bp.route('/birthdays', methods=['GET'])
-@jwt_required()
+@api_login_required
 def get_birthdays():
     """Obter aniversários do mês"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        # claims via g
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         # Mês atual ou específico
         month = request.args.get('month', datetime.now().month, type=int)

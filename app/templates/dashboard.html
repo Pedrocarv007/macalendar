@@ -214,20 +214,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Calendar Widget -->
-            <div class="card glass-card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-calendar-alt me-2"></i>Calendário
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div id="mini-calendar">
-                        <!-- Mini calendar will be rendered here -->
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -277,24 +263,23 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     loadDashboardData();
-    initMiniCalendar();
 });
 
 async function loadDashboardData() {
     try {
-        // Load stats
-        const stats = await fetch('/api/dashboard/stats').then(r => r.json());
+        // Load stats (usando rotas web ao invés de API)
+        const stats = await fetch('/dashboard/stats').then(r => r.json());
         document.getElementById('totalEmployees').textContent = stats.employees || 0;
         document.getElementById('todayEvents').textContent = stats.todayEvents || 0;
         document.getElementById('totalRestaurants').textContent = stats.restaurants || 0;
         document.getElementById('totalDocuments').textContent = stats.documents || 0;
 
         // Load recent events
-        const events = await fetch('/api/calendar/events/recent').then(r => r.json());
+        const events = await fetch('/calendar/events/recent').then(r => r.json());
         renderRecentEvents(events);
 
         // Load activity feed
-        const activities = await fetch('/api/dashboard/activities').then(r => r.json());
+        const activities = await fetch('/dashboard/activities').then(r => r.json());
         renderActivityFeed(activities);
 
     } catch (error) {
@@ -365,50 +350,6 @@ function renderActivityFeed(activities) {
     `).join('');
 }
 
-function initMiniCalendar() {
-    const calendar = document.getElementById('mini-calendar');
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    
-    // Simple mini calendar implementation
-    calendar.innerHTML = `
-        <div class="text-center mb-3">
-            <h6>${now.toLocaleDateString('pt-BR', {month: 'long', year: 'numeric'})}</h6>
-        </div>
-        <div class="mini-calendar-grid">
-            <div class="day-header">Dom</div>
-            <div class="day-header">Seg</div>
-            <div class="day-header">Ter</div>
-            <div class="day-header">Qua</div>
-            <div class="day-header">Qui</div>
-            <div class="day-header">Sex</div>
-            <div class="day-header">Sáb</div>
-            ${generateCalendarDays(year, month)}
-        </div>
-    `;
-}
-
-function generateCalendarDays(year, month) {
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const today = new Date().getDate();
-    
-    let html = '';
-    
-    // Empty cells for days before month starts
-    for (let i = 0; i < firstDay; i++) {
-        html += '<div class="day-cell empty"></div>';
-    }
-    
-    // Days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-        const isToday = day === today && month === new Date().getMonth();
-        html += `<div class="day-cell ${isToday ? 'today' : ''}">${day}</div>`;
-    }
-    
-    return html;
-}
 
 function refreshDashboard() {
     showAlert('Atualizando dashboard...', 'info');

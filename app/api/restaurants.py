@@ -1,24 +1,23 @@
 """
 Rotas da API de Restaurantes
 """
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask import Blueprint, request, jsonify, g
+from flask_jwt_extended import get_jwt_identity, get_jwt
 from datetime import datetime
 from app.extensions.database import db
 from app.models.restaurant import Restaurant
-from app.models.user import User
-from app.middleware.security import role_required
+from app.models.employee import Employee
+from app.middleware.security import api_login_required, role_required
 
 restaurants_bp = Blueprint('restaurants', __name__)
 
 @restaurants_bp.route('', methods=['GET'])
-@jwt_required()
+@api_login_required
 def get_restaurants():
     """Obter lista de restaurantes"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         # Parâmetros de filtro
         is_active = request.args.get('is_active', 'true').lower() == 'true'
@@ -47,12 +46,12 @@ def get_restaurants():
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @restaurants_bp.route('', methods=['POST'])
-@jwt_required()
+@api_login_required
 @role_required('admin', 'rh')
 def create_restaurant():
     """Criar novo restaurante"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = g.get('current_user_id')
         
         data = request.get_json()
         
@@ -71,7 +70,7 @@ def create_restaurant():
         # Verificar se manager_id é válido
         manager_id = data.get('manager_id')
         if manager_id:
-            manager = User.query.get(manager_id)
+            manager = Employee.query.get(manager_id)
             if not manager:
                 return jsonify({'error': 'Gerente não encontrado'}), 404
             if manager.role not in ['manager', 'admin']:
@@ -99,14 +98,13 @@ def create_restaurant():
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @restaurants_bp.route('/<int:restaurant_id>', methods=['PUT'])
-@jwt_required()
+@api_login_required
 @role_required('admin', 'rh', 'manager')
 def update_restaurant(restaurant_id):
     """Atualizar restaurante"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         restaurant = Restaurant.query.get(restaurant_id)
         if not restaurant:
@@ -140,7 +138,7 @@ def update_restaurant(restaurant_id):
         if 'manager_id' in data and user_role in ['admin', 'rh']:
             manager_id = data['manager_id']
             if manager_id:
-                manager = User.query.get(manager_id)
+                manager = Employee.query.get(manager_id)
                 if not manager:
                     return jsonify({'error': 'Gerente não encontrado'}), 404
                 if manager.role not in ['manager', 'admin']:
@@ -164,7 +162,7 @@ def update_restaurant(restaurant_id):
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @restaurants_bp.route('/<int:restaurant_id>', methods=['DELETE'])
-@jwt_required()
+@api_login_required
 @role_required('admin')
 def delete_restaurant(restaurant_id):
     """Deletar restaurante (soft delete) - apenas admin"""
@@ -185,13 +183,12 @@ def delete_restaurant(restaurant_id):
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @restaurants_bp.route('/<int:restaurant_id>/stats', methods=['GET'])
-@jwt_required()
+@api_login_required
 def get_restaurant_stats(restaurant_id):
     """Obter estatísticas do restaurante"""
     try:
-        claims = get_jwt()
-        user_role = claims.get('role')
-        user_restaurant_id = claims.get('restaurant_id')
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
         # Verificar permissões
         if user_role not in ['admin', 'rh', 'marketing']:
