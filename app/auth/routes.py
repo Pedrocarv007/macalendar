@@ -79,7 +79,7 @@ def login():
             else:
                 session.permanent = False
             
-            flash(f'Bem-vindo(a), {user.name}!', 'success')
+            flash(f'Bem-vindo(a), {employee.name}!', 'success')
             
             # Redirecionar para a página solicitada ou dashboard
             next_page = request.args.get('next')
@@ -88,6 +88,9 @@ def login():
             return redirect(url_for('web.dashboard'))
             
         except Exception as e:
+            print(f"[LOGIN ERROR] {str(e)}")
+            import traceback
+            traceback.print_exc()
             db.session.rollback()
             flash('Erro ao processar login. Tente novamente.', 'danger')
             return render_template('auth/login.html')

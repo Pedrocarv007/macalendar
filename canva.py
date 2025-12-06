@@ -1,8 +1,8 @@
 from PIL import Image, ImageDraw, ImageFont
 
 # Carregar o fundo
-aniversario = Image.open("aniversarios.png").convert("RGBA")
-fundo = Image.open("fundo.png").convert("RGBA")
+aniversario = Image.open("aniversario.png").convert("RGBA")
+fundo = Image.open("Bem_vindo.png").convert("RGBA")
 
 
 # Obter dimensões
@@ -43,7 +43,7 @@ fonte_nome = ImageFont.truetype("arial.ttf", 60)
 fonte_data = ImageFont.truetype("arial.ttf", 55)
 
 # Nome e data (você pode trocar esses valores em loop)
-nome = "oi"
+nome = "Pedro"
 data = "07/10/2025"
 
 

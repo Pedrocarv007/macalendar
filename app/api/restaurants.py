@@ -4,12 +4,17 @@ Rotas da API de Restaurantes
 from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import get_jwt_identity, get_jwt
 from datetime import datetime
+from werkzeug.utils import secure_filename
+import os
+from PIL import Image
 from app.extensions.database import db
 from app.models.restaurant import Restaurant
 from app.models.employee import Employee
-from app.middleware.security import api_login_required, role_required
+from app.middleware.security import api_login_required, role_required, allowed_file
 
 restaurants_bp = Blueprint('restaurants', __name__)
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 @restaurants_bp.route('', methods=['GET'])
 @api_login_required
@@ -19,14 +24,8 @@ def get_restaurants():
         user_role = g.get('current_user_role')
         user_restaurant_id = g.get('current_user_restaurant_id')
         
-        # Parâmetros de filtro
-        is_active = request.args.get('is_active', 'true').lower() == 'true'
-        
-        # Query base
+        # Query base - carregar TODOS os restaurantes (ativos e inativos)
         query = Restaurant.query
-        
-        # Filtrar por status
-        query = query.filter(Restaurant.is_active == is_active)
         
         # Filtrar por permissões
         if user_role not in ['admin', 'rh', 'marketing']:
@@ -82,6 +81,9 @@ def create_restaurant():
             address=data.get('address'),
             phone=data.get('phone'),
             email=data.get('email'),
+            capacity=data.get('capacity'),
+            opening_hours=data.get('opening_hours'),
+            description=data.get('description'),
             manager_id=manager_id
         )
         
@@ -133,6 +135,12 @@ def update_restaurant(restaurant_id):
             restaurant.phone = data['phone']
         if 'email' in data:
             restaurant.email = data['email']
+        if 'capacity' in data:
+            restaurant.capacity = data.get('capacity')
+        if 'opening_hours' in data:
+            restaurant.opening_hours = data['opening_hours']
+        if 'description' in data:
+            restaurant.description = data['description']
         
         # Apenas admin e RH podem alterar gerente
         if 'manager_id' in data and user_role in ['admin', 'rh']:
@@ -145,8 +153,8 @@ def update_restaurant(restaurant_id):
                     return jsonify({'error': 'Usuário não pode ser gerente'}), 400
             restaurant.manager_id = manager_id
         
-        # Apenas admin pode alterar status
-        if 'is_active' in data and user_role == 'admin':
+        # Admin e RH podem alterar status
+        if 'is_active' in data and user_role in ['admin', 'rh']:
             restaurant.is_active = data['is_active']
         
         restaurant.updated_at = datetime.utcnow()
@@ -232,6 +240,117 @@ def get_restaurant_stats(restaurant_id):
                 'events_this_month': events_this_month
             }
         }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+@restaurants_bp.route('/<int:restaurant_id>/upload-photo', methods=['POST'])
+@api_login_required
+@role_required('admin', 'rh', 'manager')
+def upload_restaurant_photo(restaurant_id):
+    """Upload de foto para restaurante"""
+    try:
+        # Verificar se arquivo foi enviado
+        if 'file' not in request.files:
+            return jsonify({'error': 'Arquivo não fornecido'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'Arquivo não selecionado'}), 400
+        
+        # Verificar extensão
+        if not allowed_file(file.filename, ALLOWED_EXTENSIONS):
+            return jsonify({'error': 'Formato de arquivo não permitido. Use PNG, JPG, JPEG ou GIF'}), 400
+        
+        # Verificar se restaurante existe
+        restaurant = Restaurant.query.get(restaurant_id)
+        if not restaurant:
+            return jsonify({'error': 'Restaurante não encontrado'}), 404
+        
+        # Verificar permissões
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+        
+        if user_role not in ['admin', 'rh'] and restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada'}), 403
+        
+        try:
+            # Criar pasta se não existir
+            upload_folder = 'app/static/uploads/restaurants'
+            os.makedirs(upload_folder, exist_ok=True)
+            
+            # Gerar nome seguro do arquivo
+            filename = secure_filename(f"restaurant_{restaurant_id}_{datetime.now().timestamp()}.jpg")
+            filepath = os.path.join(upload_folder, filename)
+            
+            # Redimensionar e otimizar imagem
+            img = Image.open(file)
+            
+            # Converter para RGB se necessário
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Redimensionar para 600x400 máximo
+            img.thumbnail((600, 400), Image.Resampling.LANCZOS)
+            
+            # Salvar com qualidade otimizada
+            img.save(filepath, 'JPEG', quality=85, optimize=True)
+            
+            # Deletar foto antiga se existir
+            if restaurant.photo_filename:
+                old_path = os.path.join('app/static/uploads/restaurants', restaurant.photo_filename)
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+            
+            # Atualizar banco de dados
+            restaurant.photo_filename = filename
+            restaurant.updated_at = datetime.utcnow()
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Foto enviada com sucesso',
+                'photo_filename': filename,
+                'photo_url': f'/static/uploads/restaurants/{filename}'
+            }), 200
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Erro ao processar imagem: {str(e)}'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+@restaurants_bp.route('/<int:restaurant_id>/photo', methods=['DELETE'])
+@api_login_required
+@role_required('admin', 'rh', 'manager')
+def delete_restaurant_photo(restaurant_id):
+    """Deletar foto do restaurante"""
+    try:
+        # Verificar se restaurante existe
+        restaurant = Restaurant.query.get(restaurant_id)
+        if not restaurant:
+            return jsonify({'error': 'Restaurante não encontrado'}), 404
+        
+        # Verificar permissões
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+        
+        if user_role not in ['admin', 'rh'] and restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada'}), 403
+        
+        if restaurant.photo_filename:
+            # Deletar arquivo
+            old_path = os.path.join('app/static/uploads/restaurants', restaurant.photo_filename)
+            if os.path.exists(old_path):
+                os.remove(old_path)
+            
+            # Atualizar banco
+            restaurant.photo_filename = None
+            restaurant.updated_at = datetime.utcnow()
+            db.session.commit()
+        
+        return jsonify({'message': 'Foto deletada com sucesso'}), 200
         
     except Exception as e:
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500

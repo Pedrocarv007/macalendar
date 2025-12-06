@@ -46,12 +46,14 @@ def create_app(config_name=None):
     from app.api.employees import employees_bp
     from app.api.restaurants import restaurants_bp
     from app.api.documents import documents_bp
+    from app.api.profile import profile_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(calendar_bp, url_prefix='/api/calendar')
     app.register_blueprint(employees_bp, url_prefix='/api/employees')
     app.register_blueprint(restaurants_bp, url_prefix='/api/restaurants')
     app.register_blueprint(documents_bp, url_prefix='/api/documents')
+    app.register_blueprint(profile_bp, url_prefix='/api/profile')
     
     # Registrar blueprints de interface web
     from app.auth.routes import auth_web_bp

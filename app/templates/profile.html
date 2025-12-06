@@ -13,11 +13,14 @@
                     <p class="text-muted mb-0">Gerencie suas informações pessoais</p>
                 </div>
                 <div class="d-flex gap-2">
-                    <button class="btn btn-outline-primary" onclick="toggleEditMode()">
+                    <button class="btn btn-outline-primary" id="editBtn" onclick="toggleEditMode()">
                         <i class="fas fa-edit me-1"></i>Editar
                     </button>
                     <button class="btn btn-primary" id="saveBtn" style="display: none;" onclick="saveProfile()">
                         <i class="fas fa-save me-1"></i>Salvar
+                    </button>
+                    <button class="btn btn-outline-secondary" id="cancelBtn" style="display: none;" onclick="toggleEditMode()">
+                        <i class="fas fa-times me-1"></i>Cancelar
                     </button>
                 </div>
             </div>
@@ -29,39 +32,41 @@
         <div class="col-lg-4">
             <div class="card glass-card h-100">
                 <div class="card-body text-center">
-                    <div class="profile-avatar mb-3">
-                        <img src="https://ui-avatars.com/api/?name=User&size=120&background=007AFF&color=fff" 
-                             alt="Avatar" class="rounded-circle" id="userAvatar">
-                        <div class="avatar-overlay" id="avatarOverlay" style="display: none;">
+                    <div class="profile-avatar mb-3" style="position: relative; display: inline-block;">
+                        <img src="/static/images/placeholder-user.jpg" 
+                             alt="Avatar" class="rounded-circle" id="userAvatar"
+                             style="width: 120px; height: 120px; object-fit: cover;">
+                        <div class="avatar-overlay" id="avatarOverlay" 
+                             style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; background: rgba(0,0,0,0.5); cursor: pointer; display: flex; align-items: center; justify-content: center; color: white;">
                             <i class="fas fa-camera"></i>
                         </div>
+                        <input type="file" id="photoInput" style="display: none;" accept="image/*" onchange="previewPhoto(event)">
                     </div>
                     
-                    <h4 class="mb-1" id="displayName">Usuário</h4>
-                    <p class="text-muted mb-3" id="displayRole">Administrador</p>
+                    <h4 class="mb-1" id="displayName">Carregando...</h4>
+                    <p class="text-muted mb-3" id="displayRole">Carregando...</p>
                     
                     <div class="profile-stats">
                         <div class="row g-3">
-                            <div class="col-4">
+                            <div class="col-6">
                                 <div class="stat-item">
-                                    <div class="stat-number">25</div>
-                                    <div class="stat-label">Eventos</div>
+                                    <div class="stat-number" id="yearsWorked">0</div>
+                                    <div class="stat-label">Anos de Trabalho</div>
                                 </div>
                             </div>
-                            <div class="col-4">
+                            <div class="col-6">
                                 <div class="stat-item">
-                                    <div class="stat-number">12</div>
-                                    <div class="stat-label">Equipes</div>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="stat-item">
-                                    <div class="stat-number">8</div>
-                                    <div class="stat-label">Docs</div>
+                                    <div class="stat-number" id="daysUntilBday">0</div>
+                                    <div class="stat-label">Dias para Aniv.</div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    
+                    <button class="btn btn-sm btn-outline-danger mt-3" id="removePhotoBtn" 
+                            style="display: none;" onclick="removeProfilePhoto()">
+                        <i class="fas fa-trash me-1"></i>Remover Foto
+                    </button>
                 </div>
             </div>
         </div>
@@ -79,47 +84,79 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="name" class="form-label">Nome Completo</label>
-                                <input type="text" class="form-control" id="name" name="name" 
-                                       value="Usuário Admin" disabled>
+                                <input type="text" class="form-control" id="name" name="name" disabled>
                             </div>
                             
                             <div class="col-md-6">
                                 <label for="email" class="form-label">Email</label>
-                                <input type="email" class="form-control" id="email" name="email" 
-                                       value="admin@mac.com" disabled>
+                                <input type="email" class="form-control" id="email" name="email" disabled>
                             </div>
                             
                             <div class="col-md-6">
                                 <label for="phone" class="form-label">Telefone</label>
-                                <input type="tel" class="form-control" id="phone" name="phone" 
-                                       value="(351) 99999-9999" disabled>
+                                <input type="tel" class="form-control" id="phone" name="phone" disabled>
                             </div>
                             
                             <div class="col-md-6">
-                                <label for="role" class="form-label">Cargo</label>
-                                <select class="form-select" id="role" name="role" disabled>
-                                    <option value="admin" selected>Administrador</option>
-                                    <option value="manager">Gerente</option>
-                                    <option value="employee">Funcionário</option>
+                                <label for="position" class="form-label">Cargo</label>
+                                <select class="form-select" id="position" name="position" disabled>
+                                    <option value="">Selecione...</option>
+                                    <option value="Desenvolvedor">Desenvolvedor</option>
+                                    <option value="RH">Recursos Humanos</option>
+                                    <option value="Gerente_loja">Gerente de Loja</option>
+                                    <option value="Sub_gerente">Sub Gerente</option>
+                                    <option value="Gerente_turno">Gerente de Turno</option>
+                                    <option value="colaborador">Colaborador</option>
+                                    <option value="treinador">Treinador</option>
+                                    <option value="RP">Relações Públicas</option>
                                 </select>
                             </div>
                             
                             <div class="col-md-6">
                                 <label for="department" class="form-label">Departamento</label>
-                                <input type="text" class="form-control" id="department" name="department" 
-                                       value="Administração" disabled>
+                                <select class="form-select" id="department" name="department" disabled>
+                                    <option value="">Selecione...</option>
+                                    <option value="Desenvolvedor">Desenvolvedor</option>
+                                    <option value="RH">Recursos Humanos</option>
+                                    <option value="Gerente_loja">Gerente de Loja</option>
+                                    <option value="Sub_gerente">Sub Gerente</option>
+                                    <option value="Gerente_turno">Gerente de Turno</option>
+                                    <option value="colaborador">Colaborador</option>
+                                    <option value="treinador">Treinador</option>
+                                    <option value="RP">Relações Públicas</option>
+                                </select>
                             </div>
                             
                             <div class="col-md-6">
-                                <label for="startDate" class="form-label">Data de Início</label>
-                                <input type="date" class="form-control" id="startDate" name="startDate" 
-                                       value="2024-01-01" disabled>
+                                <label for="role" class="form-label">Função no Sistema</label>
+                                <select class="form-select" id="role" name="role" disabled>
+                                    <option value="">Selecione...</option>
+                                    <option value="admin">Administrador</option>
+                                    <option value="rh">Recursos Humanos</option>
+                                    <option value="manager">Gerente</option>
+                                    <option value="marketing">Marketing</option>
+                                    <option value="employee">Funcionário</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="birthDate" class="form-label">Data de Nascimento</label>
+                                <input type="date" class="form-control" id="birthDate" name="birth_date" disabled>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="hireDate" class="form-label">Data de Contratação</label>
+                                <input type="date" class="form-control" id="hireDate" name="hire_date" disabled>
                             </div>
                             
                             <div class="col-12">
-                                <label for="bio" class="form-label">Biografia</label>
-                                <textarea class="form-control" id="bio" name="bio" rows="3" 
-                                          disabled>Administrador do sistema MAC Calendar com experiência em gestão de restaurantes.</textarea>
+                                <label for="address" class="form-label">Endereço</label>
+                                <textarea class="form-control" id="address" name="address" rows="2" disabled></textarea>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label for="notes" class="form-label">Observações</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="3" disabled></textarea>
                             </div>
                         </div>
                     </form>
@@ -171,93 +208,252 @@
 {% block scripts %}
 <script>
 let editMode = false;
+let currentUser = null;
 
 function toggleEditMode() {
     editMode = !editMode;
-    const inputs = document.querySelectorAll('#profileForm input, #profileForm select, #profileForm textarea');
+    const inputs = document.querySelectorAll('#profileForm input[type="text"], #profileForm input[type="tel"], #profileForm input[type="date"], #profileForm textarea, #profileForm select');
     const saveBtn = document.getElementById('saveBtn');
-    const editBtn = document.querySelector('[onclick="toggleEditMode()"]');
+    const editBtn = document.getElementById('editBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const avatarOverlay = document.getElementById('avatarOverlay');
     
     inputs.forEach(input => {
-        if (input.id !== 'email') { // Email não pode ser editado
+        // Email nunca pode ser editado
+        // Admins podem editar tudo (inclusive birthDate e hireDate)
+        // Não-admins não podem editar birthDate e hireDate
+        if (input.id === 'email') {
+            input.disabled = true;
+        } else if ((input.id === 'birthDate' || input.id === 'hireDate') && currentUser && currentUser.role !== 'admin') {
+            input.disabled = true;
+        } else {
             input.disabled = !editMode;
         }
     });
     
     if (editMode) {
         saveBtn.style.display = 'inline-block';
-        editBtn.innerHTML = '<i class="fas fa-times me-1"></i>Cancelar';
-        editBtn.className = 'btn btn-outline-secondary';
+        cancelBtn.style.display = 'inline-block';
+        editBtn.style.display = 'none';
+        avatarOverlay.style.display = 'flex !important';
     } else {
         saveBtn.style.display = 'none';
-        editBtn.innerHTML = '<i class="fas fa-edit me-1"></i>Editar';
-        editBtn.className = 'btn btn-outline-primary';
+        cancelBtn.style.display = 'none';
+        editBtn.style.display = 'inline-block';
+        avatarOverlay.style.display = 'none';
+        loadProfile(); // Recarregar para descartar mudanças
     }
+}
+
+async function loadProfile() {
+    try {
+        const response = await fetch('/api/profile/me');
+        if (!response.ok) throw new Error('Erro ao carregar perfil');
+        
+        currentUser = await response.json();
+        
+        // Preencher formulário
+        document.getElementById('name').value = currentUser.name || '';
+        document.getElementById('email').value = currentUser.email || '';
+        document.getElementById('phone').value = currentUser.phone || '';
+        document.getElementById('position').value = currentUser.position || '';
+        document.getElementById('department').value = currentUser.department || '';
+        document.getElementById('role').value = currentUser.role || '';
+        document.getElementById('birthDate').value = currentUser.birth_date || '';
+        document.getElementById('hireDate').value = currentUser.hire_date || '';
+        document.getElementById('address').value = currentUser.address || '';
+        document.getElementById('notes').value = currentUser.notes || '';
+        
+        // Atualizar display
+        document.getElementById('displayName').textContent = currentUser.name || 'Usuário';
+        document.getElementById('displayRole').textContent = formatRole(currentUser.role);
+        document.getElementById('yearsWorked').textContent = currentUser.work_years || 0;
+        document.getElementById('daysUntilBday').textContent = currentUser.days_until_birthday || 0;
+        
+        // Atualizar avatar
+        if (currentUser.photo_filename) {
+            document.getElementById('userAvatar').src = `/static/uploads/employees/${currentUser.photo_filename}`;
+            document.getElementById('removePhotoBtn').style.display = 'inline-block';
+        } else {
+            document.getElementById('userAvatar').src = '/static/images/placeholder-user.jpg';
+            document.getElementById('removePhotoBtn').style.display = 'none';
+        }
+        
+    } catch (error) {
+        console.error('Erro ao carregar perfil:', error);
+        Utils.showAlert('Erro ao carregar perfil', 'error');
+    }
+}
+
+function formatRole(role) {
+    const roles = {
+        'admin': 'Administrador',
+        'rh': 'Recursos Humanos',
+        'manager': 'Gerente',
+        'marketing': 'Marketing',
+        'employee': 'Funcionário'
+    };
+    return roles[role] || role;
 }
 
 async function saveProfile() {
     const formData = new FormData(document.getElementById('profileForm'));
     const data = Object.fromEntries(formData);
     
+    // Converter nomes de campos de nome de atributo HTML para nomes esperados pela API
+    if (data.birth_date) {
+        data.birthDate = data.birth_date;
+        delete data.birth_date;
+    }
+    if (data.hire_date) {
+        data.hireDate = data.hire_date;
+        delete data.hire_date;
+    }
+    
+    console.log("Dados a enviar para API:", data);
+    
     try {
-        const response = await Utils.makeRequest('/profile', {
+        const response = await fetch('/api/profile/me', {
             method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
         });
         
+        const result = await response.json();
+        
+        if (!response.ok) {
+            Utils.showAlert(result.error || 'Erro ao salvar perfil', 'error');
+            return;
+        }
+        
         Utils.showToast('Perfil atualizado com sucesso!', 'success');
+        currentUser = result.user;
         toggleEditMode();
         
-        // Atualizar dados na tela
-        document.getElementById('displayName').textContent = data.name;
-        
     } catch (error) {
-        Utils.showAlert('Erro ao salvar perfil: ' + error.message, 'error');
+        console.error('Erro ao salvar:', error);
+        Utils.showAlert('Erro ao salvar perfil', 'error');
     }
 }
 
-// Form de senha
-document.getElementById('passwordForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    const data = Object.fromEntries(formData);
-    
-    if (data.newPassword !== data.confirmPassword) {
-        Utils.showAlert('As senhas não coincidem', 'error');
-        return;
+function previewPhoto(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('userAvatar').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        
+        // Upload da foto
+        uploadProfilePhoto(file);
     }
-    
+}
+
+async function uploadProfilePhoto(file) {
     try {
-        await Utils.makeRequest('/profile/password', {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch('/api/profile/me/photo', {
             method: 'POST',
-            body: JSON.stringify({
-                current_password: data.currentPassword,
-                new_password: data.newPassword
-            })
+            body: formData
         });
         
-        Utils.showToast('Senha alterada com sucesso!', 'success');
-        this.reset();
+        const result = await response.json();
+        
+        if (!response.ok) {
+            Utils.showAlert(result.error || 'Erro ao fazer upload da foto', 'warning');
+            return;
+        }
+        
+        Utils.showToast('Foto atualizada com sucesso!', 'success');
+        currentUser.photo_filename = result.photo_filename;
+        document.getElementById('removePhotoBtn').style.display = 'inline-block';
         
     } catch (error) {
-        Utils.showAlert('Erro ao alterar senha: ' + error.message, 'error');
+        console.error('Erro ao upload:', error);
+        Utils.showAlert('Erro ao fazer upload da foto', 'error');
     }
-});
+}
 
-// Carregar dados do usuário
-document.addEventListener('DOMContentLoaded', function() {
-    const user = Utils.getCurrentUser();
-    if (user) {
-        document.getElementById('displayName').textContent = user.name || 'Usuário';
-        document.getElementById('displayRole').textContent = user.role || 'Usuário';
-        document.getElementById('name').value = user.name || '';
-        document.getElementById('email').value = user.email || '';
+async function removeProfilePhoto() {
+    if (!confirm('Tem certeza que deseja remover sua foto?')) return;
+    
+    try {
+        const response = await fetch('/api/profile/me/photo', {
+            method: 'DELETE'
+        });
         
-        // Atualizar avatar
-        const avatar = document.getElementById('userAvatar');
-        avatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&size=120&background=007AFF&color=fff`;
+        const result = await response.json();
+        
+        if (!response.ok) {
+            Utils.showAlert(result.error || 'Erro ao remover foto', 'error');
+            return;
+        }
+        
+        document.getElementById('userAvatar').src = '/static/images/placeholder-user.jpg';
+        document.getElementById('removePhotoBtn').style.display = 'none';
+        currentUser.photo_filename = null;
+        Utils.showToast('Foto removida com sucesso!', 'success');
+        
+    } catch (error) {
+        console.error('Erro ao remover foto:', error);
+        Utils.showAlert('Erro ao remover foto', 'error');
     }
+}
+
+// Avatar overlay click
+document.addEventListener('DOMContentLoaded', function() {
+    const avatarOverlay = document.getElementById('avatarOverlay');
+    const photoInput = document.getElementById('photoInput');
+    
+    if (avatarOverlay) {
+        avatarOverlay.addEventListener('click', function() {
+            photoInput.click();
+        });
+    }
+    
+    // Carregar perfil
+    loadProfile();
+    
+    // Form de senha
+    document.getElementById('passwordForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData);
+        
+        if (data.newPassword !== data.confirmPassword) {
+            Utils.showAlert('As senhas não coincidem', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/profile/me/password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    current_password: data.currentPassword,
+                    new_password: data.newPassword
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (!response.ok) {
+                Utils.showAlert(result.error || 'Erro ao alterar senha', 'error');
+                return;
+            }
+            
+            Utils.showToast('Senha alterada com sucesso!', 'success');
+            this.reset();
+            
+        } catch (error) {
+            console.error('Erro:', error);
+            Utils.showAlert('Erro ao alterar senha', 'error');
+        }
+    });
 });
 </script>
 {% endblock %}

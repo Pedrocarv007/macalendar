@@ -231,40 +231,44 @@
                     <input type="hidden" id="restaurantId" name="restaurantId">
                     
                     <div class="row g-3">
+                        <!-- Photo Upload Section -->
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <img id="restaurantPhotoPreview" src="/static/images/placeholder-user.jpg" 
+                                         alt="Foto do restaurante" class="rounded" width="200" height="150"
+                                         style="object-fit: cover; border: 3px solid #dee2e6;">
+                                    <div class="mt-3">
+                                        <label for="restaurantPhoto" class="form-label d-block">Foto do Restaurante</label>
+                                        <input type="file" class="form-control" id="restaurantPhoto" name="photo" 
+                                               accept="image/*" onchange="previewRestaurantPhoto(event)">
+                                        <small class="text-muted d-block mt-2">JPG, PNG ou GIF. Máximo 5MB</small>
+                                        <button type="button" class="btn btn-sm btn-danger mt-2" id="removeRestaurantPhotoBtn" 
+                                                style="display: none;" onclick="removeRestaurantPhoto()">
+                                            <i class="fas fa-trash me-1"></i>Remover Foto
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="col-md-8">
                             <label for="restaurantName" class="form-label">Nome do Restaurante *</label>
                             <input type="text" class="form-control" id="restaurantName" name="name" required>
                         </div>
                         
-                        <div class="col-md-4">
-                            <label for="restaurantType" class="form-label">Tipo *</label>
-                            <select class="form-select" id="restaurantType" name="type" required>
-                                <option value="">Selecione...</option>
-                                <option value="Fast Food">Fast Food</option>
-                                <option value="Restaurante">Restaurante</option>
-                                <option value="Cafeteria">Cafeteria</option>
-                                <option value="Lanchonete">Lanchonete</option>
-                                <option value="Pizzaria">Pizzaria</option>
-                            </select>
-                        </div>
                         
                         <div class="col-md-6">
                             <label for="restaurantPhone" class="form-label">Telefone</label>
                             <input type="tel" class="form-control" id="restaurantPhone" name="phone" 
-                                   placeholder="(11) 99999-9999">
+                                   placeholder="(351) 99999-9999">
                         </div>
                         
                         <div class="col-md-6">
                             <label for="restaurantEmail" class="form-label">Email</label>
                             <input type="email" class="form-control" id="restaurantEmail" name="email">
                         </div>
-                        
-                        <div class="col-md-6">
-                            <label for="restaurantCnpj" class="form-label">CNPJ</label>
-                            <input type="text" class="form-control" id="restaurantCnpj" name="cnpj" 
-                                   placeholder="00.000.000/0001-00">
-                        </div>
-                        
+                     
                         <div class="col-md-6">
                             <label for="restaurantCapacity" class="form-label">Capacidade</label>
                             <input type="number" class="form-control" id="restaurantCapacity" name="capacity" 
@@ -384,7 +388,7 @@ function renderListView() {
             </td>
             <td>${restaurant.phone || '-'}</td>
             <td>
-                <span class="badge bg-info">${restaurant.employee_count || 0}</span>
+                <span class="badge bg-info">${restaurant.employees_count || 0}</span>
             </td>
             <td>
                 <span class="badge bg-${restaurant.is_active ? 'success' : 'secondary'}">
@@ -410,30 +414,41 @@ function renderListView() {
 
 function renderGridView() {
     const container = document.getElementById('restaurantsGridContainer');
-    container.innerHTML = filteredRestaurants.map(restaurant => `
-        <div class="col-md-6 col-lg-4">
-            <div class="card restaurant-card" onclick="editRestaurant(${restaurant.id})">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <h6 class="card-title mb-0">${restaurant.name}</h6>
-                        <span class="badge bg-${restaurant.is_active ? 'success' : 'secondary'}">
-                            ${restaurant.is_active ? 'Ativo' : 'Inativo'}
-                        </span>
+    container.innerHTML = filteredRestaurants.map(restaurant => {
+        const photoUrl = restaurant.photo_filename 
+            ? `/static/uploads/restaurants/${restaurant.photo_filename}`
+            : '/static/images/placeholder-user.jpg';
+        
+        return `
+            <div class="col-md-6 col-lg-4">
+                <div class="card restaurant-card" onclick="editRestaurant(${restaurant.id})">
+                    <img src="${photoUrl}" class="card-img-top" alt="${restaurant.name}"
+                         style="height: 200px; object-fit: cover;">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <h6 class="card-title mb-0">${restaurant.name}</h6>
+                            <span class="badge bg-${restaurant.is_active ? 'success' : 'secondary'}">
+                                ${restaurant.is_active ? 'Ativo' : 'Inativo'}
+                            </span>
+                        </div>
+                        
+                        <div class="text-muted small mb-3">
+                            ${restaurant.address ? `<div><i class="fas fa-map-marker-alt me-1"></i>${restaurant.address.substring(0, 50)}${restaurant.address.length > 50 ? '...' : ''}</div>` : ''}
+                            ${restaurant.phone ? `<div><i class="fas fa-phone me-1"></i>${restaurant.phone}</div>` : ''}
+                            ${restaurant.email ? `<div><i class="fas fa-envelope me-1"></i>${restaurant.email}</div>` : ''}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="fas fa-users me-1"></i>${restaurant.employees_count || 0} funcionários
+                            </small>
+                        </div>
                     </div>
-                    
-                    <div class="mb-2">
-                        <span class="badge bg-primary">${restaurant.type || 'Não definido'}</span>
-                    </div>
-                    
-                    <div class="text-muted small mb-3">
-                        ${restaurant.address ? `<div><i class="fas fa-map-marker-alt me-1"></i>${restaurant.address.substring(0, 50)}${restaurant.address.length > 50 ? '...' : ''}</div>` : ''}
-                        ${restaurant.phone ? `<div><i class="fas fa-phone me-1"></i>${restaurant.phone}</div>` : ''}
-                        ${restaurant.email ? `<div><i class="fas fa-envelope me-1"></i>${restaurant.email}</div>` : ''}
-                    </div>
-                    
-                    <div class="d-flex justify-content-between align-items-center">
-                        <small class="text-muted">
-                            <i class="fas fa-users me-1"></i>${restaurant.employee_count || 0} funcionários
+                </div>
+            </div>
+        `;
+    }).join('');
+}
                         </small>
                         ${restaurant.capacity ? `<small class="text-muted"><i class="fas fa-chair me-1"></i>${restaurant.capacity} lugares</small>` : ''}
                     </div>
@@ -475,7 +490,8 @@ function filterRestaurants() {
             (restaurant.address && restaurant.address.toLowerCase().includes(search)) ||
             (restaurant.phone && restaurant.phone.includes(search));
         
-        const matchesStatus = status === '' || restaurant.is_active.toString() === status;
+        // Corrigir: converter status para boolean para comparação
+        const matchesStatus = status === '' || (status === 'true' ? restaurant.is_active : !restaurant.is_active);
         const matchesType = !type || restaurant.type === type;
         
         return matchesSearch && matchesStatus && matchesType;
@@ -517,16 +533,23 @@ function editRestaurant(id) {
     
     document.getElementById('restaurantModalTitle').textContent = 'Editar Restaurante';
     document.getElementById('restaurantId').value = restaurant.id;
-    document.getElementById('restaurantName').value = restaurant.name;
-    document.getElementById('restaurantType').value = restaurant.type || '';
+    document.getElementById('restaurantName').value = restaurant.name || '';
     document.getElementById('restaurantPhone').value = restaurant.phone || '';
     document.getElementById('restaurantEmail').value = restaurant.email || '';
-    document.getElementById('restaurantCnpj').value = restaurant.cnpj || '';
     document.getElementById('restaurantCapacity').value = restaurant.capacity || '';
     document.getElementById('restaurantAddress').value = restaurant.address || '';
     document.getElementById('restaurantOpeningHours').value = restaurant.opening_hours || '';
-    document.getElementById('restaurantActive').checked = restaurant.is_active;
+    document.getElementById('restaurantActive').checked = restaurant.is_active || false;
     document.getElementById('restaurantDescription').value = restaurant.description || '';
+    
+    // Atualizar foto
+    if (restaurant.photo_filename) {
+        document.getElementById('restaurantPhotoPreview').src = `/static/uploads/restaurants/${restaurant.photo_filename}`;
+        document.getElementById('removeRestaurantPhotoBtn').style.display = 'inline-block';
+    } else {
+        document.getElementById('restaurantPhotoPreview').src = '/static/images/placeholder-user.jpg';
+        document.getElementById('removeRestaurantPhotoBtn').style.display = 'none';
+    }
     
     document.getElementById('deleteRestaurantBtn').style.display = 'inline-block';
     
@@ -558,8 +581,29 @@ async function saveRestaurant() {
             body: JSON.stringify(data)
         });
         
-        if (!response.ok) throw new Error('Erro ao salvar');
+        const result = await response.json();
         
+        if (response.ok) {
+            // Se há foto, fazer upload
+            const photoFile = document.getElementById('restaurantPhoto').files[0];
+            if (photoFile && result.id) {
+                await uploadRestaurantPhoto(result.id, photoFile);
+            } else if (photoFile && restaurantId) {
+                // Atualizar foto de restaurante existente
+                await uploadRestaurantPhoto(restaurantId, photoFile);
+            }
+            
+            Utils.showToast('Restaurante salvo com sucesso!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('restaurantModal')).hide();
+            loadRestaurants();
+        } else {
+            Utils.showAlert('Erro ao salvar: ' + (result.error || 'Erro desconhecido'), 'error');
+        }
+        
+    } catch (error) {
+        Utils.showAlert('Erro ao salvar restaurante: ' + error.message, 'error');
+    }
+}
         Utils.showToast(restaurantId ? 'Restaurante atualizado!' : 'Restaurante criado!', 'success');
         
         // Close modal and refresh
@@ -610,12 +654,25 @@ function updateStats() {
     document.getElementById('totalRestaurants').textContent = restaurants.length;
     document.getElementById('activeRestaurants').textContent = restaurants.filter(r => r.is_active).length;
     
-    // Calculate total employees
-    const totalEmployees = restaurants.reduce((total, r) => total + (r.employee_count || 0), 0);
+    // Calculate total employees (usar employees_count do banco)
+    const totalEmployees = restaurants.reduce((total, r) => total + (r.employees_count || 0), 0);
     document.getElementById('totalEmployees').textContent = totalEmployees;
     
-    // Events today would need to be calculated from events API
-    document.getElementById('eventsToday').textContent = 0;
+    // Load events today
+    loadEventsToday();
+}
+
+async function loadEventsToday() {
+    try {
+        const response = await fetch('/api/calendar/events?date=' + new Date().toISOString().split('T')[0]);
+        if (!response.ok) throw new Error('Erro ao carregar');
+        const data = await response.json();
+        const eventsCount = data.events ? data.events.length : 0;
+        document.getElementById('eventsToday').textContent = eventsCount;
+    } catch (error) {
+        console.error('Erro ao carregar eventos:', error);
+        document.getElementById('eventsToday').textContent = 0;
+    }
 }
 
 function exportRestaurants() {
@@ -624,12 +681,11 @@ function exportRestaurants() {
         Tipo: rest.type,
         Telefone: rest.phone,
         Email: rest.email,
-        CNPJ: rest.cnpj,
         Endereço: rest.address,
         Capacidade: rest.capacity,
         'Horário de Funcionamento': rest.opening_hours,
         Status: rest.is_active ? 'Ativo' : 'Inativo',
-        Funcionários: rest.employee_count || 0
+        Funcionários: rest.employees_count || 0
     }));
     
     const csv = convertToCSV(data);
@@ -653,6 +709,79 @@ document.getElementById('restaurantModal').addEventListener('hidden.bs.modal', f
     document.getElementById('restaurantForm').reset();
     document.getElementById('deleteRestaurantBtn').style.display = 'none';
     document.getElementById('restaurantModalTitle').textContent = 'Novo Restaurante';
+    document.getElementById('restaurantPhotoPreview').src = '/static/images/placeholder-user.jpg';
+    document.getElementById('removeRestaurantPhotoBtn').style.display = 'none';
+    document.getElementById('restaurantPhoto').value = '';
+    
+    // Recarregar funcionários se a função existir (para sincronizar dados)
+    if (typeof window.loadEmployees === 'function') {
+        window.loadEmployees();
+    }
 });
+
+// Funções de upload de foto para restaurantes
+function previewRestaurantPhoto(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('restaurantPhotoPreview').src = e.target.result;
+            document.getElementById('removeRestaurantPhotoBtn').style.display = 'inline-block';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+async function uploadRestaurantPhoto(restaurantId, file) {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch(`/api/restaurants/${restaurantId}/upload-photo`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            console.error('Erro ao upload de foto:', result.error);
+            Utils.showAlert('Erro ao fazer upload da foto: ' + (result.error || 'Erro desconhecido'), 'warning');
+        }
+    } catch (error) {
+        console.error('Erro ao upload de foto:', error);
+    }
+}
+
+async function removeRestaurantPhoto() {
+    const restaurantId = document.getElementById('restaurantId').value;
+    
+    if (!restaurantId) {
+        // Novo restaurante - apenas resetar preview
+        document.getElementById('restaurantPhotoPreview').src = '/static/images/placeholder-user.jpg';
+        document.getElementById('restaurantPhoto').value = '';
+        document.getElementById('removeRestaurantPhotoBtn').style.display = 'none';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/restaurants/${restaurantId}/photo`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            document.getElementById('restaurantPhotoPreview').src = '/static/images/placeholder-user.jpg';
+            document.getElementById('restaurantPhoto').value = '';
+            document.getElementById('removeRestaurantPhotoBtn').style.display = 'none';
+            Utils.showToast('Foto removida com sucesso', 'success');
+        } else {
+            const result = await response.json();
+            Utils.showAlert('Erro ao remover foto: ' + (result.error || 'Erro desconhecido'), 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao remover foto:', error);
+        Utils.showAlert('Erro ao remover foto', 'error');
+    }
+}
 </script>
 {% endblock %}

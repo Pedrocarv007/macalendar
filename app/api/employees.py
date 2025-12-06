@@ -27,13 +27,9 @@ def get_employees():
         
         # Parâmetros de filtro
         restaurant_id = request.args.get('restaurant_id', type=int)
-        is_active = request.args.get('is_active', 'true').lower() == 'true'
         
         # Query base
         query = Employee.query
-        
-        # Filtrar por status
-        query = query.filter(Employee.is_active == is_active)
         
         # Filtrar por permissões
         if user_role in ['admin', 'rh', 'marketing']:
@@ -177,6 +173,12 @@ def update_employee(employee_id):
             employee.is_active = data['is_active']
         if 'notes' in data:
             employee.notes = data['notes']
+        if 'restaurant_id' in data:
+            # Validar restaurante
+            restaurant = Restaurant.query.get(data['restaurant_id'])
+            if not restaurant:
+                return jsonify({'error': 'Restaurante não encontrado'}), 404
+            employee.restaurant_id = data['restaurant_id']
         
         employee.updated_at = datetime.utcnow()
         db.session.commit()
@@ -328,6 +330,117 @@ def get_birthdays_this_month():
         birthdays.sort(key=lambda x: x['employee']['birth_date'][-2:])
         
         return jsonify({'birthdays': birthdays}), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+@employees_bp.route('/<int:employee_id>/upload-photo', methods=['POST'])
+@api_login_required
+@role_required('admin', 'rh', 'manager')
+def upload_employee_photo(employee_id):
+    """Upload de foto para colaborador"""
+    try:
+        # Verificar se arquivo foi enviado
+        if 'file' not in request.files:
+            return jsonify({'error': 'Arquivo não fornecido'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'Arquivo não selecionado'}), 400
+        
+        # Verificar extensão
+        if not allowed_file(file.filename, ALLOWED_EXTENSIONS):
+            return jsonify({'error': 'Formato de arquivo não permitido. Use PNG, JPG, JPEG ou GIF'}), 400
+        
+        # Verificar se colaborador existe
+        employee = Employee.query.get(employee_id)
+        if not employee:
+            return jsonify({'error': 'Colaborador não encontrado'}), 404
+        
+        # Verificar permissões
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+        
+        if user_role not in ['admin', 'rh'] and employee.restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada'}), 403
+        
+        try:
+            # Criar pasta se não existir
+            upload_folder = 'app/static/uploads/employees'
+            os.makedirs(upload_folder, exist_ok=True)
+            
+            # Gerar nome seguro do arquivo
+            filename = secure_filename(f"employee_{employee_id}_{datetime.now().timestamp()}.jpg")
+            filepath = os.path.join(upload_folder, filename)
+            
+            # Redimensionar e otimizar imagem
+            img = Image.open(file)
+            
+            # Converter para RGB se necessário (remove transparência, etc)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Redimensionar para 400x400 máximo
+            img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+            
+            # Salvar com qualidade otimizada
+            img.save(filepath, 'JPEG', quality=85, optimize=True)
+            
+            # Deletar foto antiga se existir
+            if employee.photo_filename:
+                old_path = os.path.join('app/static/uploads/employees', employee.photo_filename)
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+            
+            # Atualizar banco de dados
+            employee.photo_filename = filename
+            employee.updated_at = datetime.utcnow()
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Foto enviada com sucesso',
+                'photo_filename': filename,
+                'photo_url': f'/static/uploads/employees/{filename}'
+            }), 200
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Erro ao processar imagem: {str(e)}'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+@employees_bp.route('/<int:employee_id>/photo', methods=['DELETE'])
+@api_login_required
+@role_required('admin', 'rh', 'manager')
+def delete_employee_photo(employee_id):
+    """Deletar foto do colaborador"""
+    try:
+        # Verificar se colaborador existe
+        employee = Employee.query.get(employee_id)
+        if not employee:
+            return jsonify({'error': 'Colaborador não encontrado'}), 404
+        
+        # Verificar permissões
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+        
+        if user_role not in ['admin', 'rh'] and employee.restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada'}), 403
+        
+        if employee.photo_filename:
+            # Deletar arquivo
+            old_path = os.path.join('app/static/uploads/employees', employee.photo_filename)
+            if os.path.exists(old_path):
+                os.remove(old_path)
+            
+            # Atualizar banco
+            employee.photo_filename = None
+            employee.updated_at = datetime.utcnow()
+            db.session.commit()
+        
+        return jsonify({'message': 'Foto deletada com sucesso'}), 200
         
     except Exception as e:
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500

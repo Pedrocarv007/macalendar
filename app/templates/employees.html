@@ -231,6 +231,27 @@
                     <input type="hidden" id="employeeId" name="employeeId">
                     
                     <div class="row g-3">
+                        <!-- Photo Upload Section -->
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <img id="employeePhotoPreview" src="/static/images/placeholder-user.jpg" 
+                                         alt="Foto do colaborador" class="rounded-circle" width="120" height="120"
+                                         style="object-fit: cover; border: 3px solid #dee2e6;">
+                                    <div class="mt-3">
+                                        <label for="employeePhoto" class="form-label d-block">Foto do Colaborador</label>
+                                        <input type="file" class="form-control" id="employeePhoto" name="photo" 
+                                               accept="image/*" onchange="previewPhoto(event)">
+                                        <small class="text-muted d-block mt-2">JPG, PNG ou GIF. Máximo 5MB</small>
+                                        <button type="button" class="btn btn-sm btn-danger mt-2" id="removePhotoBtn" 
+                                                style="display: none;" onclick="removePhoto()">
+                                            <i class="fas fa-trash me-1"></i>Remover Foto
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="col-md-6">
                             <label for="employeeName" class="form-label">Nome Completo *</label>
                             <input type="text" class="form-control" id="employeeName" name="name" required>
@@ -251,6 +272,7 @@
                             <label for="employeePosition" class="form-label">Cargo *</label>
                             <select class="form-select" id="employeePosition" name="position" required onchange="syncPositionToDepartment()">
                                 <option value="">Selecione...</option>
+                                <option value="Desenvolvedor">Desenvolvedor</option>
                                 <option value="RH">Recursos Humanos</option>
                                 <option value="Gerente_loja">Gerente de Loja</option>
                                 <option value="Sub_gerente">Sub Gerente</option>
@@ -265,6 +287,7 @@
                             <label for="employeeDepartment" class="form-label">Departamento *</label>
                             <select class="form-select" id="employeeDepartment" name="department" required onchange="syncDepartmentToPosition()">
                                 <option value="">Selecione...</option>
+                                <option value="Desenvolvedor">Desenvolvedor</option>
                                 <option value="RH">Recursos Humanos</option>
                                 <option value="Gerente_loja">Gerente de Loja</option>
                                 <option value="Sub_gerente">Sub Gerente</option>
@@ -272,6 +295,13 @@
                                 <option value="colaborador">Colaborador</option>
                                 <option value="treinador">Treinador</option>
                                 <option value="RP">Relações Públicas</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="employeeRestaurant" class="form-label">Restaurante *</label>
+                            <select class="form-select" id="employeeRestaurant" name="restaurant_id" required>
+                                <option value="">Selecione o restaurante...</option>
                             </select>
                         </div>
                         
@@ -324,6 +354,7 @@ let currentView = 'list';
 
 document.addEventListener('DOMContentLoaded', function() {
     loadEmployees();
+    loadRestaurantsForSelect();
 });
 
 async function loadEmployees() {
@@ -343,6 +374,28 @@ async function loadEmployees() {
         Utils.showAlert('Erro ao carregar colaboradores', 'error');
     } finally{
         loading.style.display = 'none';
+    }
+}
+
+async function loadRestaurantsForSelect() {
+    try {
+        const response = await fetch('/api/restaurants');
+        if (!response.ok) throw new Error('Erro ao carregar');
+        const data = await response.json();
+        const restaurants = data.restaurants || [];
+        
+        const select = document.getElementById('employeeRestaurant');
+        if (select) {
+            select.innerHTML = '<option value="">Selecione o restaurante...</option>';
+            restaurants.forEach(restaurant => {
+                const option = document.createElement('option');
+                option.value = restaurant.id;
+                option.textContent = restaurant.name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao carregar restaurantes:', error);
     }
 }
 
@@ -373,64 +426,78 @@ function renderEmployees() {
 
 function renderListView() {
     const tbody = document.getElementById('employeesTableBody');
-    tbody.innerHTML = filteredEmployees.map(employee => `
-        <tr onclick="editEmployee(${employee.id})" style="cursor: pointer;">
-            <td>
-                <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(employee.name)}&size=40&background=007AFF&color=fff" 
-                     alt="${employee.name}" class="rounded-circle" width="40" height="40">
-            </td>
-            <td>
-                <div>
-                    <strong>${employee.name}</strong>
-                    <br><small class="text-muted">${employee.email}</small>
-                </div>
-            </td>
-            <td>${employee.position}</td>
-            <td>${employee.department}</td>
-            <td>${employee.phone || '-'}</td>
-            <td>
-                <span class="badge bg-${employee.is_active ? 'success' : 'secondary'}">
-                    ${employee.is_active ? 'Ativo' : 'Inativo'}
-                </span>
-            </td>
-            <td>
-                <div class="btn-group" role="group">
-                    <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); editEmployee(${employee.id})">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); confirmDeleteEmployee(${employee.id})">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = filteredEmployees.map(employee => {
+        const photoUrl = employee.photo_filename 
+            ? `/static/uploads/employees/${employee.photo_filename}`
+            : '/static/images/placeholder-user.jpg';
+        
+        return `
+            <tr onclick="editEmployee(${employee.id})" style="cursor: pointer;">
+                <td>
+                    <img src="${photoUrl}" 
+                         alt="${employee.name}" class="rounded-circle" width="40" height="40"
+                         style="object-fit: cover;">
+                </td>
+                <td>
+                    <div>
+                        <strong>${employee.name}</strong>
+                        <br><small class="text-muted">${employee.email}</small>
+                    </div>
+                </td>
+                <td>${employee.position}</td>
+                <td>${employee.department}</td>
+                <td>${employee.phone || '-'}</td>
+                <td>
+                    <span class="badge bg-${employee.is_active ? 'success' : 'secondary'}">
+                        ${employee.is_active ? 'Ativo' : 'Inativo'}
+                    </span>
+                </td>
+                <td>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); editEmployee(${employee.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); confirmDeleteEmployee(${employee.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 function renderGridView() {
     const container = document.getElementById('employeesGridContainer');
-    container.innerHTML = filteredEmployees.map(employee => `
-        <div class="col-md-6 col-lg-4">
-            <div class="card employee-card" onclick="editEmployee(${employee.id})">
-                <div class="card-body text-center">
-                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(employee.name)}&size=80&background=007AFF&color=fff" 
-                         alt="${employee.name}" class="rounded-circle mb-3" width="80" height="80">
-                    <h6 class="card-title">${employee.name}</h6>
-                    <p class="text-muted small mb-1">${employee.position}</p>
-                    <p class="text-muted small mb-2">${employee.department}</p>
-                    <span class="badge bg-${employee.is_active ? 'success' : 'secondary'} mb-2">
-                        ${employee.is_active ? 'Ativo' : 'Inativo'}
-                    </span>
-                    <div class="mt-2">
-                        <small class="text-muted">
-                            <i class="fas fa-envelope me-1"></i>${employee.email}<br>
-                            <i class="fas fa-phone me-1"></i>${employee.phone || 'Não informado'}
-                        </small>
+    container.innerHTML = filteredEmployees.map(employee => {
+        const photoUrl = employee.photo_filename 
+            ? `/static/uploads/employees/${employee.photo_filename}`
+            : '/static/images/placeholder-user.jpg';
+        
+        return `
+            <div class="col-md-6 col-lg-4">
+                <div class="card employee-card" onclick="editEmployee(${employee.id})">
+                    <div class="card-body text-center">
+                        <img src="${photoUrl}" 
+                             alt="${employee.name}" class="rounded-circle mb-3" width="80" height="80"
+                             style="object-fit: cover;">
+                        <h6 class="card-title">${employee.name}</h6>
+                        <p class="text-muted small mb-1">${employee.position}</p>
+                        <p class="text-muted small mb-2">${employee.department}</p>
+                        <span class="badge bg-${employee.is_active ? 'success' : 'secondary'} mb-2">
+                            ${employee.is_active ? 'Ativo' : 'Inativo'}
+                        </span>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-envelope me-1"></i>${employee.email}<br>
+                                <i class="fas fa-phone me-1"></i>${employee.phone || 'Não informado'}
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function toggleView(view) {
@@ -454,7 +521,8 @@ function filterEmployees() {
             employee.position.toLowerCase().includes(search);
         
         const matchesDepartment = !department || employee.department === department;
-        const matchesStatus = status === '' || employee.is_active.toString() === status;
+        // Corrigir: converter status para boolean para comparação
+        const matchesStatus = status === '' || (status === 'true' ? employee.is_active : !employee.is_active);
         
         return matchesSearch && matchesDepartment && matchesStatus;
     });
@@ -503,9 +571,19 @@ function editEmployee(id) {
     document.getElementById('employeePosition').value = employee.position;
     document.getElementById('employeeDepartment').value = employee.department;
     document.getElementById('employeeBirthDate').value = employee.birth_date || '';
+    document.getElementById('employeeRestaurant').value = employee.restaurant_id || '';
     document.getElementById('employeeActive').checked = employee.is_active;
     document.getElementById('employeeAddress').value = employee.address || '';
     document.getElementById('employeeNotes').value = employee.notes || '';
+    
+    // Atualizar foto
+    if (employee.photo_filename) {
+        document.getElementById('employeePhotoPreview').src = `/static/uploads/employees/${employee.photo_filename}`;
+        document.getElementById('removePhotoBtn').style.display = 'inline-block';
+    } else {
+        document.getElementById('employeePhotoPreview').src = '/static/images/placeholder-user.jpg';
+        document.getElementById('removePhotoBtn').style.display = 'none';
+    }
     
     document.getElementById('deleteEmployeeBtn').style.display = 'inline-block';
     
@@ -519,18 +597,30 @@ async function saveEmployee() {
         const formData = new FormData(form);
         const employeeId = document.getElementById('employeeId').value;
         
+        // Validar campos obrigatórios
+        const name = formData.get('name');
+        const email = formData.get('email');
+        const birth_date = formData.get('birth_date');
+        const position = formData.get('position');
+        const restaurant_id = document.getElementById('employeeRestaurant').value;
+        
+        if (!name || !email || !birth_date || !position || !restaurant_id) {
+            Utils.showAlert('Por favor, preencha todos os campos obrigatórios', 'warning');
+            return;
+        }
+        
         // Preparar dados
         const data = {
-            name: formData.get('name'),
-            email: formData.get('email'),
+            name: name,
+            email: email,
             phone: formData.get('phone'),
-            position: formData.get('position'),
+            position: position,
             department: formData.get('department'),
-            birth_date: formData.get('birth_date'),
+            birth_date: birth_date,
             address: formData.get('address'),
             notes: formData.get('notes'),
             is_active: document.getElementById('employeeActive').checked,
-            restaurant_id: {{ current_user.restaurant_id if current_user and current_user.restaurant_id else 'null' }}
+            restaurant_id: parseInt(restaurant_id)
         };
         
         let response;
@@ -557,16 +647,25 @@ async function saveEmployee() {
         const result = await response.json();
         
         if (response.ok) {
-            showAlert(result.message || 'Colaborador salvo com sucesso!', 'success');
+            // Se há foto, fazer upload
+            const photoFile = document.getElementById('employeePhoto').files[0];
+            if (photoFile && result.id) {
+                await uploadEmployeePhoto(result.id, photoFile);
+            } else if (photoFile && employeeId) {
+                // Atualizar foto de colaborador existente
+                await uploadEmployeePhoto(employeeId, photoFile);
+            }
+            
+            Utils.showToast(result.message || 'Colaborador salvo com sucesso!', 'success');
             bootstrap.Modal.getInstance(document.getElementById('employeeModal')).hide();
             loadEmployees();
         } else {
-            showAlert(result.error || 'Erro ao salvar colaborador', 'danger');
+            Utils.showAlert(result.error || 'Erro ao salvar colaborador', 'error');
         }
         
     } catch (error) {
         console.error('Erro ao salvar colaborador:', error);
-        showAlert('Erro ao salvar colaborador', 'danger');
+        Utils.showAlert('Erro ao salvar colaborador', 'error');
     }
 }
 
@@ -638,9 +737,83 @@ function convertToCSV(data) {
 // Reset modal when closed
 document.getElementById('employeeModal').addEventListener('hidden.bs.modal', function() {
     document.getElementById('employeeForm').reset();
+    document.getElementById('employeeRestaurant').value = '';
     document.getElementById('deleteEmployeeBtn').style.display = 'none';
     document.getElementById('employeeModalTitle').textContent = 'Novo Colaborador';
+    document.getElementById('employeePhotoPreview').src = '/static/images/placeholder-user.jpg';
+    document.getElementById('removePhotoBtn').style.display = 'none';
+    document.getElementById('employeePhoto').value = '';
+    
+    // Recarregar restaurantes se a função existir (para sincronizar contagem de funcionários)
+    if (window.loadRestaurants) {
+        window.loadRestaurants();
+    }
 });
+
+// Funções de upload de foto
+function previewPhoto(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('employeePhotoPreview').src = e.target.result;
+            document.getElementById('removePhotoBtn').style.display = 'inline-block';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+async function uploadEmployeePhoto(employeeId, file) {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch(`/api/employees/${employeeId}/upload-photo`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            console.error('Erro ao upload de foto:', result.error);
+            Utils.showAlert('Erro ao fazer upload da foto: ' + (result.error || 'Erro desconhecido'), 'warning');
+        }
+    } catch (error) {
+        console.error('Erro ao upload de foto:', error);
+    }
+}
+
+async function removePhoto() {
+    const employeeId = document.getElementById('employeeId').value;
+    
+    if (!employeeId) {
+        // Novo colaborador - apenas resetar preview
+        document.getElementById('employeePhotoPreview').src = '/static/images/placeholder-user.jpg';
+        document.getElementById('employeePhoto').value = '';
+        document.getElementById('removePhotoBtn').style.display = 'none';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/employees/${employeeId}/photo`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            document.getElementById('employeePhotoPreview').src = '/static/images/placeholder-user.jpg';
+            document.getElementById('employeePhoto').value = '';
+            document.getElementById('removePhotoBtn').style.display = 'none';
+            Utils.showToast('Foto removida com sucesso', 'success');
+        } else {
+            const result = await response.json();
+            Utils.showAlert('Erro ao remover foto: ' + (result.error || 'Erro desconhecido'), 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao remover foto:', error);
+        Utils.showAlert('Erro ao remover foto', 'error');
+    }
+}
 
 function syncPositionToDepartment() {
     const position = document.getElementById('employeePosition');

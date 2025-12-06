@@ -96,7 +96,7 @@ def create_document():
         print("DEBUG - Employee ID fornecido:", employee_id)
         print("DEBUG - Restaurant ID:", restaurant_id)
         print("DEBUG - User logado ID:", current_user_id)
-        print("DEBUG - User logado é employee:", current_user.id if current_user else None)
+        print("DEBUG - User logado employee_id:", current_user.employee_id if current_user else None)
         
         if not restaurant_id:
             return jsonify({'error': 'Restaurant ID é obrigatório'}), 400
@@ -104,13 +104,13 @@ def create_document():
         if not category:
             return jsonify({'error': 'Categoria é obrigatória'}), 400
         
-        # Se employee_id não foi fornecido, usar o do user logado (que agora é o employee)
+        # Se employee_id não foi fornecido, usar o do user logado
         if not employee_id:
-            if current_user:
-                employee_id = current_user.id
+            if current_user and current_user.employee_id:
+                employee_id = current_user.employee_id
                 print(f"DEBUG - Usando employee_id do user logado: {employee_id}")
             else:
-                return jsonify({'error': 'Colaborador é obrigatório e usuário não encontrado'}), 400
+                return jsonify({'error': 'Colaborador é obrigatório e usuário não tem employee_id vinculado'}), 400
         
         # Verificar se colaborador existe
         employee = Employee.query.get(employee_id)
@@ -175,50 +175,7 @@ def create_document():
         print(f"DEBUG - Erro ao criar documento: {str(e)}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'error': f'{field} é obrigatório'}), 400
-        
-        # Verificar permissões
-        restaurant_id = data['restaurant_id']
-        if user_role not in ['admin', 'rh'] and restaurant_id != user_restaurant_id:
-            return jsonify({'error': 'Permissão negada para este restaurante'}), 403
-        
-        # Verificar se funcionário existe
-        employee = Employee.query.get(data['employee_id'])
-        if not employee:
-            return jsonify({'error': 'Funcionário não encontrado'}), 404
-        
-        # Verificar se funcionário pertence ao restaurante
-        if employee.restaurant_id != restaurant_id:
-            return jsonify({'error': 'Funcionário não pertence a este restaurante'}), 400
-        
-        # Verificar se restaurante existe
-        restaurant = Restaurant.query.get(restaurant_id)
-        if not restaurant:
-            return jsonify({'error': 'Restaurante não encontrado'}), 404
-        
-        # Criar documento
-        document = Document(
-            title=data['title'],
-            document_type=data['document_type'],
-            template_name=data['template_name'],
-            employee_id=data['employee_id'],
-            restaurant_id=restaurant_id,
-            created_by=current_user_id,
-            content=data.get('content'),
-            status='draft'
-        )
-        
-        db.session.add(document)
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Documento criado com sucesso',
-            'document': document.to_dict()
-        }), 201
-        
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500        
     except Exception as e:
         db.session.rollback()
         return print({'error': f'Erro interno: {str(e)}'}), 500
