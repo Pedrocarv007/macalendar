@@ -164,6 +164,9 @@
                             <i class="fas fa-folder me-2"></i>Arquivos
                         </h5>
                         <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#generateDocumentModal">
+                                <i class="fas fa-wand-magic-sparkles me-1"></i>Gerar Cartão
+                            </button>
                             <button class="btn btn-sm btn-outline-primary" onclick="toggleView('grid')" id="gridViewBtn">
                                 <i class="fas fa-th"></i>
                             </button>
@@ -225,7 +228,66 @@
     </div>
 </div>
 
-<!-- Document Modal -->
+<!-- Generate Document Modal (Novo) -->
+<div class="modal fade" id="generateDocumentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-wand-magic-sparkles me-2"></i>Gerar Cartão
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="generateDocumentForm">
+                    <!-- Selecionar Tipo de Documento -->
+                    <div class="mb-3">
+                        <label for="genDocumentType" class="form-label">Tipo de Cartão *</label>
+                        <select class="form-select" id="genDocumentType" required>
+                            <option value="">Selecione...</option>
+                            <option value="bem_vindo">Bem-vindo</option>
+                            <option value="aniversario">Aniversário</option>
+                        </select>
+                    </div>
+
+                    <!-- Selecionar Funcionário -->
+                    <div class="mb-3">
+                        <label for="genEmployeeId" class="form-label">Funcionário *</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="genEmployeeSearch" 
+                                   placeholder="Buscar funcionário..." autocomplete="off">
+                            <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div id="employeeDropdown" class="list-group mt-2" style="display: none; max-height: 300px; overflow-y: auto;">
+                            <!-- Funcionários serão listados aqui -->
+                        </div>
+                        <input type="hidden" id="genEmployeeId" value="">
+                        <small id="selectedEmployeeName" class="form-text text-success" style="display: none;"></small>
+                    </div>
+
+                    <!-- Informações do Funcionário Selecionado -->
+                    <div id="employeeInfo" style="display: none;" class="mb-3">
+                        <div class="alert alert-info">
+                            <div><strong>Nome:</strong> <span id="infoEmployeeName"></span></div>
+                            <div><strong>Foto:</strong> <span id="infoEmployeePhoto"></span></div>
+                            <div id="infoBirthDate" style="display: none;"><strong>Data de Nascimento:</strong> <span id="infoEmployeeBirthDate"></span></div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="generateAndDownloadDocument()">
+                    <i class="fas fa-download me-1"></i>Gerar e Baixar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Document Modal (Original) -->
 <div class="modal fade" id="documentModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -806,5 +868,224 @@ document.getElementById('documentModal').addEventListener('hidden.bs.modal', fun
     document.getElementById('documentFile').style.display = 'block';
     document.getElementById('documentFile').required = true;
 });
+
+// ===== FUNÇÕES PARA GERAÇÃO DE DOCUMENTOS =====
+
+let allEmployees = [];
+let selectedEmployee = null;
+
+// Carregar lista de funcionários quando modal abrir
+document.getElementById('generateDocumentModal').addEventListener('shown.bs.modal', function() {
+    loadEmployeesForGeneration();
+});
+
+// Fechar modal quando fecha
+document.getElementById('generateDocumentModal').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('generateDocumentForm').reset();
+    document.getElementById('employeeDropdown').style.display = 'none';
+    document.getElementById('employeeInfo').style.display = 'none';
+    document.getElementById('genEmployeeId').value = '';
+    selectedEmployee = null;
+});
+
+// Carregar lista de funcionários
+async function loadEmployeesForGeneration() {
+    try {
+        const response = await fetch('/api/employees');
+        if (!response.ok) throw new Error('Erro ao carregar');
+        const data = await response.json();
+        allEmployees = data.employees || [];
+        console.log('Funcionários carregados:', allEmployees.length);
+    } catch (error) {
+        console.error('Erro ao carregar funcionários:', error);
+        Utils.showAlert('Erro ao carregar funcionários', 'error');
+    }
+}
+
+// Buscar funcionários enquanto digita
+document.getElementById('genEmployeeSearch').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase().trim();
+    const dropdown = document.getElementById('employeeDropdown');
+    
+    if (searchTerm.length < 1) {
+        dropdown.style.display = 'none';
+        return;
+    }
+    
+    const filtered = allEmployees.filter(emp => 
+        emp.name.toLowerCase().includes(searchTerm) ||
+        (emp.email && emp.email.toLowerCase().includes(searchTerm))
+    );
+    
+    dropdown.innerHTML = '';
+    
+    if (filtered.length === 0) {
+        dropdown.innerHTML = '<div class="list-group-item disabled">Nenhum funcionário encontrado</div>';
+    } else {
+        filtered.forEach(emp => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `
+                <div class="d-flex w-100 justify-content-between">
+                    <strong>${emp.name}</strong>
+                    <small class="text-muted">${emp.role || 'N/A'}</small>
+                </div>
+                <small class="text-muted">${emp.email}</small>
+            `;
+            item.onclick = (e) => {
+                e.preventDefault();
+                selectEmployee(emp);
+            };
+            dropdown.appendChild(item);
+        });
+    }
+    
+    dropdown.style.display = 'block';
+});
+
+// Limpar busca
+document.getElementById('clearSearchBtn').addEventListener('click', function() {
+    document.getElementById('genEmployeeSearch').value = '';
+    document.getElementById('employeeDropdown').style.display = 'none';
+    document.getElementById('genEmployeeId').value = '';
+    selectedEmployee = null;
+    document.getElementById('employeeInfo').style.display = 'none';
+    document.getElementById('selectedEmployeeName').style.display = 'none';
+});
+
+// Selecionar funcionário
+function selectEmployee(employee) {
+    selectedEmployee = employee;
+    document.getElementById('genEmployeeId').value = employee.id;
+    document.getElementById('genEmployeeSearch').value = employee.name;
+    document.getElementById('employeeDropdown').style.display = 'none';
+    
+    // Mostrar informações do funcionário
+    document.getElementById('infoEmployeeName').textContent = employee.name;
+    document.getElementById('infoEmployeePhoto').textContent = 
+        employee.photo_filename ? '✓ Tem foto' : '⚠ Sem foto (usará placeholder)';
+    
+    const docType = document.getElementById('genDocumentType').value;
+    if (docType === 'aniversario' && employee.birth_date) {
+        const date = new Date(employee.birth_date);
+        document.getElementById('infoEmployeeBirthDate').textContent = 
+            date.toLocaleDateString('pt-BR');
+        document.getElementById('infoBirthDate').style.display = 'block';
+    } else {
+        document.getElementById('infoBirthDate').style.display = 'none';
+    }
+    
+    document.getElementById('employeeInfo').style.display = 'block';
+    document.getElementById('selectedEmployeeName').style.display = 'block';
+    document.getElementById('selectedEmployeeName').textContent = `✓ ${employee.name} selecionado`;
+}
+
+// Atualizar tipo de documento
+document.getElementById('genDocumentType').addEventListener('change', function() {
+    if (selectedEmployee) {
+        const docType = this.value;
+        if (docType === 'aniversario' && selectedEmployee.birth_date) {
+            const date = new Date(selectedEmployee.birth_date);
+            document.getElementById('infoEmployeeBirthDate').textContent = 
+                date.toLocaleDateString('pt-BR');
+            document.getElementById('infoBirthDate').style.display = 'block';
+        } else {
+            document.getElementById('infoBirthDate').style.display = 'none';
+        }
+    }
+});
+
+// Gerar e baixar documento
+async function generateAndDownloadDocument() {
+    const docType = document.getElementById('genDocumentType').value;
+    const employeeId = document.getElementById('genEmployeeId').value;
+    
+    if (!docType) {
+        Utils.showAlert('Selecione um tipo de cartão', 'warning');
+        return;
+    }
+    
+    if (!employeeId) {
+        Utils.showAlert('Selecione um funcionário', 'warning');
+        return;
+    }
+    
+    // Mostrar loading
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';
+    
+    try {
+        // Obter restaurant_id do funcionário selecionado
+        const restaurantId = selectedEmployee.restaurant_id;
+        
+        // Chamar API para gerar documento
+        const response = await fetch('/api/documents/generate-auto', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                document_type: docType,
+                employee_id: parseInt(employeeId),
+                restaurant_id: restaurantId
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao gerar documento');
+        }
+        
+        const result = await response.json();
+        const filename = result.document.filename;
+        
+        // Atualizar status do botão
+        btn.innerHTML = '<i class="fas fa-download me-1"></i>Baixando...';
+        
+        // Gerar nome do arquivo com data e hora
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+        const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS
+        const cleanName = selectedEmployee.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+        const downloadName = `cartao_${docType}_${cleanName}_${dateStr}_${timeStr}.png`;
+        
+        // Aguardar um pouco para garantir que o arquivo foi salvo
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Baixar arquivo
+        const downloadLink = document.createElement('a');
+        downloadLink.href = `/uploads/generated/${filename}`;
+        downloadLink.download = downloadName;
+        downloadLink.style.display = 'none';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        
+        // Aguardar download iniciar
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Fechar modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('generateDocumentModal'));
+        if (modal) {
+            modal.hide();
+        }
+        
+        // Recarregar documentos
+        loadDocuments();
+        
+        // Mostrar sucesso
+        Utils.showToast(`✓ Cartão gerado e baixado: ${downloadName}`, 'success');
+        
+    } catch (error) {
+        console.error('Erro ao gerar documento:', error);
+        Utils.showAlert('Erro ao gerar documento: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
 </script>
 {% endblock %}

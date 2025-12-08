@@ -474,31 +474,31 @@ class AuthAPI {
 class CalendarAPI {
     static async getEvents(params = {}) {
         const queryString = new URLSearchParams(params).toString();
-        return await Utils.makeRequest(`/calendar/events?${queryString}`);
+        return await Utils.makeRequest(`/mac/calendar/events?${queryString}`);
     }
 
     static async createEvent(eventData) {
-        return await Utils.makeRequest('/calendar/events', {
+        return await Utils.makeRequest('/mac/calendar/events', {
             method: 'POST',
             body: JSON.stringify(eventData)
         });
     }
 
     static async updateEvent(id, eventData) {
-        return await Utils.makeRequest(`/calendar/events/${id}`, {
+        return await Utils.makeRequest(`/mac/calendar/events/${id}`, {
             method: 'PUT',
             body: JSON.stringify(eventData)
         });
     }
 
     static async deleteEvent(id) {
-        return await Utils.makeRequest(`/calendar/events/${id}`, {
+        return await Utils.makeRequest(`/mac/calendar/events/${id}`, {
             method: 'DELETE'
         });
     }
 
     static async getEvent(id) {
-        return await Utils.makeRequest(`/calendar/events/${id}`);
+        return await Utils.makeRequest(`/mac/calendar/events/${id}`);
     }
 }
 

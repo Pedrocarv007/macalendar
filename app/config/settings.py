@@ -14,6 +14,7 @@ class Config:
     # Configurações básicas do Flask
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'mac-calendar-secret-key-2024-dev'
     DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    APPLICATION_ROOT = os.environ.get('APPLICATION_ROOT', '/mac')
     
     # Configurações do banco de dados
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{BASE_DIR}/instance/macalendar.db'

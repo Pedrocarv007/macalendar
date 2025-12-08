@@ -213,8 +213,46 @@
     <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Custom JS -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <!-- Core JS Modules (carregados em ordem) -->
+    <!-- 1. API Client -->
+    <script src="{{ url_for('static', filename='js/api-client.js') }}"></script>
+    
+    <!-- 2. App State -->
+    <script src="{{ url_for('static', filename='js/app-state.js') }}"></script>
+    
+    <!-- 3. Utilities -->
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+    
+    <!-- 4. DOM Utilities -->
+    <script src="{{ url_for('static', filename='js/dom.js') }}"></script>
+    
+    <!-- 5. Page Modules (conforme necessário) -->
+    {% if 'dashboard' in request.path %}
+    <script src="{{ url_for('static', filename='js/modules/dashboard.js') }}"></script>
+    {% endif %}
+    
+    {% if 'employees' in request.path %}
+    <script src="{{ url_for('static', filename='js/modules/employees.js') }}"></script>
+    {% endif %}
+    
+    {% if 'restaurants' in request.path %}
+    <script src="{{ url_for('static', filename='js/modules/restaurants.js') }}"></script>
+    {% endif %}
+    
+    {% if 'documents' in request.path %}
+    <script src="{{ url_for('static', filename='js/modules/documents.js') }}"></script>
+    {% endif %}
+    
+    {% if 'calendar' in request.path %}
+    <script src="{{ url_for('static', filename='js/modules/calendar.js') }}"></script>
+    {% endif %}
+    
+    {% if 'profile' in request.path %}
+    <script src="{{ url_for('static', filename='js/modules/profile.js') }}"></script>
+    {% endif %}
+    
+    <!-- 6. Main App Initialization -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     
     <!-- Page Specific Scripts -->
     {% block scripts %}{% endblock %}

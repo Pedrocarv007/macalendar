@@ -33,7 +33,7 @@
             <div class="card glass-card h-100">
                 <div class="card-body text-center">
                     <div class="profile-avatar mb-3" style="position: relative; display: inline-block;">
-                        <img src="/static/images/placeholder-user.jpg" 
+                        <img src="{{ url_for('static', filename='images/placeholder-user.jpg') }}" 
                              alt="Avatar" class="rounded-circle" id="userAvatar"
                              style="width: 120px; height: 120px; object-fit: cover;">
                         <div class="avatar-overlay" id="avatarOverlay" 

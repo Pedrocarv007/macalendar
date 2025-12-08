@@ -217,7 +217,13 @@ const userRestaurantId = {{ current_user.restaurant_id if current_user and curre
 
 document.addEventListener('DOMContentLoaded', function() {
     initCalendar();
-    loadEvents();
+    
+    // Inicializar módulo do calendário
+    if (typeof CalendarModule !== 'undefined') {
+        CalendarModule.init();
+    } else {
+        console.warn('CalendarModule não carregado ainda');
+    }
     
     // View type change handlers
     document.querySelectorAll('input[name="viewType"]').forEach(radio => {
@@ -396,87 +402,8 @@ function editEvent(event) {
     modal.show();
 }
 
-async function saveEvent() {
-    const form = document.getElementById('eventForm');
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData);
-    
-    try {
-        const eventId = data.eventId;
-        const url = eventId ? `/api/calendar/events/${eventId}` : '/api/calendar/events';
-        const method = eventId ? 'PUT' : 'POST';
-        
-        const response = await fetch(url, {
-            method: method,
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                title: data.title,
-                description: data.description,
-                start_date: data.startDate,
-                end_date: data.endDate,
-                event_type: data.category || 'meeting',
-                restaurant_id: userRestaurantId,
-                is_all_day: data.allDay === 'on',
-                is_recurring: data.recurring === 'on'
-            })
-        });
-        
-        if (!response.ok) throw new Error('Erro ao salvar');
-        
-        Utils.showToast(eventId ? 'Evento atualizado!' : 'Evento criado!', 'success');
-        
-        // Close modal and refresh
-        bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-        form.reset();
-        document.getElementById('deleteEventBtn').style.display = 'none';
-        document.getElementById('eventModalTitle').textContent = 'Novo Evento';
-        
-        loadEvents();
-        
-    } catch (error) {
-        Utils.showAlert('Erro ao salvar evento: ' + error.message, 'error');
-    }
-}
-
-async function deleteEvent() {
-    const eventId = document.getElementById('eventId').value;
-    
-    if (!confirm('Tem certeza que deseja excluir este evento?')) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/calendar/events/${eventId}`, {
-            method: 'DELETE'
-        });
-        
-        if (!response.ok) throw new Error('Erro ao excluir');
-        
-        Utils.showToast('Evento excluído!', 'success');
-        
-        // Close modal and refresh
-        bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-        loadEvents();
-        
-    } catch (error) {
-        Utils.showAlert('Erro ao excluir evento: ' + error.message, 'error');
-    }
-}
-
-async function loadEvents() {
-    try {
-        const response = await fetch('/api/calendar/events');
-        if (!response.ok) throw new Error('Erro ao carregar');
-        const data = await response.json();
-        events = data.events || [];
-        renderCalendar();
-        renderTodayEvents();
-        renderUpcomingEvents();
-    } catch (error) {
-        console.error('Erro ao carregar eventos:', error);
-        events = [];
-    }
-}
+// Funções saveEvent(), deleteEvent() e loadEvents() foram movidas para calendar.js
+// Não adicione funções duplicadas aqui!
 
 function renderTodayEvents() {
     const container = document.getElementById('todayEvents');

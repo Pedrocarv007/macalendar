@@ -178,6 +178,51 @@ def get_current_user():
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @auth_bp.route('/current-user', methods=['GET'])
+def get_current_user_session():
+    """Obter dados do usuário logado via sessão ou JWT"""
+    try:
+        # Tentar primeiro com JWT
+        try:
+            from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+            verify_jwt_in_request(optional=True)
+            current_user_id = get_jwt_identity()
+        except:
+            # Se JWT falhar, usar sessão
+            from flask import session
+            if 'user_id' not in session:
+                return jsonify({'error': 'Não autenticado'}), 401
+            current_user_id = session.get('user_id')
+        
+        if not current_user_id:
+            return jsonify({'error': 'Não autenticado'}), 401
+        
+        employee = Employee.query.get(current_user_id)
+        
+        if not employee:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+        
+        return jsonify(employee.to_dict()), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+@auth_bp.route('/user', methods=['GET'])
+def get_user_session():
+    """Alias para /current-user (compatibilidade)"""
+    from flask import session
+    try:
+        if 'user_id' not in session:
+            return jsonify({'error': 'Não autenticado'}), 401
+        
+        employee = Employee.query.get(session.get('user_id'))
+        
+        if not employee:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+        
+        return jsonify(employee.to_dict()), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 def get_current_user_web():
     """Obter dados do usuário logado via sessão (para aplicação web)"""
     try:

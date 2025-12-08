@@ -96,7 +96,7 @@ def create_document():
         print("DEBUG - Employee ID fornecido:", employee_id)
         print("DEBUG - Restaurant ID:", restaurant_id)
         print("DEBUG - User logado ID:", current_user_id)
-        print("DEBUG - User logado employee_id:", current_user.employee_id if current_user else None)
+        print("DEBUG - User logado role:", user_role)
         
         if not restaurant_id:
             return jsonify({'error': 'Restaurant ID é obrigatório'}), 400
@@ -106,11 +106,11 @@ def create_document():
         
         # Se employee_id não foi fornecido, usar o do user logado
         if not employee_id:
-            if current_user and current_user.employee_id:
-                employee_id = current_user.employee_id
+            if current_user:
+                employee_id = current_user.id
                 print(f"DEBUG - Usando employee_id do user logado: {employee_id}")
             else:
-                return jsonify({'error': 'Colaborador é obrigatório e usuário não tem employee_id vinculado'}), 400
+                return jsonify({'error': 'Colaborador é obrigatório'}), 400
         
         # Verificar se colaborador existe
         employee = Employee.query.get(employee_id)
@@ -398,4 +398,116 @@ def generate_document():
         
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+@documents_bp.route('/generate-auto', methods=['POST'])
+@api_login_required
+@role_required('admin', 'rh', 'manager')
+def generate_document_auto():
+    """Gerar documento automaticamente (cartão de boas-vindas, aniversário) - APENAS nome, data e foto"""
+    try:
+        from app.utils.document_generator import DocumentGenerator
+        
+        current_user_id = g.get('current_user_id')
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+        
+        data = request.get_json() or {}
+        
+        # Parâmetros
+        document_type = data.get('document_type')  # 'bem_vindo', 'aniversario'
+        try:
+            employee_id = int(data.get('employee_id', 0)) if data.get('employee_id') else None
+            restaurant_id = int(data.get('restaurant_id', 0)) if data.get('restaurant_id') else None
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Employee ID e Restaurant ID devem ser números'}), 400
+        
+        if not document_type:
+            return jsonify({'error': 'Tipo de documento é obrigatório'}), 400
+        
+        if not employee_id or not restaurant_id:
+            return jsonify({'error': 'Employee ID e Restaurant ID são obrigatórios'}), 400
+        
+        # Verificar permissões
+        if user_role not in ['admin', 'rh'] and restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada para este restaurante'}), 403
+        
+        # Obter dados do colaborador
+        employee = Employee.query.get(employee_id)
+        if not employee:
+            return jsonify({'error': 'Colaborador não encontrado'}), 404
+        
+        if employee.restaurant_id != restaurant_id:
+            return jsonify({'error': 'Colaborador não pertence a este restaurante'}), 400
+        
+        # Verificar restaurante
+        restaurant = Restaurant.query.get(restaurant_id)
+        if not restaurant:
+            return jsonify({'error': 'Restaurante não encontrado'}), 404
+        
+        # Gerar documento
+        generator = DocumentGenerator()
+        photo_path = None
+        
+        # Obter caminho da foto se existir
+        if employee.photo_filename:
+            photo_path = os.path.join('app/static/uploads/employees', employee.photo_filename)
+        
+        try:
+            if document_type.lower() == 'bem_vindo':
+                file_path, filename = generator.generate_welcome_card(
+                    employee_name=employee.name,
+                    employee_photo_path=photo_path,
+                    restaurant_name=restaurant.name
+                )
+                doc_category = 'Boas-vindas'
+            
+            elif document_type.lower() == 'aniversario':
+                file_path, filename = generator.generate_birthday_card(
+                    employee_name=employee.name,
+                    birth_date=employee.birth_date,
+                    employee_photo_path=photo_path
+                )
+                doc_category = 'Aniversário'
+            
+            else:
+                return jsonify({'error': f'Tipo de documento inválido: {document_type}. Use: bem_vindo, aniversario'}), 400
+            
+        except Exception as e:
+            return jsonify({'error': f'Erro ao gerar documento: {str(e)}'}), 500
+        
+        # Obter tamanho do arquivo
+        file_size = os.path.getsize(file_path)
+        
+        # Criar documento no banco de dados
+        document = Document(
+            title=f'Cartão - {employee.name}',
+            document_type=doc_category,
+            template_name=document_type,
+            filename=filename,
+            file_path=file_path,
+            file_size=file_size,
+            restaurant_id=restaurant_id,
+            employee_id=employee_id,
+            created_by=current_user_id,
+            description=f'Documento gerado automaticamente - {document_type}',
+            tags=f'{document_type},{employee.name}',
+            is_public=False,
+            status='generated'
+        )
+        
+        db.session.add(document)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Documento gerado com sucesso',
+            'document': document.to_dict(),
+            'file_path': file_path
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao gerar documento: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500

@@ -129,6 +129,28 @@ def create_employee():
         traceback.print_exc()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
+@employees_bp.route('/<int:employee_id>', methods=['GET'])
+@api_login_required
+def get_employee(employee_id):
+    """Obter colaborador por ID"""
+    try:
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+        
+        employee = Employee.query.get(employee_id)
+        
+        if not employee:
+            return jsonify({'error': 'Colaborador não encontrado'}), 404
+        
+        # Verificar permissões
+        if user_role not in ['admin', 'rh', 'marketing'] and employee.restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada'}), 403
+        
+        return jsonify({'employee': employee.to_dict()}), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
 @employees_bp.route('/<int:employee_id>', methods=['PUT'])
 @api_login_required
 @role_required('admin', 'rh', 'manager')
