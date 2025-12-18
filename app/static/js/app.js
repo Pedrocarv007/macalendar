@@ -133,8 +133,7 @@ class App {
         try {
             await api.get('/auth/logout');
             appState.clear();
-            // Detectar se está com /mac prefix
-            const loginPath = window.location.pathname.includes('/mac') ? '/mac/auth/login' : '/auth/login';
+            const loginPath = window.APP_PREFIX ? `${window.APP_PREFIX}/auth/login` : '/auth/login';
             window.location.href = loginPath;
         } catch (error) {
             console.error('Erro ao fazer logout:', error);

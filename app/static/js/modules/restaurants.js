@@ -6,6 +6,17 @@
 const RestaurantsModule = {
     data: [],
     currentFilter: '',
+
+    notify(message, type = 'info') {
+        if (typeof Utils !== 'undefined' && typeof Utils.showToast === 'function') {
+            Utils.showToast(message, type === 'error' ? 'danger' : type);
+        } else if (typeof App !== 'undefined' && typeof App.notify === 'function') {
+            App.notify(message, type);
+        } else {
+            const prefix = type === 'error' ? 'Erro: ' : '';
+            alert(prefix + message);
+        }
+    },
     
     /**
      * Inicializar o módulo
@@ -44,9 +55,7 @@ const RestaurantsModule = {
             this.filterAndDisplay();
         } catch (error) {
             console.error('❌ Erro ao carregar restaurantes:', error);
-            if (typeof appState !== 'undefined' && typeof appState.notify === 'function') {
-                appState.notify('Erro ao carregar restaurantes', 'error');
-            }
+            this.notify('Erro ao carregar restaurantes', 'error');
         } finally {
             if (loading) loading.style.display = 'none';
         }
@@ -88,7 +97,6 @@ const RestaurantsModule = {
                         ${rest.email ? `<br><small class="text-muted">${rest.email}</small>` : ''}
                     </div>
                 </td>
-                <td>${rest.type || '-'}</td>
                 <td><small>${rest.address || 'Não informado'}</small></td>
                 <td>${rest.phone || '-'}</td>
                 <td><span class="badge bg-info">${rest.employees_count || 0}</span></td>
@@ -129,11 +137,11 @@ const RestaurantsModule = {
         if (confirm('Tem certeza que deseja deletar este restaurante?')) {
             try {
                 await api.delete(`/restaurants/${id}`);
-                appState.notify('Restaurante deletado com sucesso', 'success');
+                this.notify('Restaurante deletado com sucesso', 'success');
                 this.loadRestaurants();
             } catch (error) {
                 console.error('Erro ao deletar restaurante:', error);
-                appState.notify('Erro ao deletar restaurante', 'error');
+                this.notify('Erro ao deletar restaurante', 'error');
             }
         }
     },

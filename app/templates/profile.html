@@ -128,18 +128,6 @@
                             </div>
                             
                             <div class="col-md-6">
-                                <label for="role" class="form-label">Função no Sistema</label>
-                                <select class="form-select" id="role" name="role" disabled>
-                                    <option value="">Selecione...</option>
-                                    <option value="admin">Administrador</option>
-                                    <option value="rh">Recursos Humanos</option>
-                                    <option value="manager">Gerente</option>
-                                    <option value="marketing">Marketing</option>
-                                    <option value="employee">Funcionário</option>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-6">
                                 <label for="birthDate" class="form-label">Data de Nascimento</label>
                                 <input type="date" class="form-control" id="birthDate" name="birth_date" disabled>
                             </div>
@@ -217,25 +205,35 @@ function toggleEditMode() {
     const editBtn = document.getElementById('editBtn');
     const cancelBtn = document.getElementById('cancelBtn');
     const avatarOverlay = document.getElementById('avatarOverlay');
+    const isPrivileged = currentUser && ['admin', 'rh'].includes((currentUser.role || '').toLowerCase());
     
     inputs.forEach(input => {
         // Email nunca pode ser editado
-        // Admins podem editar tudo (inclusive birthDate e hireDate)
-        // Não-admins não podem editar birthDate e hireDate
         if (input.id === 'email') {
             input.disabled = true;
-        } else if ((input.id === 'birthDate' || input.id === 'hireDate') && currentUser && currentUser.role !== 'admin') {
-            input.disabled = true;
-        } else {
-            input.disabled = !editMode;
+            return;
         }
+
+        // Birth/ hire date apenas admin
+        if ((input.id === 'birthDate' || input.id === 'hireDate') && (!currentUser || currentUser.role !== 'admin')) {
+            input.disabled = true;
+            return;
+        }
+
+        // Cargo e Departamento apenas admin ou RH
+        if ((input.id === 'position' || input.id === 'department') && !isPrivileged) {
+            input.disabled = true;
+            return;
+        }
+
+        input.disabled = !editMode;
     });
     
     if (editMode) {
         saveBtn.style.display = 'inline-block';
         cancelBtn.style.display = 'inline-block';
         editBtn.style.display = 'none';
-        avatarOverlay.style.display = 'flex !important';
+        avatarOverlay.style.display = 'flex';
     } else {
         saveBtn.style.display = 'none';
         cancelBtn.style.display = 'none';
@@ -247,10 +245,7 @@ function toggleEditMode() {
 
 async function loadProfile() {
     try {
-        const response = await fetch('/api/profile/me');
-        if (!response.ok) throw new Error('Erro ao carregar perfil');
-        
-        currentUser = await response.json();
+        currentUser = await api.get('/profile/me');
         
         // Preencher formulário
         document.getElementById('name').value = currentUser.name || '';
@@ -258,7 +253,6 @@ async function loadProfile() {
         document.getElementById('phone').value = currentUser.phone || '';
         document.getElementById('position').value = currentUser.position || '';
         document.getElementById('department').value = currentUser.department || '';
-        document.getElementById('role').value = currentUser.role || '';
         document.getElementById('birthDate').value = currentUser.birth_date || '';
         document.getElementById('hireDate').value = currentUser.hire_date || '';
         document.getElementById('address').value = currentUser.address || '';
@@ -271,11 +265,12 @@ async function loadProfile() {
         document.getElementById('daysUntilBday').textContent = currentUser.days_until_birthday || 0;
         
         // Atualizar avatar
+        const prefix = window.APP_PREFIX || '';
         if (currentUser.photo_filename) {
-            document.getElementById('userAvatar').src = `/static/uploads/employees/${currentUser.photo_filename}`;
+            document.getElementById('userAvatar').src = `${prefix}/uploads/employees/${currentUser.photo_filename}`;
             document.getElementById('removePhotoBtn').style.display = 'inline-block';
         } else {
-            document.getElementById('userAvatar').src = '/static/images/placeholder-user.jpg';
+            document.getElementById('userAvatar').src = `${prefix}/static/images/placeholder-user.jpg`;
             document.getElementById('removePhotoBtn').style.display = 'none';
         }
         
@@ -313,23 +308,10 @@ async function saveProfile() {
     console.log("Dados a enviar para API:", data);
     
     try {
-        const response = await fetch('/api/profile/me', {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (!response.ok) {
-            Utils.showAlert(result.error || 'Erro ao salvar perfil', 'error');
-            return;
-        }
-        
+        const result = await api.put('/profile/me', data);
         Utils.showToast('Perfil atualizado com sucesso!', 'success');
         currentUser = result.user;
         toggleEditMode();
-        
     } catch (error) {
         console.error('Erro ao salvar:', error);
         Utils.showAlert('Erro ao salvar perfil', 'error');
@@ -355,7 +337,7 @@ async function uploadProfilePhoto(file) {
         const formData = new FormData();
         formData.append('file', file);
         
-        const response = await fetch('/api/profile/me/photo', {
+        const response = await fetch(`${window.API_BASE_URL}/profile/me/photo`, {
             method: 'POST',
             body: formData
         });
@@ -381,7 +363,7 @@ async function removeProfilePhoto() {
     if (!confirm('Tem certeza que deseja remover sua foto?')) return;
     
     try {
-        const response = await fetch('/api/profile/me/photo', {
+        const response = await fetch(`${window.API_BASE_URL}/profile/me/photo`, {
             method: 'DELETE'
         });
         
@@ -430,25 +412,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         try {
-            const response = await fetch('/api/profile/me/password', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
+                await api.post('/profile/me/password', {
                     current_password: data.currentPassword,
                     new_password: data.newPassword
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (!response.ok) {
-                Utils.showAlert(result.error || 'Erro ao alterar senha', 'error');
-                return;
-            }
-            
-            Utils.showToast('Senha alterada com sucesso!', 'success');
-            this.reset();
-            
+                });
+                Utils.showToast('Senha alterada com sucesso!', 'success');
+                this.reset();
         } catch (error) {
             console.error('Erro:', error);
             Utils.showAlert('Erro ao alterar senha', 'error');

@@ -1,15 +1,20 @@
 """
 Rotas da API de Documentos
 """
+import os
+import traceback
+from datetime import datetime
+from datetime import date as date_module
 from flask import Blueprint, request, jsonify, send_file, g
 from flask_jwt_extended import get_jwt_identity, get_jwt
-from datetime import datetime
-import os
+from werkzeug.utils import secure_filename
+
 from app.extensions.database import db
+from app.middleware.security import api_login_required, role_required
 from app.models.document import Document
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
-from app.middleware.security import api_login_required, role_required
+from app.utils.document_generator import DocumentGenerator
 
 documents_bp = Blueprint('documents', __name__)
 
@@ -64,23 +69,21 @@ def get_documents():
 def create_document():
     """Criar novo documento com upload de arquivo"""
     try:
-        from flask import session
-        
         current_user_id = g.get('current_user_id')
         user_role = g.get('current_user_role')
         user_restaurant_id = g.get('current_user_restaurant_id')
         
         # Obter dados do usuário logado (agora é um employee)
         current_user = Employee.query.get(current_user_id)
-        
+
         # Validar arquivo
         if 'file' not in request.files:
             return jsonify({'error': 'Nenhum arquivo foi enviado'}), 400
-        
+
         file = request.files['file']
         if file.filename == '':
             return jsonify({'error': 'Arquivo não selecionado'}), 400
-        
+
         # Dados do formulário
         name = request.form.get('name') or file.filename
         category = request.form.get('category')
@@ -89,14 +92,6 @@ def create_document():
         tags = request.form.get('tags')
         restaurant_id = request.form.get('restaurant_id', type=int)
         is_public = request.form.get('is_public') == 'true'
-        
-        print("DEBUG - Arquivo:", file.filename)
-        print("DEBUG - Nome:", name)
-        print("DEBUG - Categoria:", category)
-        print("DEBUG - Employee ID fornecido:", employee_id)
-        print("DEBUG - Restaurant ID:", restaurant_id)
-        print("DEBUG - User logado ID:", current_user_id)
-        print("DEBUG - User logado role:", user_role)
         
         if not restaurant_id:
             return jsonify({'error': 'Restaurant ID é obrigatório'}), 400
@@ -135,7 +130,6 @@ def create_document():
         os.makedirs(upload_folder, exist_ok=True)
         
         # Gerar nome de arquivo seguro
-        from werkzeug.utils import secure_filename
         filename = secure_filename(f"{int(datetime.now().timestamp())}_{file.filename}")
         file_path = os.path.join(upload_folder, filename)
         
@@ -169,16 +163,10 @@ def create_document():
             'message': 'Documento enviado com sucesso',
             'document': document.to_dict()
         }), 201
-        
+
     except Exception as e:
         db.session.rollback()
-        print(f"DEBUG - Erro ao criar documento: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500        
-    except Exception as e:
-        db.session.rollback()
-        return print({'error': f'Erro interno: {str(e)}'}), 500
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @documents_bp.route('/<int:document_id>', methods=['PUT'])
 @api_login_required
@@ -406,8 +394,6 @@ def generate_document():
 def generate_document_auto():
     """Gerar documento automaticamente (cartão de boas-vindas, aniversário) - APENAS nome, data e foto"""
     try:
-        from app.utils.document_generator import DocumentGenerator
-        
         current_user_id = g.get('current_user_id')
         user_role = g.get('current_user_role')
         user_restaurant_id = g.get('current_user_restaurant_id')
@@ -463,9 +449,19 @@ def generate_document_auto():
                 doc_category = 'Boas-vindas'
             
             elif document_type.lower() == 'aniversario':
+                # Usar data de aniversário no ano atual, não o ano de nascimento
+
+                birth_date_current_year = employee.birth_date
+                if birth_date_current_year:
+                    try:
+                        birth_date_current_year = employee.birth_date.replace(year=date_module.today().year)
+                    except ValueError:
+                        # Lidar com 29/02 em anos não bissextos
+                        birth_date_current_year = employee.birth_date.replace(year=date_module.today().year, day=28)
+                
                 file_path, filename = generator.generate_birthday_card(
                     employee_name=employee.name,
-                    birth_date=employee.birth_date,
+                    birth_date=birth_date_current_year,
                     employee_photo_path=photo_path
                 )
                 doc_category = 'Aniversário'
@@ -508,6 +504,5 @@ def generate_document_auto():
     except Exception as e:
         db.session.rollback()
         print(f"Erro ao gerar documento: {str(e)}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500

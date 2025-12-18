@@ -5,7 +5,9 @@
 
 class DocumentGenerator {
   constructor(apiBaseUrl = '/api/documents') {
-    this.apiUrl = apiBaseUrl;
+    const base = window.API_BASE_URL || '';
+    // Garantir prefixo correto (ex.: /mac/api)
+    this.apiUrl = apiBaseUrl.startsWith('http') ? apiBaseUrl : `${base}${apiBaseUrl}`;
   }
 
   /**
@@ -47,15 +49,21 @@ class DocumentGenerator {
         headers: {
           'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify(data)
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao gerar documento');
+        let errorText = await response.text();
+        let errorJson = null;
+        try { errorJson = JSON.parse(errorText); } catch (e) { /* fallback */ }
+        throw new Error((errorJson && (errorJson.error || errorJson.message)) || errorText || 'Erro ao gerar documento');
       }
 
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
+      if (!result || !result.document) {
+        throw new Error('Resposta inválida da API');
+      }
       return {
         success: true,
         document: result.document,

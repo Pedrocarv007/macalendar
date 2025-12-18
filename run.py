@@ -3,30 +3,80 @@
 Ponto de entrada da aplicação MAC Calendar
 """
 import os
+import sys
+from io import StringIO
+from pathlib import Path
+
+from dotenv import load_dotenv
+
 from app import create_app
+from app.config.iis_settings import IISConfig
 from app.extensions.database import db
 
-# Determinar qual configuração usar
+# Carregar variáveis do arquivo .env na raiz do projeto
+BASE_DIR = Path(__file__).resolve().parent
+
+
+def load_env_file(env_path: Path) -> None:
+    """Carrega .env suportando arquivos com BOM ou codificação UTF-16."""
+
+    if not env_path.exists():
+        load_dotenv(env_path)
+        return
+
+    encodings = ('utf-8', 'utf-8-sig', 'utf-16', 'utf-16le', 'utf-16be')
+
+    for encoding in encodings:
+        try:
+            with env_path.open('r', encoding=encoding) as pointer:
+                content = pointer.read()
+        except UnicodeDecodeError:
+            continue
+        else:
+            load_dotenv(stream=StringIO(content))
+            return
+
+    # Se nenhuma codificação funcionou, usar comportamento padrão
+    load_dotenv(env_path)
+
+
+load_env_file(BASE_DIR / '.env')
+
+# Debug: verify critical env vars are loaded
+if os.environ.get('FLASK_DEBUG'):
+    print(f"[DEBUG] MAIL_USERNAME={os.environ.get('MAIL_USERNAME')!r}")
+    print(f"[DEBUG] MAIL_PASSWORD={'***' if os.environ.get('MAIL_PASSWORD') else 'NOT SET'}")
+    print(f"[DEBUG] MAIL_DEFAULT_SENDER={os.environ.get('MAIL_DEFAULT_SENDER')!r}")
+
+
+def resolve_config_name() -> str:
+    """Determinar qual configuração utilizar."""
+    if len(sys.argv) > 1:
+        return sys.argv[1]
+    return os.environ.get('APP_CONFIG') or os.environ.get('FLASK_CONFIG') or 'development'
+
+
+CONFIG_NAME = resolve_config_name()
+
+# Criar aplicação com a configuração selecionada
+app = create_app(CONFIG_NAME)
+
+# Ajustes específicos quando executado atrás do IIS
 if os.environ.get('RUNNING_ON_IIS'):
-    from app.config.iis_settings import IISConfig
-    app = create_app()
     app.config.from_object(IISConfig)
-else:
-    app = create_app()
+
 
 if __name__ == '__main__':
-    # Configurações para desenvolvimento
-    debug_mode = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    debug_mode = app.config.get('DEBUG', False)
     port = int(os.environ.get('PORT', 6005))
     host = os.environ.get('HOST', '127.0.0.1')
-    
+
     # Criar tabelas se não existirem
     with app.app_context():
         db.create_all()
     
+    # Exibir configuração ativa
+    print(f"Iniciando MAC Calendar com config '{CONFIG_NAME}' em {host}:{port} (debug={debug_mode})")
+
     # Executar aplicação
-    app.run(
-        debug=debug_mode,
-        host=host,
-        port=port
-    )
+    app.run(debug=debug_mode, host=host, port=port)

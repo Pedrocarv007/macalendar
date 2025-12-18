@@ -1,16 +1,19 @@
 """
 Rotas da API de Restaurantes
 """
+import os
+from datetime import datetime
+
 from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import get_jwt_identity, get_jwt
-from datetime import datetime
-from werkzeug.utils import secure_filename
-import os
 from PIL import Image
+from werkzeug.utils import secure_filename
+
 from app.extensions.database import db
-from app.models.restaurant import Restaurant
-from app.models.employee import Employee
 from app.middleware.security import api_login_required, role_required, allowed_file
+from app.models.calendar_event import CalendarEvent
+from app.models.employee import Employee
+from app.models.restaurant import Restaurant
 
 restaurants_bp = Blueprint('restaurants', __name__)
 
@@ -208,9 +211,6 @@ def get_restaurant_stats(restaurant_id):
             return jsonify({'error': 'Restaurante não encontrado'}), 404
         
         # Calcular estatísticas
-        from app.models.employee import Employee
-        from app.models.calendar_event import CalendarEvent
-        
         total_employees = Employee.query.filter_by(
             restaurant_id=restaurant_id, 
             is_active=True

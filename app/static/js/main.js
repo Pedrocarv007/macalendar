@@ -1,7 +1,8 @@
 // MAC Calendar - Main JavaScript
 
 // API Configuration
-const API_BASE_URL = '/api';
+const API_BASE_URL = window.API_BASE_URL || '/api';
+
 const STORAGE_KEYS = {
     AUTH_TOKEN: 'mac_auth_token',
     USER_DATA: 'mac_user_data',
@@ -209,8 +210,9 @@ class Utils {
 
     static async makeRequest(url, options = {}) {
         const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-        
-        const defaultOptions = {
+
+        const config = {
+            method: options.method || 'GET',
             headers: {
                 'Content-Type': 'application/json',
                 ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -218,34 +220,35 @@ class Utils {
             }
         };
 
+        if (options.body && typeof options.body === 'string') {
+            config.body = options.body;
+        } else if (options.body && typeof options.body === 'object') {
+            config.body = JSON.stringify(options.body);
+        }
+
         try {
-            const response = await fetch(API_BASE_URL + url, {
-                ...defaultOptions,
-                ...options
-            });
-            
+            const response = await fetch(`${API_BASE_URL}${url}`, config);
+
             if (response.status === 401) {
-                this.handleUnauthorized();
-                throw new Error('Unauthorized');
+                Utils.handleUnauthorized();
+                throw new Error('Não autorizado');
             }
-            
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
             }
-            
+
+            if (response.status === 204) {
+                return { success: true };
+            }
+
             return await response.json();
         } catch (error) {
             console.error('Request failed:', error);
-            this.showAlert('Erro na requisição: ' + error.message, 'error');
+            Utils.showAlert('Erro na requisição: ' + error.message, 'error');
             throw error;
         }
-    }
-
-    static handleUnauthorized() {
-        localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-        localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-        window.location.href = '/auth/login';
     }
 
     static isAuthenticated() {
@@ -260,7 +263,8 @@ class Utils {
     static logout() {
         localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
         localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-        window.location.href = '/auth/login';
+        const loginPath = window.APP_PREFIX ? `${window.APP_PREFIX}/auth/login` : '/auth/login';
+        window.location.href = loginPath;
     }
 
     static validateForm(form) {
@@ -474,31 +478,32 @@ class AuthAPI {
 class CalendarAPI {
     static async getEvents(params = {}) {
         const queryString = new URLSearchParams(params).toString();
-        return await Utils.makeRequest(`/mac/calendar/events?${queryString}`);
+        const endpoint = queryString ? `/calendar/events?${queryString}` : '/calendar/events';
+        return await Utils.makeRequest(endpoint);
     }
 
     static async createEvent(eventData) {
-        return await Utils.makeRequest('/mac/calendar/events', {
+        return await Utils.makeRequest('/calendar/events', {
             method: 'POST',
             body: JSON.stringify(eventData)
         });
     }
 
     static async updateEvent(id, eventData) {
-        return await Utils.makeRequest(`/mac/calendar/events/${id}`, {
+        return await Utils.makeRequest(`/calendar/events/${id}`, {
             method: 'PUT',
             body: JSON.stringify(eventData)
         });
     }
 
     static async deleteEvent(id) {
-        return await Utils.makeRequest(`/mac/calendar/events/${id}`, {
+        return await Utils.makeRequest(`/calendar/events/${id}`, {
             method: 'DELETE'
         });
     }
 
     static async getEvent(id) {
-        return await Utils.makeRequest(`/mac/calendar/events/${id}`);
+        return await Utils.makeRequest(`/calendar/events/${id}`);
     }
 }
 

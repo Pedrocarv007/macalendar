@@ -29,12 +29,30 @@ const CalendarModule = {
      */
     async loadEvents() {
         try {
-            const dateStr = this.currentDate.toISOString().split('T')[0];
-            this.events = await api.get(`/calendar/events?date=${dateStr}`);
-            this.renderCalendar();
+            const res = await api.get('/calendar/events');
+            this.events = res.events || [];
+            if (typeof events !== 'undefined') {
+                events = this.events;
+            }
+            if (typeof renderCalendar === 'function') {
+                renderCalendar();
+                if (typeof renderTodayEvents === 'function') {
+                    renderTodayEvents();
+                }
+                if (typeof renderUpcomingEvents === 'function') {
+                    renderUpcomingEvents();
+                }
+                if (typeof updateCurrentMonth === 'function') {
+                    updateCurrentMonth();
+                }
+            } else {
+                console.log('📅 Eventos carregados:', this.events.length);
+            }
         } catch (error) {
             console.error('❌ Erro ao carregar eventos:', error);
-            appState.notify('Erro ao carregar eventos', 'error');
+            if (typeof appState !== 'undefined' && appState.notify) {
+                appState.notify('Erro ao carregar eventos', 'error');
+            }
         }
     },
     
@@ -73,6 +91,54 @@ const CalendarModule = {
         } catch (error) {
             console.error('Erro ao criar evento:', error);
             appState.notify('Erro ao criar evento', 'error');
+        }
+    },
+
+    async generateMysteryChallenges(params) {
+        try {
+            const res = await api.post('/calendar/generate/mystery-tuesdays', params);
+            if (typeof appState !== 'undefined' && appState.notify) {
+                appState.notify(`Gerados ${res.count || 0} desafios`, 'success');
+            }
+            await this.loadEvents();
+        } catch (error) {
+            console.error('Erro ao gerar desafios:', error);
+            if (typeof appState !== 'undefined' && appState.notify) {
+                appState.notify(error.message || 'Erro ao gerar desafios', 'error');
+            }
+            throw error;
+        }
+    },
+
+    async generateMysteryAnswers(params) {
+        try {
+            const res = await api.post('/calendar/generate/mystery-answers', params);
+            if (typeof appState !== 'undefined' && appState.notify) {
+                appState.notify(`Geradas ${res.count || 0} respostas de sábado`, 'success');
+            }
+            await this.loadEvents();
+        } catch (error) {
+            console.error('Erro ao gerar respostas:', error);
+            if (typeof appState !== 'undefined' && appState.notify) {
+                appState.notify(error.message || 'Erro ao gerar respostas', 'error');
+            }
+            throw error;
+        }
+    },
+
+    async markPosted(id) {
+        try {
+            await api.put(`/calendar/events/${id}/mark-posted`, {});
+            if (typeof appState !== 'undefined' && appState.notify) {
+                appState.notify('Evento marcado como postado', 'success');
+            }
+            await this.loadEvents();
+        } catch (error) {
+            console.error('Erro ao marcar postado:', error);
+            if (typeof appState !== 'undefined' && appState.notify) {
+                appState.notify('Erro ao marcar postado', 'error');
+            }
+            throw error;
         }
     }
 };

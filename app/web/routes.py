@@ -1,10 +1,16 @@
 """
 Rotas da interface web principal
 """
-from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
-from app.middleware.security import login_required, web_role_required
-from app.extensions.database import db
 from datetime import datetime, timedelta
+
+from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
+
+from app.extensions.database import db
+from app.middleware.security import login_required, web_role_required
+from app.models.calendar_event import CalendarEvent
+from app.models.document import Document
+from app.models.employee import Employee
+from app.models.restaurant import Restaurant
 
 # Blueprint principal da web
 web_bp = Blueprint('web', __name__)
@@ -28,12 +34,6 @@ def dashboard():
 @login_required
 def dashboard_stats():
     """Estatísticas do dashboard"""
-    from app.models.employee import Employee
-    from app.models.restaurant import Restaurant
-    from app.models.document import Document
-    from app.models.calendar_event import CalendarEvent
-    from datetime import datetime
-    
     try:
         # Contar colaboradores
         total_employees = Employee.query.filter_by(is_active=True).count()
@@ -63,9 +63,6 @@ def dashboard_stats():
 @login_required
 def recent_events():
     """Eventos recentes"""
-    from app.models.calendar_event import CalendarEvent
-    from datetime import datetime, timedelta
-    
     try:
         # Buscar eventos dos próximos 7 dias
         now = datetime.utcnow()
@@ -122,42 +119,17 @@ def employees():
     """Página de colaboradores"""
     return render_template('employees.html')
 
-@web_bp.route('/employees/new')
-def new_employee():
-    """Página para adicionar novo colaborador"""
-    return render_template('employees/new.html')
-
-@web_bp.route('/employees/<int:employee_id>')
-def employee_detail(employee_id):
-    """Página de detalhes do colaborador"""
-    return render_template('employees/detail.html', employee_id=employee_id)
-
 @web_bp.route('/restaurants')
 @login_required
 def restaurants():
     """Página de restaurantes"""
     return render_template('restaurants.html')
 
-@web_bp.route('/restaurants/new')
-def new_restaurant():
-    """Página para adicionar novo restaurante"""
-    return render_template('restaurants/new.html')
-
-@web_bp.route('/restaurants/<int:restaurant_id>')
-def restaurant_detail(restaurant_id):
-    """Página de detalhes do restaurante"""
-    return render_template('restaurants/detail.html', restaurant_id=restaurant_id)
-
 @web_bp.route('/documents')
 @login_required
 def documents():
     """Página de documentos"""
     return render_template('documents.html')
-
-@web_bp.route('/documents/new')
-def new_document():
-    """Página para gerar novo documento"""
-    return render_template('documents/new.html')
 
 @web_bp.route('/profile')
 def profile():

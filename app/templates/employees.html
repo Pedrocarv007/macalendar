@@ -112,10 +112,14 @@
                             <label for="filterDepartment" class="form-label">Departamento</label>
                             <select class="form-select" id="filterDepartment" onchange="filterEmployees()">
                                 <option value="">Todos</option>
-                                <option value="Administração">Administração</option>
-                                <option value="Cozinha">Cozinha</option>
-                                <option value="Atendimento">Atendimento</option>
-                                <option value="Limpeza">Limpeza</option>
+                                <option value="Desenvolvedor">Desenvolvedor</option>
+                                <option value="RH">Recursos Humanos</option>
+                                <option value="Gerente_loja">Gerente de Loja</option>
+                                <option value="Sub_gerente">Sub Gerente</option>
+                                <option value="Gerente_turno">Gerente de Turno</option>
+                                <option value="colaborador">Colaborador</option>
+                                <option value="treinador">Treinador</option>
+                                <option value="RP">Relações Públicas</option>
                             </select>
                         </div>
                         
@@ -181,7 +185,7 @@
                     <div id="employeesList" style="display: none;">
                         <div class="table-responsive">
                             <table class="table table-hover">
-                                <thead>
+                                <thead id="employeesTableHead">
                                     <tr>
                                         <th>Foto</th>
                                         <th>Nome</th>
@@ -308,6 +312,11 @@
                         <div class="col-md-6">
                             <label for="employeeBirthDate" class="form-label">Data de Nascimento</label>
                             <input type="date" class="form-control" id="employeeBirthDate" name="birth_date">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="employeeHireDate" class="form-label">Data de Contratação</label>
+                            <input type="date" class="form-control" id="employeeHireDate" name="hire_date">
                         </div>
                         
                         <div class="col-md-6">

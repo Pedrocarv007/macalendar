@@ -1,12 +1,15 @@
 """
 Rotas de autenticação web (interface HTML)
 """
+from datetime import datetime
+import traceback
+
 from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify
 from flask_jwt_extended import create_access_token
-from datetime import datetime
-from app.models.employee import Employee
-from app.middleware.security import validate_email
+
 from app.extensions.database import db
+from app.middleware.security import validate_email
+from app.models.employee import Employee
 
 auth_web_bp = Blueprint('auth_web', __name__)
 
@@ -47,6 +50,8 @@ def login():
                 flash('Conta inativa. Entre em contato com o administrador', 'warning')
                 return render_template('auth/login.html')
             
+            # Detectar primeiro login (antes de atualizar last_login)
+            first_login = employee.last_login is None
             # Atualizar último login
             employee.last_login = datetime.utcnow()
             db.session.commit()
@@ -79,17 +84,25 @@ def login():
             else:
                 session.permanent = False
             
+            # Forçar troca de senha no primeiro login
+            if first_login:
+                session['must_change_pw'] = True
+                flash('Primeiro acesso: por favor, altere sua senha.', 'warning')
+            else:
+                session.pop('must_change_pw', None)
+            
             flash(f'Bem-vindo(a), {employee.name}!', 'success')
             
             # Redirecionar para a página solicitada ou dashboard
             next_page = request.args.get('next')
+            if session.get('must_change_pw'):
+                return redirect(url_for('web.profile'))
             if next_page:
                 return redirect(next_page)
             return redirect(url_for('web.dashboard'))
             
         except Exception as e:
             print(f"[LOGIN ERROR] {str(e)}")
-            import traceback
             traceback.print_exc()
             db.session.rollback()
             flash('Erro ao processar login. Tente novamente.', 'danger')

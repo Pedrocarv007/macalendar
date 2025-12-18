@@ -1,11 +1,13 @@
-"""
-Testes de autenticação
-"""
-import pytest
+"""Testes de autenticação para endpoints da API."""
 import json
+from datetime import date
+
+import pytest
+
 from app import create_app
 from app.extensions.database import db
-from app.models.user import User
+from app.models.employee import Employee
+from app.models.restaurant import Restaurant
 
 @pytest.fixture
 def app():
@@ -17,20 +19,34 @@ def app():
     
     with app.app_context():
         db.create_all()
-        
-        # Criar usuário de teste
-        user = User(
+
+        restaurant = Restaurant(
+            name='Restaurante Teste',
+            address='Rua 123',
+            phone='999999999',
+            email='restaurante@test.com',
+            is_active=True
+        )
+        db.session.add(restaurant)
+        db.session.commit()
+
+        user = Employee(
             email='test@mac.com',
             name='Test User',
             role='admin',
-            department='TI'
+            department='TI',
+            position='Administrador',
+            birth_date=date(1990, 1, 1),
+            restaurant_id=restaurant.id,
+            is_active=True
         )
-        user.set_password('test123')
+        user.set_password('test123A!')
         db.session.add(user)
         db.session.commit()
-        
+
         yield app
-        
+
+        db.session.remove()
         db.drop_all()
 
 @pytest.fixture  
@@ -41,10 +57,10 @@ def client(app):
 @pytest.fixture
 def auth_headers(client):
     """Headers com token de autenticação"""
-    response = client.post('/api/auth/login', 
+    response = client.post('/api/auth/login',
         data=json.dumps({
             'email': 'test@mac.com',
-            'password': 'test123'
+            'password': 'test123A!'
         }),
         content_type='application/json'
     )
@@ -59,10 +75,11 @@ class TestAuth:
     
     def test_login_success(self, client):
         """Teste de login com sucesso"""
-        response = client.post('/api/auth/login',
+        response = client.post(
+            '/api/auth/login',
             data=json.dumps({
                 'email': 'test@mac.com',
-                'password': 'test123'
+                'password': 'test123A!'
             }),
             content_type='application/json'
         )

@@ -29,7 +29,13 @@ def init_security(app):
                 '/health'
             ]
             
-            if request.path not in public_routes:
+            # Permitir rotas da API que requerem autenticação mas já verificam via session
+            # (a verificação será feita pelo before_request que checa session primeiro)
+            session_authenticated_routes = [
+                '/api/ai/posts'
+            ]
+            
+            if request.path not in public_routes and request.path not in session_authenticated_routes:
                 # Tentar autenticação por sessão primeiro
                 if 'user_id' in session:
                     g.current_user_id = session.get('user_id')
@@ -43,6 +49,13 @@ def init_security(app):
                     g.current_user_claims = get_jwt()
                 except Exception as e:
                     return jsonify({'error': 'Autenticação necessária'}), 401
+            
+            # Para rotas autenticadas por sessão, apenas verificar se tem sessão
+            if request.path in session_authenticated_routes:
+                if 'user_id' not in session:
+                    return jsonify({'error': 'Autenticação necessária'}), 401
+                g.current_user_id = session.get('user_id')
+                g.current_user_role = session.get('user_role')
 
 def api_login_required(f):
     """Decorator para rotas API que aceita JWT ou Session"""
@@ -194,6 +207,12 @@ def login_required(f):
         if 'user_id' not in session:
             flash('Por favor, faça login para acessar esta página.', 'warning')
             return redirect(url_for('auth_web.login', next=request.url))
+        # Enforce password change on first login: redirect everything to profile except profile/settings and logout
+        must_change = session.get('must_change_pw')
+        allowed_paths = {'/profile', '/logout'}
+        if must_change and request.path not in allowed_paths:
+            flash('Você precisa alterar sua senha antes de continuar.', 'warning')
+            return redirect(url_for('web.profile'))
         return f(*args, **kwargs)
     return decorated_function
 

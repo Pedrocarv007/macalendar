@@ -3,13 +3,27 @@ Rotas da API do Calendário
 """
 from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import get_jwt_identity, get_jwt
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
+import os
+import calendar as pycalendar
+from app.api.ai import get_client
 from app.extensions.database import db
 from app.models.calendar_event import CalendarEvent
 from app.models.employee import Employee
 from app.middleware.security import api_login_required, role_required
+import random
+import string
 
 calendar_bp = Blueprint('calendar', __name__)
+
+
+def _normalize_birthday(original_date, target_year):
+    """Ajusta datas para lidar com aniversários em 29/02."""
+    try:
+        return original_date.replace(year=target_year)
+    except ValueError:
+        # Ajusta 29/02 para 28/02 em anos não bissextos
+        return original_date.replace(year=target_year, day=28)
 
 @calendar_bp.route('/events', methods=['GET'])
 @api_login_required
@@ -118,6 +132,8 @@ def create_event():
         db.session.rollback()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
+
+
 @calendar_bp.route('/events/<int:event_id>', methods=['PUT'])
 @api_login_required
 def update_event(event_id):
@@ -202,6 +218,377 @@ def delete_event(event_id):
         db.session.rollback()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
+@calendar_bp.route('/events/<int:event_id>/mark-posted', methods=['PUT'])
+@api_login_required
+def mark_event_posted(event_id):
+    """Marcar evento (desafio) como postado usando a cor como flag."""
+    try:
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+        current_user_id = g.get('current_user_id')
+        event = CalendarEvent.query.get(event_id)
+        if not event:
+            return jsonify({'error': 'Evento não encontrado'}), 404
+        if user_role not in ['admin', 'rh', 'marketing']:
+            if event.restaurant_id != user_restaurant_id:
+                return jsonify({'error': 'Permissão negada'}), 403
+        # usar cor verde para indicar postado
+        event.color = '#2ecc71'
+        event.updated_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify({'message': 'Evento marcado como postado', 'event': event.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+
+@calendar_bp.route('/generate/mystery-tuesdays', methods=['POST'])
+@api_login_required
+def generate_mystery_tuesdays():
+    """Gerar eventos de Desafio Mistério para todas as terças do mês, com texto via IA."""
+    try:
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+        current_user_id = g.get('current_user_id')
+
+        data = request.get_json() or {}
+        month = int(data.get('month') or datetime.utcnow().month)
+        year = int(data.get('year') or datetime.utcnow().year)
+        restaurant_id = data.get('restaurant_id') or user_restaurant_id
+        image_url = data.get('image_url')
+        start_hour = int(data.get('start_hour') or 10)
+        duration_minutes = int(data.get('duration_minutes') or 30)
+
+        if not restaurant_id:
+            return jsonify({'error': 'restaurant_id é obrigatório'}), 400
+        if user_role not in ['admin', 'rh', 'marketing'] and restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada para este restaurante'}), 403
+        if not image_url:
+            return jsonify({'error': 'image_url é obrigatório'}), 400
+
+        # 🔹 Calcular todas as terças do mês
+        tuesdays = []
+        cal = pycalendar.Calendar()
+        for week in cal.monthdatescalendar(year, month):
+            for day in week:
+                if day.month == month and day.weekday() == 1:
+                    tuesdays.append(day)
+
+        client = get_client()
+        created_events = []
+        generated_texts = []
+
+        styles = [
+            'poético e enigmático',
+            'rimado e brincalhão',
+            'curto e direto',
+            'misterioso e provocativo',
+            'divertido e leve',
+            'com metáforas sutis'
+        ]
+
+        # 🔹 Utilitários
+        def _normalize(s):
+            return ' '.join(
+                ''.join(ch.lower() for ch in s if ch.isalnum() or ch.isspace()).split()
+            )
+
+        def _strip_header(text):
+            return text.replace('🎯Desafio Misterio Da Semana🎯', '').strip()
+
+        def _similar(a, b):
+            wa = set(_normalize(a).split())
+            wb = set(_normalize(b).split())
+            if not wa or not wb:
+                return 0.0
+            return len(wa & wb) / len(wa | wb)
+
+        def _gen_text(topic, style, seed, extra_hint=''):
+            return client.chat.completions.create(
+                model=os.getenv('OPENAI_MODEL') or 'gpt-4o-mini',
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Você é um redator criativo do McDonald's especializado em enigmas "
+                            "curtos para redes sociais. Nunca revele a resposta. "
+                            "Nunca explique nada. Responda apenas com o texto final."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            "Crie um enigma ORIGINAL seguindo EXATAMENTE esta estrutura:\n\n"
+                            "🎯Desafio Misterio Da Semana🎯\n\n"
+                            "- 4 a 6 linhas curtas\n"
+                            "- Tom divertido, curioso e misterioso\n"
+                            "- Não usar perguntas diretas\n"
+                            "- Não mencionar McDonald's explicitamente\n"
+                            "- Não repetir frases, rimas ou metáforas comuns\n\n"
+                            f"Tema oculto: {topic}\n"
+                            f"Estilo literário: {style}\n"
+                            f"Semente criativa: {seed}\n\n"
+                            "O enigma deve sugerir o tema sem o nomear."
+                            + (" " + extra_hint if extra_hint else "")
+                        ),
+                    },
+                ],
+                temperature=0.95,
+                presence_penalty=0.6,
+                frequency_penalty=0.4,
+                max_tokens=220,
+            )
+
+        # 🔹 Geração dos eventos
+        for idx, day in enumerate(tuesdays, start=1):
+            start_dt = datetime(year, month, day.day, start_hour, 0)
+            end_dt = start_dt + timedelta(minutes=duration_minutes)
+
+            topic = f"Desafio Mistério – Terça {idx} ({day.strftime('%d/%m/%Y')})"
+            seed = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
+            style = styles[(idx - 1) % len(styles)]
+
+            try:
+                resp = _gen_text(topic, style, seed)
+                text = resp.choices[0].message.content.strip()
+
+                if not text.startswith('🎯Desafio Misterio Da Semana🎯'):
+                    text = f"🎯Desafio Misterio Da Semana🎯\n\n{text}"
+
+                too_similar = any(
+                    _similar(
+                        _strip_header(text),
+                        _strip_header(prev)
+                    ) > 0.6
+                    for prev in generated_texts
+                )
+
+                if too_similar:
+                    alt_style = styles[idx % len(styles)]
+                    resp2 = _gen_text(
+                        topic,
+                        alt_style,
+                        seed,
+                        extra_hint='Use vocabulário totalmente diferente das terças anteriores.'
+                    )
+                    alt_text = resp2.choices[0].message.content.strip()
+                    if not alt_text.startswith('🎯Desafio Misterio Da Semana🎯'):
+                        alt_text = f"🎯Desafio Misterio Da Semana🎯\n\n{alt_text}"
+
+                    sim1 = max(
+                        (_similar(_strip_header(text), _strip_header(p)) for p in generated_texts),
+                        default=0
+                    )
+                    sim2 = max(
+                        (_similar(_strip_header(alt_text), _strip_header(p)) for p in generated_texts),
+                        default=0
+                    )
+
+                    if sim2 < sim1:
+                        text = alt_text
+                        style = alt_style
+
+            except Exception as e:
+                text = (
+                    "🎯Desafio Misterio Da Semana🎯\n\n"
+                    f"[Erro ao gerar enigma automaticamente]"
+                )
+
+            generated_texts.append(text)
+
+            event = CalendarEvent(
+                title='Desafio Mistério McD',
+                description=text,
+                start_date=start_dt,
+                end_date=end_dt,
+                event_type='desafio_misterio',
+                restaurant_id=restaurant_id,
+                created_by=current_user_id,
+                is_all_day=False,
+                color='#9b59b6',
+                location=image_url,
+                is_recurring=False,
+                metadata_json={
+                    "style": style,
+                    "seed": seed,
+                    "generator": "openai"
+                }
+            )
+
+            db.session.add(event)
+            created_events.append(event)
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Desafios Mistério gerados com sucesso',
+            'count': len(created_events),
+            'events': [e.to_dict() for e in created_events]
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+@calendar_bp.route('/generate/mystery-answers', methods=['POST'])
+@api_login_required
+def generate_mystery_answers():
+    """
+    Gera eventos de Resposta do Desafio aos sábados.
+    Para cada sábado do mês, encontra a terça anterior com 'desafio_misterio'
+    e cria um evento de resposta usando IA.
+    """
+    try:
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+        current_user_id = g.get('current_user_id')
+
+        data = request.get_json() or {}
+        month = int(data.get('month') or datetime.utcnow().month)
+        year = int(data.get('year') or datetime.utcnow().year)
+        restaurant_id = data.get('restaurant_id') or user_restaurant_id
+        start_hour = int(data.get('start_hour') or 10)
+        duration_minutes = int(data.get('duration_minutes') or 30)
+
+        if not restaurant_id:
+            return jsonify({'error': 'restaurant_id é obrigatório'}), 400
+        if user_role not in ['admin', 'rh', 'marketing'] and restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada para este restaurante'}), 403
+
+        # 🔹 Listar sábados do mês
+        saturdays = []
+        cal = pycalendar.Calendar()
+        for week in cal.monthdatescalendar(year, month):
+            for day in week:
+                if day.month == month and day.weekday() == 5:  # Saturday
+                    saturdays.append(day)
+
+        client = get_client()
+        created_events = []
+
+        # 🔹 Função para encontrar a terça anterior
+        def get_previous_tuesday(saturday):
+            d = saturday - timedelta(days=1)
+            while d.month == saturday.month:
+                if d.weekday() == 1:
+                    return d
+                d -= timedelta(days=1)
+            return None
+
+        for saturday in saturdays:
+            prev_tuesday = get_previous_tuesday(saturday)
+            if not prev_tuesday:
+                continue
+
+            # 🔹 Buscar evento de terça
+            tue_start = datetime(prev_tuesday.year, prev_tuesday.month, prev_tuesday.day)
+            tue_end = tue_start + timedelta(days=1)
+
+            tuesday_event = (
+                CalendarEvent.query
+                .filter(CalendarEvent.restaurant_id == restaurant_id)
+                .filter(CalendarEvent.event_type == 'desafio_misterio')
+                .filter(CalendarEvent.start_date >= tue_start)
+                .filter(CalendarEvent.start_date < tue_end)
+                .first()
+            )
+
+            if not tuesday_event:
+                continue
+
+            # 🔹 Evitar duplicar resposta
+            existing_answer = (
+                CalendarEvent.query
+                .filter(CalendarEvent.restaurant_id == restaurant_id)
+                .filter(CalendarEvent.event_type == 'desafio_misterio_resposta')
+                .filter(CalendarEvent.start_date.date() == saturday)
+                .first()
+            )
+            if existing_answer:
+                continue
+
+            riddle_text = tuesday_event.description or ''
+            image_url = tuesday_event.location
+
+            # 🔹 Gerar resposta via IA
+            try:
+                resp = client.chat.completions.create(
+                    model=os.getenv('OPENAI_MODEL') or 'gpt-4o-mini',
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "Você é um redator do McDonald's responsável por revelar respostas "
+                                "de desafios semanais. Seja claro, curto e envolvente. "
+                                "Nunca repita o enigma."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": (
+                                "Crie um post de RESPOSTA para redes sociais seguindo exatamente este formato:\n\n"
+                                "🔍Resposta do Desafio🎯\n\n"
+                                "- 1 linha revelando a resposta de forma direta\n"
+                                "- 1 a 2 linhas de encerramento amigável e engajador\n"
+                                "- Linguagem simples e positiva\n\n"
+                                "Enigma original (apenas para contexto):\n"
+                                f"{riddle_text}"
+                            ),
+                        },
+                    ],
+                    temperature=0.6,
+                    max_tokens=160,
+                )
+
+                answer_text = resp.choices[0].message.content.strip()
+                if not answer_text.startswith('🔍Resposta do Desafio🎯'):
+                    answer_text = f"🔍Resposta do Desafio🎯\n\n{answer_text}"
+
+            except Exception:
+                answer_text = (
+                    "🔍Resposta do Desafio🎯\n\n"
+                    "A resposta deste desafio já está no ar! "
+                    "Parabéns a quem acertou 👏 Nos vemos no próximo mistério!"
+                )
+
+            # 🔹 Criar evento de sábado
+            start_dt = datetime(year, month, saturday.day, start_hour, 0)
+            end_dt = start_dt + timedelta(minutes=duration_minutes)
+
+            event = CalendarEvent(
+                title='Resposta do Desafio',
+                description=answer_text,
+                start_date=start_dt,
+                end_date=end_dt,
+                event_type='desafio_misterio_resposta',
+                restaurant_id=restaurant_id,
+                created_by=current_user_id,
+                is_all_day=False,
+                color='#3498db',
+                location=image_url,
+                is_recurring=False,
+                metadata_json={
+                    "source_event_id": tuesday_event.id,
+                    "generator": "openai"
+                }
+            )
+
+            db.session.add(event)
+            created_events.append(event)
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Respostas de sábado geradas com sucesso',
+            'count': len(created_events),
+            'events': [e.to_dict() for e in created_events]
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+
 @calendar_bp.route('/birthdays', methods=['GET'])
 @api_login_required
 def get_birthdays():
@@ -232,7 +619,7 @@ def get_birthdays():
         # Preparar dados dos aniversários
         birthdays = []
         for employee in employees:
-            birthday_this_year = employee.birth_date.replace(year=year)
+            birthday_this_year = _normalize_birthday(employee.birth_date, year)
             birthdays.append({
                 'employee': employee.to_dict(),
                 'birthday_date': birthday_this_year.isoformat(),

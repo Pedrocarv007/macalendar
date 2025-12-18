@@ -3,21 +3,20 @@
  * Módulo para comunicação com a API do servidor
  */
 
-// Detectar se está rodando com /mac prefix - SEMPRE usar /mac por padrão
-let APP_PREFIX = '/mac';
+const detectAppPrefix = () => {
+    const basePath = window.location.pathname;
+    const [ , maybePrefix ] = basePath.split('/');
+    if (!maybePrefix) return '';
 
-// Construir a baseURL dinamicamente baseada no domínio atual
-// Se estiver via www.thecarv.com, usar o mesmo domínio
-// Se estiver via localhost, usar o mesmo
-let API_BASE_URL;
+    const candidate = `/${maybePrefix}`;
+    return candidate.toLowerCase() === '/mac' ? candidate : '';
+};
 
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    // Local development
-    API_BASE_URL = `http://${window.location.hostname}:6005${APP_PREFIX}/api`;
-} else {
-    // Production (www.thecarv.com ou qualquer outro domínio)
-    API_BASE_URL = `${window.location.protocol}//${window.location.hostname}${APP_PREFIX}/api`;
-}
+const APP_PREFIX = detectAppPrefix();
+const API_BASE_URL = `${window.location.origin}${APP_PREFIX}/api`;
+
+window.APP_PREFIX = APP_PREFIX;
+window.API_BASE_URL = API_BASE_URL;
 
 class APIClient {
     constructor(baseURL = API_BASE_URL) {
@@ -66,9 +65,11 @@ class APIClient {
         console.log(`   baseURL: ${this.baseURL}`);
         console.log(`   endpoint: ${endpoint}`);
         
+        const isFormData = data instanceof FormData;
+        
         const config = {
             method,
-            headers: {
+            headers: isFormData ? {} : {
                 'Content-Type': 'application/json',
                 ...options.headers
             },
@@ -77,13 +78,26 @@ class APIClient {
         };
 
         if (data) {
-            config.body = JSON.stringify(data);
+            if (isFormData) {
+                // FormData será enviado como multipart/form-data
+                // Não definir Content-Type, o navegador faz automaticamente
+                config.body = data;
+            } else {
+                config.body = JSON.stringify(data);
+            }
         }
 
         try {
             console.log(`➡️  ${method} ${url}`);
             const response = await fetch(url, config);
             
+            if (response.status === 401) {
+                if (typeof Utils !== 'undefined' && typeof Utils.handleUnauthorized === 'function') {
+                    Utils.handleUnauthorized();
+                }
+                throw new APIError(response.status, 'Unauthorized', response);
+            }
+
             if (!response.ok) {
                 const text = await response.text();
                 let error = {};
@@ -92,16 +106,15 @@ class APIClient {
                 } catch (e) {
                     error = { error: text || `HTTP ${response.status}` };
                 }
-                
-                // Log detalhado de erro
+
                 console.error(`❌ API Error ${response.status}:`, {
-                    url: url,
+                    url,
                     status: response.status,
                     statusText: response.statusText,
-                    error: error
+                    error
                 });
-                
-                throw new APIError(response.status, error.error || 'Request failed', response);
+
+                throw new APIError(response.status, error.error || error.message || 'Request failed', response);
             }
 
             // Se for DELETE ou 204 No Content, retornar vazio
@@ -122,6 +135,9 @@ class APIClient {
             return result;
         } catch (error) {
             console.error(`❌ API Error [${method} ${url}]:`, error);
+            if (typeof Utils !== 'undefined' && typeof Utils.showAlert === 'function') {
+                Utils.showAlert('Erro na requisição: ' + (error.message || 'Falha desconhecida'), 'error');
+            }
             throw error;
         }
     }
@@ -141,3 +157,4 @@ class APIError extends Error {
 
 // Instância global
 const api = new APIClient();
+window.api = api;

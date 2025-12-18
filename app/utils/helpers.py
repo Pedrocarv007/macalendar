@@ -2,10 +2,11 @@
 Utilitários e funções auxiliares
 """
 import os
+import random
+import re
 import uuid
 from datetime import datetime, date
 from PIL import Image
-import re
 
 def generate_unique_filename(original_filename, prefix="file"):
     """Gerar nome único para arquivo"""
@@ -146,5 +147,5 @@ def is_image_file(filename):
 
 def generate_random_color():
     """Gerar cor hexadecimal aleatória"""
-    import random
     return f"#{random.randint(0, 0xFFFFFF):06x}"
+

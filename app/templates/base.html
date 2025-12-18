@@ -254,6 +254,11 @@
     <!-- 6. Main App Initialization -->
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     
+    <!-- Expose config to front-end -->
+    <script>
+        window.VALID_ROLES = {{ VALID_ROLES | tojson }};
+    </script>
+    
     <!-- Page Specific Scripts -->
     {% block scripts %}{% endblock %}
 

@@ -1,12 +1,20 @@
 """
 Rotas da API de Perfil do Usuário
 """
-from flask import Blueprint, request, jsonify, g, session
-from werkzeug.security import check_password_hash
+import os
 from datetime import datetime
+
+from flask import Blueprint, request, jsonify, g, session
+from PIL import Image
+from werkzeug.utils import secure_filename
+
 from app.extensions.database import db
+from app.middleware.security import (
+    allowed_file,
+    api_login_required,
+    validate_password_strength,
+)
 from app.models.employee import Employee
-from app.middleware.security import api_login_required
 
 profile_bp = Blueprint('profile', __name__)
 
@@ -105,11 +113,6 @@ def update_profile():
 def upload_profile_photo():
     """Upload de foto do perfil"""
     try:
-        import os
-        from werkzeug.utils import secure_filename
-        from PIL import Image
-        from app.middleware.security import allowed_file
-        
         if 'file' not in request.files:
             return jsonify({'error': 'Arquivo não fornecido'}), 400
         
@@ -174,8 +177,6 @@ def upload_profile_photo():
 def delete_profile_photo():
     """Deletar foto do perfil"""
     try:
-        import os
-        
         user_id = g.get('current_user_id')
         employee = Employee.query.get(user_id)
         if not employee:
@@ -216,14 +217,17 @@ def change_password():
         if not employee.check_password(data['current_password']):
             return jsonify({'error': 'Senha atual incorreta'}), 401
         
-        # Validar comprimento da nova senha
-        if len(data['new_password']) < 6:
-            return jsonify({'error': 'Nova senha deve ter no mínimo 6 caracteres'}), 400
+        is_valid, message = validate_password_strength(data['new_password'])
+        if not is_valid:
+            return jsonify({'error': message}), 400
         
         # Definir nova senha
         employee.set_password(data['new_password'])
         employee.updated_at = datetime.utcnow()
         db.session.commit()
+        
+        # Limpar flag de mudança obrigatória de senha no primeiro login
+        session.pop('must_change_pw', None)
         
         return jsonify({'message': 'Senha alterada com sucesso'}), 200
         

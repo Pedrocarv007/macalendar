@@ -13,11 +13,12 @@ class Config:
     
     # Configurações básicas do Flask
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'mac-calendar-secret-key-2024-dev'
-    DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     APPLICATION_ROOT = os.environ.get('APPLICATION_ROOT', '/mac')
     
     # Configurações do banco de dados
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{BASE_DIR}/instance/macalendar.db'
+    _default_sqlite_path = (BASE_DIR / 'instance' / 'macalendar.db').resolve()
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f"sqlite:///{_default_sqlite_path.as_posix()}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
@@ -35,6 +36,16 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
     
+    # Configurações de roles de usuário (podem ser sobrescritas por env)
+    _roles_env = os.environ.get('VALID_ROLES')
+    if _roles_env:
+        VALID_ROLES = [r.strip().lower() for r in _roles_env.split(',') if r.strip()]
+    else:
+        VALID_ROLES = ['admin', 'rh', 'marketing', 'manager', 'employee', 'shift_manager', 'sub_manager', 'rp', 'coucher']
+
+    _default_role_env = os.environ.get('DEFAULT_ROLE', 'employee').strip().lower()
+    DEFAULT_ROLE = _default_role_env if _default_role_env in VALID_ROLES else (VALID_ROLES[0] if VALID_ROLES else 'employee')
+    
     # Configurações de sessão
     SESSION_TYPE = 'filesystem'
     SESSION_PERMANENT = False
@@ -44,6 +55,8 @@ class Config:
     SESSION_COOKIE_SECURE = False  # True apenas em produção com HTTPS
     SESSION_COOKIE_HTTPONLY = True  # Previne acesso via JavaScript
     SESSION_COOKIE_SAMESITE = 'Lax'  # Proteção contra CSRF
+    SESSION_COOKIE_PATH = os.environ.get('APPLICATION_ROOT', '/mac')  # Path do cookie deve corresponder ao APPLICATION_ROOT
+    SESSION_COOKIE_NAME = 'mac_session'  # Nome específico para evitar conflitos
     
     # Configurações de email
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
@@ -71,14 +84,14 @@ class Config:
     CACHE_TYPE = 'simple'
     CACHE_DEFAULT_TIMEOUT = 300
     
-    @staticmethod
-    def init_app(app):
+    @classmethod
+    def init_app(cls, app):
         """Inicializar configurações específicas da aplicação"""
         
         # Criar diretórios necessários
-        os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
-        os.makedirs(Config.UPLOAD_FOLDER / 'employees', exist_ok=True)
-        os.makedirs(Config.UPLOAD_FOLDER / 'documents', exist_ok=True)
+        os.makedirs(cls.UPLOAD_FOLDER, exist_ok=True)
+        os.makedirs(cls.UPLOAD_FOLDER / 'employees', exist_ok=True)
+        os.makedirs(cls.UPLOAD_FOLDER / 'documents', exist_ok=True)
         os.makedirs(BASE_DIR / 'instance', exist_ok=True)
         os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 
@@ -93,9 +106,11 @@ class ProductionConfig(Config):
     TESTING = False
     
     # Configurações mais restritivas para produção
-    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True  # HTTPS obrigatório
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_PATH = os.environ.get('APPLICATION_ROOT', '/mac')
+    SESSION_COOKIE_DOMAIN = None  # Let Flask handle it automatically
     
     # Logging mais detalhado
     LOG_LEVEL = 'WARNING'

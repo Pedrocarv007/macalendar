@@ -40,13 +40,13 @@ class DocumentGenerator:
     def _get_template_image(self, template_name):
         """Obter imagem de template"""
         templates = {
-            'bem_vindo': 'Bem_vindo.png',
+            'bem_vindo': 'bem_vindo.png',
             'aniversario': 'aniversario.png',
-            'welcome': 'Bem_vindo.png',
+            'welcome': 'bem_vindo.png',
             'birthday': 'aniversario.png'
         }
         
-        filename = templates.get(template_name.lower(), 'Bem_vindo.png')
+        filename = templates.get(template_name.lower(), 'bem_vindo.png')
         template_path = self.base_dir / filename
         
         if not os.path.exists(template_path):

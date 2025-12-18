@@ -1,15 +1,41 @@
 """
 Rotas de autenticação da API
 """
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, create_access_token, get_jwt_identity, get_jwt
 from datetime import datetime
+
+from flask import Blueprint, request, jsonify, session
+from flask_jwt_extended import (
+    create_access_token,
+    get_jwt,
+    get_jwt_identity,
+    jwt_required,
+    verify_jwt_in_request,
+)
+
 from app.extensions.database import db
+from app.middleware.security import validate_email, validate_password_strength, role_required
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
-from app.middleware.security import validate_email, validate_password_strength, role_required
 
 auth_bp = Blueprint('auth', __name__)
+
+
+def _ensure_default_restaurant():
+    """Garantir que exista um restaurante padrão para associação automática."""
+    default = Restaurant.query.filter_by(name='Restaurante Padrão').first()
+    if default:
+        return default
+
+    default = Restaurant(
+        name='Restaurante Padrão',
+        address='Atualize este endereço',
+        phone='910000000',
+        email='default@mac.com',
+        is_active=True
+    )
+    db.session.add(default)
+    db.session.commit()
+    return default
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -83,7 +109,7 @@ def register():
             return jsonify({'error': 'Dados não fornecidos'}), 400
         
         # Validar dados obrigatórios
-        required_fields = ['email', 'password', 'name', 'role']
+        required_fields = ['email', 'password', 'name', 'role', 'position', 'birth_date']
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'error': f'{field} é obrigatório'}), 400
@@ -101,7 +127,8 @@ def register():
         if not is_valid:
             return jsonify({'error': message}), 400
         
-        valid_roles = ['admin', 'rh', 'marketing', 'manager', 'employee']
+        from flask import current_app
+        valid_roles = current_app.config.get('VALID_ROLES', ['admin', 'rh', 'marketing', 'manager', 'employee'])
         if role not in valid_roles:
             return jsonify({'error': f'Role inválido. Deve ser um de: {", ".join(valid_roles)}'}), 400
         
@@ -111,23 +138,44 @@ def register():
         
         # Verificar restaurante se fornecido
         restaurant_id = data.get('restaurant_id')
+        restaurant = None
         if restaurant_id:
             restaurant = Restaurant.query.get(restaurant_id)
             if not restaurant:
                 return jsonify({'error': 'Restaurante não encontrado'}), 404
-            
             if not restaurant.is_active:
                 return jsonify({'error': 'Restaurante inativo'}), 400
+        else:
+            restaurant = _ensure_default_restaurant()
+            restaurant_id = restaurant.id
+
+        # Validar datas obrigatórias
+        try:
+            birth_date = datetime.fromisoformat(data['birth_date']).date()
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Formato de data de nascimento inválido. Use YYYY-MM-DD.'}), 400
         
+        hire_date = None
+        if data.get('hire_date'):
+            try:
+                hire_date = datetime.fromisoformat(data['hire_date']).date()
+            except (TypeError, ValueError):
+                return jsonify({'error': 'Formato de data de contratação inválido. Use YYYY-MM-DD.'}), 400
+
         # Criar novo employee (agora funciona como user também)
         new_employee = Employee(
             email=email,
             name=name,
             role=role,
             department=data.get('department'),
-            restaurant_id=restaurant_id or 1,  # Default restaurant
-            position=name,  # Usar nome como posição
-            birth_date=datetime.utcnow().date()  # Data padrão
+            restaurant_id=restaurant_id,
+            position=data['position'],
+            birth_date=birth_date,
+            hire_date=hire_date,
+            phone=data.get('phone'),
+            address=data.get('address'),
+            notes=data.get('notes'),
+            is_active=data.get('is_active', True)
         )
         new_employee.set_password(password)
         
@@ -183,12 +231,10 @@ def get_current_user_session():
     try:
         # Tentar primeiro com JWT
         try:
-            from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
             verify_jwt_in_request(optional=True)
             current_user_id = get_jwt_identity()
-        except:
+        except Exception:
             # Se JWT falhar, usar sessão
-            from flask import session
             if 'user_id' not in session:
                 return jsonify({'error': 'Não autenticado'}), 401
             current_user_id = session.get('user_id')
@@ -209,39 +255,30 @@ def get_current_user_session():
 @auth_bp.route('/user', methods=['GET'])
 def get_user_session():
     """Alias para /current-user (compatibilidade)"""
-    from flask import session
     try:
+        print(f"[DEBUG] Session keys: {list(session.keys())}")
+        print(f"[DEBUG] user_id in session: {'user_id' in session}")
+        
         if 'user_id' not in session:
+            print("[DEBUG] Não autenticado - user_id não está na sessão")
             return jsonify({'error': 'Não autenticado'}), 401
-        
-        employee = Employee.query.get(session.get('user_id'))
-        
-        if not employee:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
-        
-        return jsonify(employee.to_dict()), 200
-        
-    except Exception as e:
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
-def get_current_user_web():
-    """Obter dados do usuário logado via sessão (para aplicação web)"""
-    try:
-        from flask import session
         
         user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({'error': 'Não autenticado'}), 401
+        print(f"[DEBUG] user_id da sessão: {user_id}")
         
         employee = Employee.query.get(user_id)
+        print(f"[DEBUG] Employee encontrado: {employee is not None}")
+        
         if not employee:
+            print(f"[DEBUG] Employee com ID {user_id} não encontrado no banco")
             return jsonify({'error': 'Usuário não encontrado'}), 404
         
         return jsonify(employee.to_dict()), 200
         
     except Exception as e:
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
-        
-    except Exception as e:
+        print(f"[DEBUG ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @auth_bp.route('/profile', methods=['PUT'])

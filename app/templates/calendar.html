@@ -22,6 +22,12 @@
                     <button class="btn btn-outline-primary" onclick="nextMonth()">
                         <i class="fas fa-chevron-right"></i>
                     </button>
+                    <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#mysteryModal">
+                        <i class="fas fa-magic me-1"></i>Desafio Mistério
+                    </button>
+                    <button class="btn btn-outline-info" onclick="generateMysteryAnswersFromModal()">
+                        <i class="fas fa-lightbulb me-1"></i>Respostas Sábados
+                    </button>
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#eventModal">
                         <i class="fas fa-plus me-1"></i>Novo Evento
                     </button>
@@ -131,6 +137,51 @@
     </div>
 </div>
 
+<!-- Mystery Challenge Modal -->
+<div class="modal fade" id="mysteryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Gerar Desafios de Terça</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="mysteryForm">
+                    <div class="mb-3">
+                        <label class="form-label">Mês</label>
+                        <input type="number" min="1" max="12" class="form-control" id="mysteryMonth" value="{{ current_date.month if current_date else 12 }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ano</label>
+                        <input type="number" min="2024" class="form-control" id="mysteryYear" value="{{ current_date.year if current_date else 2025 }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Restaurante</label>
+                        <input type="number" class="form-control" id="mysteryRestaurant" value="{{ current_user.restaurant_id if current_user and current_user.restaurant_id else '' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">URL da Imagem</label>
+                        <input type="url" class="form-control" id="mysteryImage" placeholder="https://..." required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Hora de início (0-23)</label>
+                        <input type="number" min="0" max="23" class="form-control" id="mysteryHour" value="10">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="generateMystery()">
+                    <i class="fas fa-magic me-1"></i>Gerar
+                </button>
+                <button type="button" class="btn btn-info" onclick="generateMysteryAnswersFromModal()">
+                    <i class="fas fa-lightbulb me-1"></i>Gerar respostas de sábados
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Event Modal -->
 <div class="modal fade" id="eventModal" tabindex="-1">
     <div class="modal-dialog">
@@ -152,6 +203,15 @@
                         <label for="description" class="form-label">Descrição</label>
                         <textarea class="form-control" id="description" name="description" rows="3"></textarea>
                     </div>
+
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Link/Imagem</label>
+                        <div class="input-group">
+                            <input type="url" class="form-control" id="location" name="location" placeholder="https://...">
+                            <a class="btn btn-outline-secondary" id="locationPreview" href="#" target="_blank" rel="noopener" style="display: none;">Abrir</a>
+                        </div>
+                        <div class="form-text">Use para anexar a imagem do post ou um link relevante (ex.: Desafio Mistério).</div>
+                    </div>
                     
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
@@ -172,6 +232,7 @@
                             <option value="training">Treinamento</option>
                             <option value="event">Evento</option>
                             <option value="urgent">Urgente</option>
+                            <option value="desafio_misterio">Desafio Mistério</option>
                         </select>
                     </div>
                     
@@ -199,8 +260,57 @@
                 <button type="button" class="btn btn-danger" id="deleteEventBtn" style="display: none;" onclick="deleteEvent()">
                     <i class="fas fa-trash me-1"></i>Excluir
                 </button>
+                <button type="button" class="btn btn-success" id="markPostedBtn" style="display: none;" onclick="markPostedFromModal()">
+                    <i class="fas fa-check me-1"></i>Marcar como postado
+                </button>
                 <button type="button" class="btn btn-primary" onclick="saveEvent()">
                     <i class="fas fa-save me-1"></i>Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Event Details Modal -->
+<div class="modal fade" id="eventDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="detailsTitle">Detalhes do Evento</h5>
+                    <div class="text-muted" id="detailsWhen"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="badge bg-primary" id="detailsCategory">Categoria</div>
+                    <button type="button" class="btn btn-sm btn-outline-success" id="detailsMarkPosted" style="display: none;" onclick="markPostedFromDetails()">
+                        <i class="fas fa-check me-1"></i>Marcar como postado
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Descrição</label>
+                    <div class="border rounded p-3 bg-light" id="detailsDescription" style="min-height: 80px;"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Imagem/Link</label>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <a href="#" id="detailsLink" target="_blank" rel="noopener" style="display: none;">Abrir link</a>
+                        <span class="text-muted" id="detailsNoLink" style="display: none;">Nenhum link informado</span>
+                    </div>
+                    <div id="detailsImageWrapper" style="display: none;">
+                        <img id="detailsImage" src="" alt="Prévia" class="img-fluid rounded border">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-danger" onclick="deleteEventFromDetails()">
+                    <i class="fas fa-trash me-1"></i>Remover
+                </button>
+                <button type="button" class="btn btn-primary" onclick="editEventFromDetails()">
+                    <i class="fas fa-edit me-1"></i>Editar
                 </button>
             </div>
         </div>
@@ -214,6 +324,7 @@ let currentDate = new Date();
 let events = [];
 let viewType = 'month';
 const userRestaurantId = {{ current_user.restaurant_id if current_user and current_user.restaurant_id else 'null' }};
+let selectedEvent = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     initCalendar();
@@ -232,6 +343,11 @@ document.addEventListener('DOMContentLoaded', function() {
             renderCalendar();
         });
     });
+
+    const locationInput = document.getElementById('location');
+    if (locationInput) {
+        locationInput.addEventListener('input', (e) => updateLocationPreview(e.target.value));
+    }
     
     // Reset modal quando abrir para novo evento
     const eventModal = document.getElementById('eventModal');
@@ -242,6 +358,9 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('eventId').value = '';
             document.getElementById('deleteEventBtn').style.display = 'none';
             document.getElementById('eventModalTitle').textContent = 'Novo Evento';
+            document.getElementById('location').value = '';
+            updateLocationPreview('');
+            document.getElementById('markPostedBtn').style.display = 'none';
         }
     });
 });
@@ -317,11 +436,12 @@ function createDayCell(date, currentMonth) {
     
     dayEvents.forEach(event => {
         const eventElement = document.createElement('div');
-        eventElement.className = `event event-${event.category || 'default'}`;
+        const category = event.extendedProps?.event_type || event.category || 'default';
+        eventElement.className = `event event-${category}`;
         eventElement.textContent = event.title;
         eventElement.addEventListener('click', (e) => {
             e.stopPropagation();
-            editEvent(event);
+            showEventDetails(event);
         });
         eventsContainer.appendChild(eventElement);
     });
@@ -395,6 +515,14 @@ function editEvent(event) {
     document.getElementById('category').value = event.extendedProps?.event_type || 'meeting';
     document.getElementById('allDay').checked = event.allDay || false;
     document.getElementById('recurring').checked = event.extendedProps?.is_recurring || false;
+    const imageUrl = event.extendedProps?.location || '';
+    document.getElementById('location').value = imageUrl;
+    updateLocationPreview(imageUrl);
+    const markPostedBtn = document.getElementById('markPostedBtn');
+    if (markPostedBtn) {
+        const isMystery = event.extendedProps?.event_type === 'desafio_misterio';
+        markPostedBtn.style.display = isMystery ? 'inline-block' : 'none';
+    }
     
     document.getElementById('deleteEventBtn').style.display = 'inline-block';
     
@@ -404,6 +532,212 @@ function editEvent(event) {
 
 // Funções saveEvent(), deleteEvent() e loadEvents() foram movidas para calendar.js
 // Não adicione funções duplicadas aqui!
+
+async function generateMystery() {
+    if (typeof CalendarModule === 'undefined' || typeof CalendarModule.generateMysteryChallenges !== 'function') {
+        alert('Módulo de calendário não carregado.');
+        return;
+    }
+
+    const month = parseInt(document.getElementById('mysteryMonth')?.value, 10) || (currentDate.getMonth() + 1);
+    const year = parseInt(document.getElementById('mysteryYear')?.value, 10) || currentDate.getFullYear();
+    const restaurant_id = parseInt(document.getElementById('mysteryRestaurant')?.value, 10) || userRestaurantId;
+    const image_url = document.getElementById('mysteryImage')?.value?.trim();
+    const startHourRaw = parseInt(document.getElementById('mysteryHour')?.value, 10);
+    const start_hour = Number.isNaN(startHourRaw) ? 10 : startHourRaw;
+
+    if (!restaurant_id) {
+        alert('Informe o restaurante.');
+        return;
+    }
+    if (!image_url) {
+        alert('Informe a URL da imagem.');
+        return;
+    }
+
+    try {
+        await CalendarModule.generateMysteryChallenges({ month, year, restaurant_id, image_url, start_hour });
+        const modal = bootstrap.Modal.getInstance(document.getElementById('mysteryModal'));
+        if (modal) {
+            modal.hide();
+        }
+    } catch (error) {
+        console.error('Erro ao gerar desafios:', error);
+        const message = error.message || 'Erro ao gerar desafios';
+        if (typeof appState !== 'undefined' && appState.notify) {
+            appState.notify(message, 'error');
+        } else {
+            alert(message);
+        }
+    }
+}
+
+async function markPostedFromModal() {
+    const eventId = document.getElementById('eventId')?.value;
+    if (!eventId) {
+        return;
+    }
+    if (typeof CalendarModule === 'undefined' || typeof CalendarModule.markPosted !== 'function') {
+        alert('Módulo de calendário não carregado.');
+        return;
+    }
+
+    try {
+        await CalendarModule.markPosted(eventId);
+        const modal = bootstrap.Modal.getInstance(document.getElementById('eventModal'));
+        if (modal) {
+            modal.hide();
+        }
+    } catch (error) {
+        console.error('Erro ao marcar como postado:', error);
+        const message = error.message || 'Erro ao marcar como postado';
+        if (typeof appState !== 'undefined' && appState.notify) {
+            appState.notify(message, 'error');
+        } else {
+            alert(message);
+        }
+    }
+}
+
+function updateLocationPreview(url) {
+    const preview = document.getElementById('locationPreview');
+    if (!preview) return;
+    if (url) {
+        preview.style.display = 'inline-flex';
+        preview.href = url;
+    } else {
+        preview.style.display = 'none';
+        preview.removeAttribute('href');
+    }
+}
+
+async function generateMysteryAnswersFromModal() {
+    if (typeof CalendarModule === 'undefined' || typeof CalendarModule.generateMysteryAnswers !== 'function') {
+        alert('Módulo de calendário não carregado.');
+        return;
+    }
+    const month = parseInt(document.getElementById('mysteryMonth')?.value, 10) || (currentDate.getMonth() + 1);
+    const year = parseInt(document.getElementById('mysteryYear')?.value, 10) || currentDate.getFullYear();
+    const restaurant_id = parseInt(document.getElementById('mysteryRestaurant')?.value, 10) || userRestaurantId;
+    const startHourRaw = parseInt(document.getElementById('mysteryHour')?.value, 10);
+    const start_hour = Number.isNaN(startHourRaw) ? 10 : startHourRaw;
+    if (!restaurant_id) {
+        alert('Informe o restaurante.');
+        return;
+    }
+    try {
+        await CalendarModule.generateMysteryAnswers({ month, year, restaurant_id, start_hour });
+        const modal = bootstrap.Modal.getInstance(document.getElementById('mysteryModal'));
+        if (modal) modal.hide();
+    } catch (error) {
+        console.error('Erro ao gerar respostas:', error);
+        const message = error.message || 'Erro ao gerar respostas';
+        if (typeof appState !== 'undefined' && appState.notify) {
+            appState.notify(message, 'error');
+        } else {
+            alert(message);
+        }
+    }
+}
+
+function showEventDetails(event) {
+    selectedEvent = event;
+    const modalEl = document.getElementById('eventDetailsModal');
+    if (!modalEl) return;
+    document.getElementById('detailsTitle').textContent = event.title || 'Evento';
+    const start = new Date(event.start);
+    const end = event.end ? new Date(event.end) : null;
+    const when = end ? `${formatDate(start)} ${formatTime(start)} - ${formatTime(end)}` : `${formatDate(start)} ${formatTime(start)}`;
+    document.getElementById('detailsWhen').textContent = when;
+    const cat = event.extendedProps?.event_type || 'Geral';
+    const catEl = document.getElementById('detailsCategory');
+    catEl.textContent = cat;
+    catEl.className = `badge bg-${getCategoryColor(cat)}`;
+
+    const descEl = document.getElementById('detailsDescription');
+    descEl.innerText = event.description || 'Sem descrição';
+
+    const linkEl = document.getElementById('detailsLink');
+    const noLinkEl = document.getElementById('detailsNoLink');
+    const imgWrap = document.getElementById('detailsImageWrapper');
+    const imgEl = document.getElementById('detailsImage');
+    const loc = event.extendedProps?.location || '';
+    if (loc) {
+        linkEl.href = loc;
+        linkEl.style.display = 'inline-flex';
+        noLinkEl.style.display = 'none';
+        imgEl.src = loc;
+        imgWrap.style.display = 'block';
+    } else {
+        linkEl.style.display = 'none';
+        linkEl.removeAttribute('href');
+        noLinkEl.style.display = 'inline';
+        imgWrap.style.display = 'none';
+        imgEl.removeAttribute('src');
+    }
+
+    const markBtn = document.getElementById('detailsMarkPosted');
+    if (markBtn) {
+        const isMystery = event.extendedProps?.event_type === 'desafio_misterio';
+        markBtn.style.display = isMystery ? 'inline-flex' : 'none';
+    }
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
+
+async function editEventFromDetails() {
+    if (!selectedEvent) return;
+    const modalEl = document.getElementById('eventDetailsModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+    editEvent(selectedEvent);
+}
+
+async function deleteEventFromDetails() {
+    if (!selectedEvent || !selectedEvent.id) return;
+    if (!confirm('Deseja remover este evento?')) return;
+    if (typeof CalendarModule === 'undefined') {
+        alert('Módulo de calendário não carregado.');
+        return;
+    }
+    try {
+        await CalendarModule.deleteEvent(selectedEvent.id);
+        const modalEl = document.getElementById('eventDetailsModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    } catch (error) {
+        console.error('Erro ao remover evento:', error);
+        const message = error.message || 'Erro ao remover evento';
+        if (typeof appState !== 'undefined' && appState.notify) {
+            appState.notify(message, 'error');
+        } else {
+            alert(message);
+        }
+    }
+}
+
+async function markPostedFromDetails() {
+    if (!selectedEvent || !selectedEvent.id) return;
+    if (typeof CalendarModule === 'undefined' || typeof CalendarModule.markPosted !== 'function') {
+        alert('Módulo de calendário não carregado.');
+        return;
+    }
+    try {
+        await CalendarModule.markPosted(selectedEvent.id);
+        const modalEl = document.getElementById('eventDetailsModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    } catch (error) {
+        console.error('Erro ao marcar postado:', error);
+        const message = error.message || 'Erro ao marcar postado';
+        if (typeof appState !== 'undefined' && appState.notify) {
+            appState.notify(message, 'error');
+        } else {
+            alert(message);
+        }
+    }
+}
 
 function renderTodayEvents() {
     const container = document.getElementById('todayEvents');
@@ -421,7 +755,7 @@ function renderTodayEvents() {
     }
     
     container.innerHTML = todayEvents.map(event => `
-        <div class="event-item" onclick="editEvent(${JSON.stringify(event).replace(/"/g, '&quot;')})">
+        <div class="event-item" onclick='showEventDetails(${JSON.stringify(event).replace(/"/g, "&quot;")})'>
             <div class="event-time">${formatTime(new Date(event.start))}</div>
             <div class="event-title">${event.title}</div>
             <div class="event-category badge bg-${getCategoryColor(event.extendedProps?.event_type)}">${event.extendedProps?.event_type || 'Geral'}</div>
@@ -443,7 +777,7 @@ function renderUpcomingEvents() {
     }
     
     container.innerHTML = upcomingEvents.map(event => `
-        <div class="event-item small" onclick="editEvent(${JSON.stringify(event).replace(/"/g, '&quot;')})">
+        <div class="event-item small" onclick='showEventDetails(${JSON.stringify(event).replace(/"/g, "&quot;")})'>
             <div class="event-date">${formatDate(new Date(event.start))}</div>
             <div class="event-title">${event.title}</div>
         </div>
@@ -485,7 +819,8 @@ function getCategoryColor(category) {
         meeting: 'primary',
         training: 'success',
         event: 'warning',
-        urgent: 'danger'
+        urgent: 'danger',
+        desafio_misterio: 'info'
     };
     return colors[category] || 'secondary';
 }

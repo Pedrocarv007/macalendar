@@ -2,9 +2,25 @@
 Inicialização da aplicação Flask para MAC Calendar
 Sistema de gestão para restaurantes com calendário e gestão de colaboradores
 """
-from flask import Flask, session
-from flask_cors import CORS
 import os
+from datetime import datetime
+
+from flask import Flask, session, send_from_directory
+from flask_cors import CORS
+
+from app.api.auth import auth_bp
+from app.api.calendar import calendar_bp
+from app.api.dashboard import dashboard_bp
+from app.api.documents import documents_bp
+from app.api.employees import employees_bp
+from app.api.profile import profile_bp
+from app.api.restaurants import restaurants_bp
+from app.api.ai import ai_bp
+from app.auth.routes import auth_web_bp
+from app.config.settings import Config, config as CONFIG_MAP
+from app.extensions.database import init_db
+from app.middleware.security import init_security
+from app.web.routes import web_bp
 
 class ScriptNameMiddleware:
     """Middleware WSGI que define SCRIPT_NAME para proxy reverso"""
@@ -32,15 +48,16 @@ def create_app(config_name=None):
     app = Flask(__name__)
     
     # Carregar configurações
-    from app.config.settings import Config
-    app.config.from_object(Config)
+    selected_config = config_name or os.environ.get('FLASK_CONFIG') or 'default'
+    config_class = CONFIG_MAP.get(selected_config, Config)
+    app.config.from_object(config_class)
+    config_class.init_app(app)
     
     # Adicionar middleware WSGI para proxy reverso
     app_root = app.config.get('APPLICATION_ROOT', '/mac')
     app.wsgi_app = ScriptNameMiddleware(app.wsgi_app, app_root)
     
     # Inicializar extensões
-    from app.extensions.database import init_db
     init_db(app)
     
     # Configurar CORS (permitir qualquer origem via proxy)
@@ -60,19 +77,16 @@ def create_app(config_name=None):
             }
         return {'current_user': None}
 
+    @app.context_processor
+    def inject_valid_roles():
+        return {
+            'VALID_ROLES': app.config.get('VALID_ROLES', ['admin', 'rh', 'marketing', 'manager', 'employee'])
+        }
+
     # Registrar middlewares
-    from app.middleware.security import init_security
     init_security(app)
     
     # Registrar blueprints da API
-    from app.api.auth import auth_bp
-    from app.api.calendar import calendar_bp
-    from app.api.employees import employees_bp
-    from app.api.restaurants import restaurants_bp
-    from app.api.documents import documents_bp
-    from app.api.profile import profile_bp
-    from app.api.dashboard import dashboard_bp
-    
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(calendar_bp, url_prefix='/api/calendar')
     app.register_blueprint(employees_bp, url_prefix='/api/employees')
@@ -80,11 +94,9 @@ def create_app(config_name=None):
     app.register_blueprint(documents_bp, url_prefix='/api/documents')
     app.register_blueprint(profile_bp, url_prefix='/api/profile')
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
+    app.register_blueprint(ai_bp, url_prefix='/api/ai')
     
     # Registrar blueprints de interface web
-    from app.auth.routes import auth_web_bp
-    from app.web.routes import web_bp
-    
     app.register_blueprint(auth_web_bp, url_prefix='/auth')
     app.register_blueprint(web_bp)
     
@@ -100,7 +112,6 @@ def create_app(config_name=None):
     
     @app.route('/api/health')
     def api_health():
-        from datetime import datetime
         return {
             'status': 'healthy',
             'timestamp': datetime.utcnow().isoformat(),
@@ -110,9 +121,6 @@ def create_app(config_name=None):
     # Servir arquivos gerados (documentos, cartões, etc)
     @app.route('/uploads/generated/<filename>')
     def serve_generated_file(filename):
-        from flask import send_from_directory
-        import os
-        
         # Validar filename para evitar path traversal
         if '..' in filename or filename.startswith('/'):
             return {'error': 'Acesso negado'}, 403
@@ -123,6 +131,29 @@ def create_app(config_name=None):
         except FileNotFoundError:
             return {'error': 'Arquivo não encontrado'}, 404
         except Exception as e:
+            return {'error': f'Erro ao servir arquivo: {str(e)}'}, 500
+    
+    # Servir fotos de colaboradores via rota estática
+    @app.route('/uploads/employees/<filename>')
+    def serve_employee_photo(filename):
+        # Validar filename para evitar path traversal
+        if '..' in filename or filename.startswith('/'):
+            return {'error': 'Acesso negado'}, 403
+        
+        try:
+            uploads_dir = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'employees')
+            print(f'[DEBUG] Servindo foto: {filename}')
+            print(f'[DEBUG] Diretório: {uploads_dir}')
+            print(f'[DEBUG] Caminho completo: {os.path.join(uploads_dir, filename)}')
+            print(f'[DEBUG] Arquivo existe: {os.path.exists(os.path.join(uploads_dir, filename))}')
+            return send_from_directory(uploads_dir, filename, as_attachment=False)
+        except FileNotFoundError as e:
+            print(f'[DEBUG] Arquivo não encontrado: {filename} - {str(e)}')
+            return {'error': 'Arquivo não encontrado'}, 404
+        except Exception as e:
+            print(f'[DEBUG] Erro ao servir arquivo: {str(e)}')
+            import traceback
+            traceback.print_exc()
             return {'error': f'Erro ao servir arquivo: {str(e)}'}, 500
     
     # Manipuladores de erro
