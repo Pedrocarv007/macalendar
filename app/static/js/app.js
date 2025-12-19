@@ -24,29 +24,22 @@ class App {
         if (this.initialized) return;
 
         try {
-            console.log('🚀 Inicializando MAC Calendar...');
-
             // Inicializar state
             appState.init();
-            console.log('✓ Estado inicializado');
 
             // Configurar event listeners
             this.setupGlobalHandlers();
-            console.log('✓ Event listeners configurados');
 
             // Verificar autenticação
             await this.checkAuth();
-            console.log('✓ Autenticação verificada');
 
             // Inicializar módulos específicos da página
             this.initPageModules();
-            console.log('✓ Módulos da página inicializados');
 
             this.initialized = true;
-            console.log('✅ MAC Calendar inicializado com sucesso!');
 
         } catch (error) {
-            console.error('❌ Erro ao inicializar:', error);
+            // Silenciar erros de inicialização
         }
     }
 
@@ -62,7 +55,6 @@ class App {
             }
         } catch (error) {
             // Usuário não autenticado
-            console.log('Usuário não autenticado');
         }
     }
 
@@ -136,7 +128,7 @@ class App {
             const loginPath = window.APP_PREFIX ? `${window.APP_PREFIX}/auth/login` : '/auth/login';
             window.location.href = loginPath;
         } catch (error) {
-            console.error('Erro ao fazer logout:', error);
+            // Silenciar erro de logout
         }
     }
 

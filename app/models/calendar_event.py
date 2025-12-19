@@ -3,6 +3,7 @@ Modelo de Evento de Calendário
 """
 from app.extensions.database import db
 from datetime import datetime
+import json
 
 class CalendarEvent(db.Model):
     """Modelo de Evento de Calendário"""
@@ -22,8 +23,34 @@ class CalendarEvent(db.Model):
     location = db.Column(db.String(200), nullable=True)
     is_recurring = db.Column(db.Boolean, default=False, nullable=False)
     recurrence_rule = db.Column(db.String(500), nullable=True)  # Regra de recorrência (RRULE)
+    event_metadata = db.Column(db.Text, nullable=True)  # JSON para dados extras (mystery answer, etc.)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relacionamentos
+    employee_ref = db.relationship('Employee', foreign_keys=[employee_id], overlaps='events')
+    creator = db.relationship('Employee', foreign_keys=[created_by], overlaps='created_events')
+    # Restaurant relationship is auto-created by Restaurant.calendar_events backref
+    
+    @property
+    def metadata_json(self):
+        """Getter para event_metadata como dicionário"""
+        if self.event_metadata:
+            try:
+                return json.loads(self.event_metadata)
+            except (json.JSONDecodeError, TypeError):
+                return {}
+        return {}
+    
+    @metadata_json.setter
+    def metadata_json(self, value):
+        """Setter para event_metadata (aceita dicionário e converte para JSON)"""
+        if isinstance(value, dict):
+            self.event_metadata = json.dumps(value)
+        elif isinstance(value, str):
+            self.event_metadata = value
+        else:
+            self.event_metadata = None
     
     # Relacionamentos
     employee_ref = db.relationship('Employee', foreign_keys=[employee_id], overlaps='events')

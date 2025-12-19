@@ -12,14 +12,13 @@ const DocumentsModule = {
      * Inicializar o módulo
      */
     async init() {
-        console.log('📄 Inicializando Documents Module...');
         try {
             // Obter usuário atual
             this.currentUser = await api.get('/auth/user');
             this.setupHandlers();
             this.loadDocuments();
         } catch (error) {
-            console.error('Erro ao inicializar Documents Module:', error);
+            // Silenciar erro
         }
     },
     
@@ -38,7 +37,6 @@ const DocumentsModule = {
             this.data = await api.get('/documents');
             this.filterAndDisplay();
         } catch (error) {
-            console.error('❌ Erro ao carregar documentos:', error);
             appState.notify('Erro ao carregar documentos', 'error');
         }
     },
@@ -48,7 +46,6 @@ const DocumentsModule = {
      */
     filterAndDisplay() {
         // Filtro será implementado conforme necessário
-        console.log('📋 Documentos carregados:', this.data.length);
     },
     
     /**
@@ -61,7 +58,6 @@ const DocumentsModule = {
                 appState.notify('Documento deletado com sucesso', 'success');
                 this.loadDocuments();
             } catch (error) {
-                console.error('Erro ao deletar documento:', error);
                 appState.notify('Erro ao deletar documento', 'error');
             }
         }
@@ -71,7 +67,6 @@ const DocumentsModule = {
      * Gerar documento
      */
     async generateDocument(type, data) {
-        console.log('Gerando documento:', type);
         // Será implementado conforme necessário
     }
 };

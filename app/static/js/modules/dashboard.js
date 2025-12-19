@@ -13,7 +13,6 @@ const DashboardModule = {
      * Inicializar o módulo
      */
     init() {
-        console.log('📊 Inicializando Dashboard Module...');
         this.loadDashboardData();
         
         // Configurar listeners
@@ -31,8 +30,6 @@ const DashboardModule = {
      */
     async loadDashboardData() {
         try {
-            console.log('📥 Carregando dados do dashboard...');
-            
             // Load stats via API
             this.stats = await api.get('/dashboard/stats');
             this.updateStatsUI();
@@ -45,11 +42,9 @@ const DashboardModule = {
             this.activities = await api.get('/dashboard/activities');
             this.renderActivityFeed();
             
-            console.log('✓ Dashboard carregado com sucesso');
             appState.notify('Dashboard atualizado', 'success');
             
         } catch (error) {
-            console.error('❌ Erro ao carregar dashboard:', error);
             appState.notify('Erro ao carregar dashboard: ' + error.message, 'error');
         }
     },
@@ -78,39 +73,37 @@ const DashboardModule = {
      */
     renderRecentEvents() {
         const container = document.getElementById('recentEvents');
-        
-        if (!container) return;
-        
-        if (!this.events || this.events.length === 0) {
-            container.innerHTML = `
-                <div class="col-12 text-center py-4">
-                    <i class="fas fa-calendar-times text-muted" style="font-size: 3rem;"></i>
-                    <p class="text-muted mt-2">Nenhum evento próximo</p>
-                </div>
-            `;
-            return;
-        }
-        
-        container.innerHTML = this.events.map(event => `
-            <div class="col-md-6">
+            if (!container) return;
+
+            const events = Array.isArray(this.events) ? this.events : [];
+            if (!events.length) { /* placeholder */ return; }
+
+            container.innerHTML = events.map(event => {
+            const start = new Date(event.start || event.start_date || event.date);
+            if (Number.isNaN(start)) {
+                return `<div class="col-12 text-danger small">Evento sem data válida</div>`;
+            }
+            const day = start.getDate();
+            const month = start.toLocaleDateString('pt-BR', { month: 'short' });
+            const time = start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            return `
+                <div class="col-md-6">
                 <div class="event-card">
                     <div class="d-flex align-items-center">
-                        <div class="event-date">
-                            <div class="day">${new Date(event.date).getDate()}</div>
-                            <div class="month">${new Date(event.date).toLocaleDateString('pt-BR', {month: 'short'})}</div>
-                        </div>
-                        <div class="ms-3 flex-grow-1">
-                            <h6 class="mb-1">${event.title}</h6>
-                            <p class="text-muted mb-0">${event.description || 'Sem descrição'}</p>
-                            <small class="text-muted">
-                                <i class="fas fa-clock me-1"></i>
-                                ${new Date(event.date).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}
-                            </small>
-                        </div>
+                    <div class="event-date">
+                        <div class="day">${day}</div>
+                        <div class="month">${month}</div>
+                    </div>
+                    <div class="ms-3 flex-grow-1">
+                        <h6 class="mb-1">${event.title}</h6>
+                        <p class="text-muted mb-0">${event.description || 'Sem descrição'}</p>
+                        <small class="text-muted"><i class="fas fa-clock me-1"></i>${time}</small>
+                    </div>
                     </div>
                 </div>
-            </div>
-        `).join('');
+                </div>
+            `;
+            }).join('');
     },
     
     /**
@@ -131,36 +124,64 @@ const DashboardModule = {
             return;
         }
         
-        container.innerHTML = this.activities.map(activity => `
-            <div class="activity-item">
-                <div class="activity-icon ${activity.type}">
-                    <i class="fas fa-${activity.icon}"></i>
+        // Mapear tipos de atividade para ícones e cores
+        const activityTypes = {
+            'employee_created': { icon: 'user-plus', color: 'success' },
+            'document_uploaded': { icon: 'file-upload', color: 'info' },
+            'document_created': { icon: 'file-alt', color: 'primary' },
+            'event_created': { icon: 'calendar-plus', color: 'warning' },
+            'restaurant_created': { icon: 'store', color: 'danger' }
+        };
+        
+        container.innerHTML = this.activities.map(activity => {
+            const typeInfo = activityTypes[activity.activity_type] || { icon: 'info-circle', color: 'secondary' };
+            const timeText = activity.created_at_relative || this.formatRelativeTime(activity.created_at);
+            
+            return `
+                <div class="activity-item">
+                    <div class="activity-icon bg-${typeInfo.color}">
+                        <i class="fas fa-${typeInfo.icon}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-title">${activity.description || 'Atividade registrada'}</div>
+                        <div class="activity-meta">
+                            ${activity.restaurant_name ? `<span class="badge bg-light text-dark me-2"><i class="fas fa-store me-1"></i>${activity.restaurant_name}</span>` : ''}
+                            <span class="text-muted"><i class="fas fa-clock me-1"></i>${timeText}</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="activity-content">
-                    <div class="activity-title">${activity.title}</div>
-                    <div class="activity-desc">${activity.description}</div>
-                    <div class="activity-time">${this.formatRelativeTime(activity.timestamp)}</div>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     },
     
     /**
      * Formatar tempo relativo (ex: "2 horas atrás")
      */
     formatRelativeTime(timestamp) {
+        if (!timestamp) return 'Data desconhecida';
+        
         const now = new Date();
         const time = new Date(timestamp);
+        
+        // Verificar se a data é válida
+        if (isNaN(time.getTime())) {
+            return 'Data inválida';
+        }
+        
         const diff = now - time;
         
+        const seconds = Math.floor(diff / 1000);
         const minutes = Math.floor(diff / 60000);
         const hours = Math.floor(diff / 3600000);
         const days = Math.floor(diff / 86400000);
         
-        if (minutes < 1) return 'Agora';
-        if (minutes < 60) return `${minutes}m atrás`;
-        if (hours < 24) return `${hours}h atrás`;
-        return `${days}d atrás`;
+        if (seconds < 60) return 'Agora mesmo';
+        if (minutes < 60) return `${minutes} minuto${minutes > 1 ? 's' : ''} atrás`;
+        if (hours < 24) return `${hours} hora${hours > 1 ? 's' : ''} atrás`;
+        if (days < 7) return `${days} dia${days > 1 ? 's' : ''} atrás`;
+        
+        // Se for mais de 7 dias, mostrar a data formatada
+        return time.toLocaleDateString('pt-BR');
     },
     
     /**
@@ -170,9 +191,7 @@ const DashboardModule = {
         try {
             appState.notify('Iniciando exportação de dados...', 'info');
             // TODO: Implementar exportação (CSV, PDF, etc)
-            console.log('Exportação não implementada ainda');
         } catch (error) {
-            console.error('Erro ao exportar:', error);
             appState.notify('Erro ao exportar dados', 'error');
         }
     }

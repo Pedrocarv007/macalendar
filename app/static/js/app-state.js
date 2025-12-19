@@ -32,11 +32,6 @@ class AppState {
      */
     loadFromStorage() {
         try {
-            const userData = localStorage.getItem(STORAGE_KEYS.USER_DATA);
-            if (userData) {
-                this.user = JSON.parse(userData);
-            }
-
             const theme = localStorage.getItem(STORAGE_KEYS.THEME);
             if (theme) {
                 this.theme = theme;
@@ -48,7 +43,7 @@ class AppState {
                 this.settings = JSON.parse(settings);
             }
         } catch (error) {
-            console.error('Erro ao carregar do storage:', error);
+            // Silenciar erros de storage
         }
     }
 
@@ -59,7 +54,7 @@ class AppState {
         try {
             localStorage.setItem(key, JSON.stringify(data));
         } catch (error) {
-            console.error('Erro ao salvar no storage:', error);
+            // Silenciar erros de storage
         }
     }
 

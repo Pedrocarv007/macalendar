@@ -12,7 +12,6 @@ const CalendarModule = {
      * Inicializar o módulo
      */
     init() {
-        console.log('📅 Inicializando Calendar Module...');
         this.setupHandlers();
         this.loadEvents();
     },
@@ -45,11 +44,11 @@ const CalendarModule = {
                 if (typeof updateCurrentMonth === 'function') {
                     updateCurrentMonth();
                 }
-            } else {
-                console.log('📅 Eventos carregados:', this.events.length);
+                if (typeof renderCategoryCounts === 'function') {
+                    renderCategoryCounts();
+                }
             }
         } catch (error) {
-            console.error('❌ Erro ao carregar eventos:', error);
             if (typeof appState !== 'undefined' && appState.notify) {
                 appState.notify('Erro ao carregar eventos', 'error');
             }
@@ -61,23 +60,43 @@ const CalendarModule = {
      */
     renderCalendar() {
         // Será implementado conforme necessário
-        console.log('📅 Eventos carregados:', this.events.length);
     },
     
     /**
      * Deletar evento
      */
     async deleteEvent(id) {
-        if (confirm('Tem certeza que deseja deletar este evento?')) {
-            try {
-                await api.delete(`/calendar/events/${id}`);
-                appState.notify('Evento deletado com sucesso', 'success');
-                this.loadEvents();
-            } catch (error) {
-                console.error('Erro ao deletar evento:', error);
-                appState.notify('Erro ao deletar evento', 'error');
+        const self = this;  // Preservar contexto de 'this'
+        Swal.fire({
+            title: 'Deletar evento?',
+            text: 'Esta ação não pode ser desfeita!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sim, deletar!',
+            cancelButtonText: 'Cancelar'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                try {
+                    const response = await api.delete(`/calendar/events/${id}`);
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Deletado!',
+                        text: 'Evento deletado com sucesso',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    await self.loadEvents();
+                } catch (error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: error.message || 'Erro ao deletar evento'
+                    });
+                }
             }
-        }
+        });
     },
     
     /**
@@ -89,7 +108,6 @@ const CalendarModule = {
             appState.notify('Evento criado com sucesso', 'success');
             this.loadEvents();
         } catch (error) {
-            console.error('Erro ao criar evento:', error);
             appState.notify('Erro ao criar evento', 'error');
         }
     },
@@ -97,15 +115,9 @@ const CalendarModule = {
     async generateMysteryChallenges(params) {
         try {
             const res = await api.post('/calendar/generate/mystery-tuesdays', params);
-            if (typeof appState !== 'undefined' && appState.notify) {
-                appState.notify(`Gerados ${res.count || 0} desafios`, 'success');
-            }
             await this.loadEvents();
+            return res;
         } catch (error) {
-            console.error('Erro ao gerar desafios:', error);
-            if (typeof appState !== 'undefined' && appState.notify) {
-                appState.notify(error.message || 'Erro ao gerar desafios', 'error');
-            }
             throw error;
         }
     },
@@ -118,7 +130,6 @@ const CalendarModule = {
             }
             await this.loadEvents();
         } catch (error) {
-            console.error('Erro ao gerar respostas:', error);
             if (typeof appState !== 'undefined' && appState.notify) {
                 appState.notify(error.message || 'Erro ao gerar respostas', 'error');
             }
@@ -134,7 +145,6 @@ const CalendarModule = {
             }
             await this.loadEvents();
         } catch (error) {
-            console.error('Erro ao marcar postado:', error);
             if (typeof appState !== 'undefined' && appState.notify) {
                 appState.notify('Erro ao marcar postado', 'error');
             }
@@ -149,7 +159,6 @@ const CalendarModule = {
 async function saveEvent() {
     const form = document.getElementById('eventForm');
     if (!form) {
-        console.error('Formulário de evento não encontrado');
         alert('Erro: formulário não encontrado');
         return;
     }
@@ -189,8 +198,6 @@ async function saveEvent() {
         delete data.allDay;
         delete data.recurring;
         
-        console.log('📝 Salvando evento:', data);
-        
         let response;
         let message;
         if (eventId && eventId !== '') {
@@ -202,8 +209,6 @@ async function saveEvent() {
             response = await api.post('/calendar/events', data);
             message = 'Evento criado com sucesso';
         }
-        
-        console.log('✅ Resposta:', response);
         
         // Mostrar notificação
         if (typeof appState !== 'undefined' && appState.notify) {
@@ -232,7 +237,6 @@ async function saveEvent() {
         }
         
     } catch (error) {
-        console.error('❌ Erro ao salvar evento:', error);
         const errorMsg = error.message || 'Erro ao salvar evento';
         
         if (typeof appState !== 'undefined' && appState.notify) {
@@ -251,7 +255,6 @@ async function saveEvent() {
 function deleteEvent() {
     const eventId = document.getElementById('eventId')?.value;
     if (!eventId) {
-        console.error('ID do evento não encontrado');
         return;
     }
     

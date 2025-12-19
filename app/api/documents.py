@@ -14,6 +14,7 @@ from app.middleware.security import api_login_required, role_required
 from app.models.document import Document
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
+from app.models.activity_log import ActivityLog
 from app.utils.document_generator import DocumentGenerator
 
 documents_bp = Blueprint('documents', __name__)
@@ -157,6 +158,18 @@ def create_document():
         )
         
         db.session.add(document)
+        
+        # Registrar atividade
+        current_user = Employee.query.get(current_user_id)
+        ActivityLog.log_activity(
+            activity_type='document_uploaded',
+            description=f'Documento enviado: {name} por {current_user.name if current_user else "Sistema"}',
+            user_id=current_user_id,
+            restaurant_id=restaurant_id,
+            target_id=document.id,
+            target_type='document'
+        )
+        
         db.session.commit()
         
         return jsonify({

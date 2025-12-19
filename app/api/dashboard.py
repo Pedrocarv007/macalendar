@@ -1,15 +1,17 @@
 """
 API routes para Dashboard
 """
-from flask import Blueprint, jsonify, session
+from flask import Blueprint, jsonify, session, g
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
 from app.models.document import Document
 from app.models.calendar_event import CalendarEvent
+from app.models.activity_log import ActivityLog
 from app.extensions.database import db
 from datetime import datetime, timedelta
 from functools import wraps
+from app.middleware.security import api_login_required
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -69,23 +71,41 @@ def get_recent_events():
         return jsonify({'error': str(e)}), 500
 
 @dashboard_bp.route('/activities', methods=['GET'])
-@session_required
+@api_login_required
 def get_activities():
-    """Obter feed de atividades recentes"""
+    """Obter feed de atividades recentes com permissões"""
     try:
-        # Por enquanto, retornar atividades vazias
-        # Em uma implementação real, teríamos uma tabela de Activity
-        activities = [
-            {
-                'id': 1,
-                'type': 'employee',
-                'icon': 'user-check',
-                'title': 'Novo colaborador',
-                'description': 'Pedro Carvalho foi adicionado',
-                'timestamp': datetime.utcnow().isoformat()
-            }
-        ]
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
         
-        return jsonify(activities), 200
+        # Query base - últimos 50 logs ordenados por data
+        query = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(50)
+        
+        # Filtrar por permissões
+        if user_role in ['admin', 'rh']:
+            # Admin e RH veem tudo
+            pass
+        elif user_role == 'manager' and user_restaurant_id:
+            # Gerente só vê do seu restaurante
+            query = query.filter(ActivityLog.restaurant_id == user_restaurant_id)
+        else:
+            # Outros não veem nada
+            return jsonify([]), 200
+        
+        activities = query.all()
+        
+        print(f"📋 [ACTIVITIES] Encontrados {len(activities)} logs")
+        if activities:
+            first = activities[0]
+            print(f"📋 [ACTIVITIES] Primeiro log - ID: {first.id}, created_at: {first.created_at}, tipo: {type(first.created_at)}")
+        
+        result = [activity.to_dict() for activity in activities]
+        if result:
+            print(f"📋 [ACTIVITIES] Primeiro resultado to_dict: {result[0]}")
+        
+        return jsonify(result), 200
     except Exception as e:
+        print(f"❌ [ACTIVITIES] Erro: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500

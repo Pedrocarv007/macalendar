@@ -10,14 +10,13 @@ const ProfileModule = {
      * Inicializar o módulo
      */
     async init() {
-        console.log('👤 Inicializando Profile Module...');
         try {
             // Obter usuário atual via sessão
             this.user = await api.get('/auth/user');
             this.setupHandlers();
             this.displayProfile();
         } catch (error) {
-            console.error('Erro ao inicializar Profile Module:', error);
+            // Silenciar erro
         }
     },
     
@@ -34,10 +33,8 @@ const ProfileModule = {
     async loadProfile() {
         try {
             this.user = await api.get('/auth/me');
-            console.log('👤 Perfil carregado:', this.user.name);
             this.displayProfile();
         } catch (error) {
-            console.error('❌ Erro ao carregar perfil:', error);
             appState.notify('Erro ao carregar perfil', 'error');
         }
     },
@@ -47,7 +44,6 @@ const ProfileModule = {
      */
     displayProfile() {
         // Será implementado conforme necessário
-        console.log('Exibindo perfil de:', this.user.name);
     },
     
     /**
@@ -60,7 +56,6 @@ const ProfileModule = {
             appState.notify('Perfil atualizado com sucesso', 'success');
             this.displayProfile();
         } catch (error) {
-            console.error('Erro ao atualizar perfil:', error);
             appState.notify('Erro ao atualizar perfil', 'error');
         }
     },
@@ -81,7 +76,6 @@ const ProfileModule = {
                 this.loadProfile();
             }
         } catch (error) {
-            console.error('Erro ao atualizar foto:', error);
             appState.notify('Erro ao atualizar foto', 'error');
         }
     },
@@ -97,7 +91,6 @@ const ProfileModule = {
             });
             appState.notify('Senha alterada com sucesso', 'success');
         } catch (error) {
-            console.error('Erro ao mudar senha:', error);
             appState.notify('Erro ao mudar senha', 'error');
         }
     }

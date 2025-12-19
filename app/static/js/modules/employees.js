@@ -12,7 +12,6 @@ const EmployeesModule = {
      * Inicializar módulo
      */
     init() {
-        console.log('Inicializando Employees Module');
         this.setupHandlers();
         this.loadRestaurants();
         this.loadEmployees();
@@ -57,7 +56,6 @@ const EmployeesModule = {
             
             this.display();
         } catch (error) {
-            console.error('Erro ao carregar colaboradores:', error);
             const loadingDiv = DOM.$('#employeesLoading');
             if (loadingDiv) loadingDiv.style.display = 'none';
             if (window.App && window.App.notify) {
@@ -83,7 +81,7 @@ const EmployeesModule = {
                 restaurantSelect.value = currentValue;
             }
         } catch (error) {
-            console.error('Erro ao carregar restaurantes:', error);
+            // Silenciar erro
         }
     },
 
@@ -353,21 +351,17 @@ const EmployeesModule = {
                 
                 if (title) title.textContent = `Editar Colaborador - ${employee.name}`;
                 
-                console.log('📝 Abrindo modal para editar:', employee);
-                
                 // Mostrar modal via Bootstrap
                 if (modal) {
                     const bsModal = new bootstrap.Modal(modal);
                     bsModal.show();
                 }
             } else {
-                console.error('Form ou employee não encontrado:', {form, employee});
                 if (window.App && window.App.notify) {
                     window.App.notify('Erro ao carregar dados do colaborador', 'danger');
                 }
             }
         } catch (error) {
-            console.error('Erro ao carregar colaborador:', error);
             if (window.App && window.App.notify) {
                 window.App.notify('Erro ao carregar colaborador', 'danger');
             }
@@ -389,7 +383,6 @@ const EmployeesModule = {
             }
             this.loadEmployees();
         } catch (error) {
-            console.error('Erro ao remover colaborador:', error);
             if (window.App && window.App.notify) {
                 window.App.notify('Erro ao remover colaborador', 'danger');
             }
@@ -435,16 +428,6 @@ async function saveEmployee() {
         }
         keysToDelete.forEach(key => formData.delete(key));
         
-        // Log dos dados sendo enviados
-        console.log('📦 Dados sendo enviados:');
-        for (let [key, value] of formData.entries()) {
-            if (value instanceof File) {
-                console.log(`  ${key}: File(${value.name}, ${value.size} bytes)`);
-            } else {
-                console.log(`  ${key}: ${value}`);
-            }
-        }
-
         let response;
         if (employeeId && employeeId !== '') {
             // Atualizar
@@ -471,7 +454,6 @@ async function saveEmployee() {
         EmployeesModule.loadEmployees();
         
     } catch (error) {
-        console.error('Erro ao salvar colaborador:', error);
         if (window.App && window.App.notify) {
             window.App.notify(error.message || 'Erro ao salvar colaborador', 'danger');
         }

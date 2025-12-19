@@ -94,7 +94,6 @@ class Utils {
             await navigator.clipboard.writeText(text);
             return true;
         } catch (error) {
-            console.error('Erro ao copiar:', error);
             return false;
         }
     }

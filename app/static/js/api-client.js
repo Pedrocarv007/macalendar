@@ -4,12 +4,15 @@
  */
 
 const detectAppPrefix = () => {
-    const basePath = window.location.pathname;
-    const [ , maybePrefix ] = basePath.split('/');
-    if (!maybePrefix) return '';
-
-    const candidate = `/${maybePrefix}`;
-    return candidate.toLowerCase() === '/mac' ? candidate : '';
+    // Detect dynamic app prefix from the first path segment, if any.
+    // If the first segment is a known top-level route (dashboard, calendar, etc.), assume no prefix.
+    const parts = window.location.pathname.split('/').filter(Boolean);
+    if (parts.length === 0) return '';
+    const first = parts[0].toLowerCase();
+    const knownTopRoutes = new Set([
+        'dashboard', 'calendar', 'employees', 'restaurants', 'documents', 'profile', 'settings', 'auth'
+    ]);
+    return knownTopRoutes.has(first) ? '' : `/${parts[0]}`;
 };
 
 const APP_PREFIX = detectAppPrefix();
@@ -21,10 +24,6 @@ window.API_BASE_URL = API_BASE_URL;
 class APIClient {
     constructor(baseURL = API_BASE_URL) {
         this.baseURL = baseURL;
-        console.log(`📡 API Client inicializado`);
-        console.log(`   📍 window.location.pathname: ${window.location.pathname}`);
-        console.log(`   🔑 APP_PREFIX detectado: "${APP_PREFIX}"`);
-        console.log(`   📡 baseURL: ${this.baseURL}`);
     }
 
     /**
@@ -61,10 +60,6 @@ class APIClient {
     async request(method, endpoint, data = null, options = {}) {
         let url = `${this.baseURL}${endpoint}`;
         
-        console.log(`🔵 REQUEST: ${method} ${url}`);
-        console.log(`   baseURL: ${this.baseURL}`);
-        console.log(`   endpoint: ${endpoint}`);
-        
         const isFormData = data instanceof FormData;
         
         const config = {
@@ -88,7 +83,6 @@ class APIClient {
         }
 
         try {
-            console.log(`➡️  ${method} ${url}`);
             const response = await fetch(url, config);
             
             if (response.status === 401) {
@@ -107,34 +101,22 @@ class APIClient {
                     error = { error: text || `HTTP ${response.status}` };
                 }
 
-                console.error(`❌ API Error ${response.status}:`, {
-                    url,
-                    status: response.status,
-                    statusText: response.statusText,
-                    error
-                });
-
                 throw new APIError(response.status, error.error || error.message || 'Request failed', response);
             }
 
             // Se for DELETE ou 204 No Content, retornar vazio
             if (method === 'DELETE' || response.status === 204) {
-                console.log(`✓ ${method} ${url} - 204 No Content`);
                 return { success: true };
             }
 
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
-                console.warn(`⚠️  Resposta não é JSON: ${contentType}`);
-                console.warn(`   Response text: ${await response.text()}`);
                 throw new APIError(response.status, 'Response is not JSON', response);
             }
 
             const result = await response.json();
-            console.log(`✓ ${method} ${url} - 200 OK`);
             return result;
         } catch (error) {
-            console.error(`❌ API Error [${method} ${url}]:`, error);
             if (typeof Utils !== 'undefined' && typeof Utils.showAlert === 'function') {
                 Utils.showAlert('Erro na requisição: ' + (error.message || 'Falha desconhecida'), 'error');
             }

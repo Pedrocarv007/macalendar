@@ -471,22 +471,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadCurrentEmployeeId() {
     try {
-        // Obter o employee_id do usuário logado via sessão (prefix-aware)
-        const apiBase = window.API_BASE_URL || '/api';
-        const currentUserResponse = await fetch(`${apiBase}/auth/current-user`, { credentials: 'include' });
-        const currentUser = await currentUserResponse.json().catch(() => ({}));
-        if (!currentUser || !currentUser.employee_id) {
-            console.warn('Não foi possível obter current_user');
+        // Usar o api client que já está configurado
+        const currentUser = await api.get('/auth/user');
+        
+        if (!currentUser || !currentUser.id) {
+            console.warn('Não foi possível obter dados do usuário');
             return;
         }
-        const currentEmployeeId = currentUser.employee_id;
         
         // Preencher o campo hidden com o employee_id do user logado
-        document.getElementById('documentEmployee').value = currentEmployeeId;
+        document.getElementById('documentEmployee').value = currentUser.id;
         
-        console.log('DEBUG - Employee ID carregado:', currentEmployeeId);
+        console.log('✅ Employee ID carregado:', currentUser.id);
     } catch (error) {
-        console.error('Erro ao carregar dados do colaborador:', error);
+        console.error('❌ Erro ao carregar dados do colaborador:', error);
         if (window.Utils && typeof Utils.showAlert === 'function') {
             Utils.showAlert('Erro ao carregar usuário atual', 'error');
         }
@@ -738,18 +736,18 @@ async function saveDocument() {
     formData.set('is_public', document.getElementById('documentPublic').checked);
     
     try {
-        const url = documentId ? `/api/documents/${documentId}` : '/api/documents';
-        const method = documentId ? 'PUT' : 'POST';
+        console.log('📤 Enviando documento...', { documentId, employeeId });
         
-        const response = await fetch(url, {
-            method: method,
-            body: formData  // Usar FormData diretamente, NÃO JSON
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Erro ao salvar');
+        let result;
+        if (documentId) {
+            // Atualizar documento existente
+            result = await api.put(`/documents/${documentId}`, formData);
+        } else {
+            // Criar novo documento
+            result = await api.post('/documents', formData);
         }
+        
+        console.log('✅ Documento salvo:', result);
         
         Utils.showToast(documentId ? 'Documento atualizado!' : 'Documento enviado!', 'success');
         
@@ -762,6 +760,7 @@ async function saveDocument() {
         loadDocuments();
         
     } catch (error) {
+        console.error('❌ Erro ao salvar documento:', error);
         Utils.showAlert('Erro ao salvar documento: ' + error.message, 'error');
     }
 }

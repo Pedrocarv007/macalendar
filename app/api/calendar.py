@@ -71,6 +71,7 @@ def get_events():
     except Exception as e:
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
+
 @calendar_bp.route('/events', methods=['POST'])
 @api_login_required
 def create_event():
@@ -196,7 +197,6 @@ def delete_event(event_id):
     """Deletar evento"""
     try:
         current_user_id = g.get('current_user_id')
-        # claims via g
         user_role = g.get('current_user_role')
         user_restaurant_id = g.get('current_user_restaurant_id')
         
@@ -258,6 +258,12 @@ def generate_mystery_tuesdays():
         image_url = data.get('image_url')
         start_hour = int(data.get('start_hour') or 10)
         duration_minutes = int(data.get('duration_minutes') or 30)
+        
+        # 🔹 Parse topics from comma-separated string
+        topics_raw = data.get('topics', '')
+        custom_topics = []
+        if topics_raw and topics_raw.strip():
+            custom_topics = [t.strip() for t in topics_raw.split(',') if t.strip()]
 
         if not restaurant_id:
             return jsonify({'error': 'restaurant_id é obrigatório'}), 400
@@ -344,7 +350,12 @@ def generate_mystery_tuesdays():
             start_dt = datetime(year, month, day.day, start_hour, 0)
             end_dt = start_dt + timedelta(minutes=duration_minutes)
 
-            topic = f"Desafio Mistério – Terça {idx} ({day.strftime('%d/%m/%Y')})"
+            # Use custom topic if provided, otherwise generate generic
+            if custom_topics and idx <= len(custom_topics):
+                topic = custom_topics[idx - 1]
+            else:
+                topic = f"Desafio Mistério – Terça {idx} ({day.strftime('%d/%m/%Y')})"
+            
             seed = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
             style = styles[(idx - 1) % len(styles)]
 
@@ -389,6 +400,7 @@ def generate_mystery_tuesdays():
                         style = alt_style
 
             except Exception as e:
+                print(f"[ERRO] Falha ao gerar enigma para {day}: {str(e)}")
                 text = (
                     "🎯Desafio Misterio Da Semana🎯\n\n"
                     f"[Erro ao gerar enigma automaticamente]"
@@ -396,7 +408,8 @@ def generate_mystery_tuesdays():
 
             generated_texts.append(text)
 
-            event = CalendarEvent(
+            # 🔹 Criar evento de terça
+            tuesday_event = CalendarEvent(
                 title='Desafio Mistério McD',
                 description=text,
                 start_date=start_dt,
@@ -407,21 +420,100 @@ def generate_mystery_tuesdays():
                 is_all_day=False,
                 color='#9b59b6',
                 location=image_url,
-                is_recurring=False,
-                metadata_json={
-                    "style": style,
-                    "seed": seed,
-                    "generator": "openai"
-                }
+                is_recurring=False
             )
+            # Adicionar metadata após criar o objeto
+            tuesday_event.metadata_json = {
+                "style": style,
+                "seed": seed,
+                "generator": "openai",
+                "answer": topic
+            }
 
-            db.session.add(event)
-            created_events.append(event)
+            db.session.add(tuesday_event)
+            db.session.flush()  # Get the ID
+            created_events.append(tuesday_event)
+
+            # 🔹 Calcular próximo sábado após a terça (terça é dia 1, sábado é dia 5)
+            days_until_saturday = (5 - day.weekday()) % 7
+            if days_until_saturday == 0:  # Se terça cair num sábado (impossível, mas garantir)
+                days_until_saturday = 7
+            next_saturday = day + timedelta(days=days_until_saturday)
+            
+            print(f"[DEBUG] Terça {day} ({day.weekday()}) → Sábado {next_saturday} ({next_saturday.weekday()})")
+            
+            # 🔹 Gerar texto de resposta via IA
+            try:
+                print(f"[DEBUG] Gerando resposta para tema: {topic}")
+                resp_answer = client.chat.completions.create(
+                    model=os.getenv('OPENAI_MODEL') or 'gpt-4o-mini',
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "Você é um redator do McDonald's responsável por revelar respostas "
+                                "de desafios semanais. Seja claro, curto e envolvente."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": (
+                                "Crie um post de RESPOSTA para redes sociais seguindo exatamente este formato:\n\n"
+                                "🔍Resposta do Desafio🎯\n\n"
+                                f"- 1 linha revelando que a resposta é: {topic}\n"
+                                "- 1 a 2 linhas de encerramento amigável e engajador\n"
+                                "- Linguagem simples e positiva\n"
+                                "- Mencionar o produto/tema de forma entusiasmada"
+                            ),
+                        },
+                    ],
+                    temperature=0.6,
+                    max_tokens=160,
+                )
+                answer_text = resp_answer.choices[0].message.content.strip()
+                if not answer_text.startswith('🔍Resposta do Desafio🎯'):
+                    answer_text = f"🔍Resposta do Desafio🎯\n\n{answer_text}"
+                print(f"[DEBUG] Resposta gerada com sucesso")
+            except Exception as e:
+                print(f"[ERRO] Falha ao gerar resposta: {str(e)}")
+                answer_text = (
+                    "🔍Resposta do Desafio🎯\n\n"
+                    f"A resposta é: {topic}! "
+                    "Parabéns a quem acertou 👏"
+                )
+            
+            # 🔹 Criar evento de resposta no sábado
+            saturday_start = datetime(next_saturday.year, next_saturday.month, next_saturday.day, start_hour, 0)
+            saturday_end = saturday_start + timedelta(minutes=duration_minutes)
+            
+            answer_event = CalendarEvent(
+                title='Resposta do Desafio',
+                description=answer_text,
+                start_date=saturday_start,
+                end_date=saturday_end,
+                event_type='desafio_misterio_resposta',
+                restaurant_id=restaurant_id,
+                created_by=current_user_id,
+                is_all_day=False,
+                color='#3498db',
+                location=image_url,
+                is_recurring=False
+            )
+            # Adicionar metadata após criar o objeto
+            answer_event.metadata_json = {
+                "source_event_id": tuesday_event.id,
+                "generator": "openai",
+                "answer": topic
+            }
+            
+            db.session.add(answer_event)
+            created_events.append(answer_event)
+            print(f"[DEBUG] Evento de resposta criado para {saturday_start}")
 
         db.session.commit()
 
         return jsonify({
-            'message': 'Desafios Mistério gerados com sucesso',
+            'message': 'Desafios e respostas gerados com sucesso',
             'count': len(created_events),
             'events': [e.to_dict() for e in created_events]
         }), 201
@@ -509,6 +601,15 @@ def generate_mystery_answers():
 
             riddle_text = tuesday_event.description or ''
             image_url = tuesday_event.location
+            
+            # 🔹 Extrair resposta do metadata do evento de terça
+            correct_answer = None
+            if tuesday_event.metadata_json and isinstance(tuesday_event.metadata_json, dict):
+                correct_answer = tuesday_event.metadata_json.get('answer')
+            
+            # Se não encontrou resposta no metadata, tentar inferir
+            if not correct_answer:
+                correct_answer = "a resposta correta"
 
             # 🔹 Gerar resposta via IA
             try:
@@ -528,9 +629,10 @@ def generate_mystery_answers():
                             "content": (
                                 "Crie um post de RESPOSTA para redes sociais seguindo exatamente este formato:\n\n"
                                 "🔍Resposta do Desafio🎯\n\n"
-                                "- 1 linha revelando a resposta de forma direta\n"
+                                f"- 1 linha revelando que a resposta é: {correct_answer}\n"
                                 "- 1 a 2 linhas de encerramento amigável e engajador\n"
-                                "- Linguagem simples e positiva\n\n"
+                                "- Linguagem simples e positiva\n"
+                                "- Mencionar o produto/tema de forma entusiasmada\n\n"
                                 "Enigma original (apenas para contexto):\n"
                                 f"{riddle_text}"
                             ),
@@ -547,7 +649,7 @@ def generate_mystery_answers():
             except Exception:
                 answer_text = (
                     "🔍Resposta do Desafio🎯\n\n"
-                    "A resposta deste desafio já está no ar! "
+                    f"A resposta é: {correct_answer}! "
                     "Parabéns a quem acertou 👏 Nos vemos no próximo mistério!"
                 )
 
@@ -569,7 +671,8 @@ def generate_mystery_answers():
                 is_recurring=False,
                 metadata_json={
                     "source_event_id": tuesday_event.id,
-                    "generator": "openai"
+                    "generator": "openai",
+                    "answer": correct_answer
                 }
             )
 

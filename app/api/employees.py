@@ -16,6 +16,7 @@ from app.extensions.database import db
 from app.middleware.security import api_login_required, role_required, allowed_file, validate_email
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
+from app.models.activity_log import ActivityLog
 from app.utils.email import send_email_async
 
 employees_bp = Blueprint('employees', __name__)
@@ -225,6 +226,17 @@ def create_employee():
                 except Exception as e:
                     print(f'Erro ao processar foto: {str(e)}')
                     # Continuar mesmo se falhar a foto
+        
+        # Registrar atividade
+        current_user = Employee.query.get(current_user_id)
+        ActivityLog.log_activity(
+            activity_type='employee_created',
+            description=f'Novo colaborador adicionado: {employee.name} por {current_user.name if current_user else "Sistema"}',
+            user_id=current_user_id,
+            restaurant_id=restaurant_id,
+            target_id=employee.id,
+            target_type='employee'
+        )
         
         db.session.commit()
 

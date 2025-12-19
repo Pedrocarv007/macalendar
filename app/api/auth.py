@@ -256,29 +256,18 @@ def get_current_user_session():
 def get_user_session():
     """Alias para /current-user (compatibilidade)"""
     try:
-        print(f"[DEBUG] Session keys: {list(session.keys())}")
-        print(f"[DEBUG] user_id in session: {'user_id' in session}")
-        
         if 'user_id' not in session:
-            print("[DEBUG] Não autenticado - user_id não está na sessão")
             return jsonify({'error': 'Não autenticado'}), 401
         
         user_id = session.get('user_id')
-        print(f"[DEBUG] user_id da sessão: {user_id}")
-        
         employee = Employee.query.get(user_id)
-        print(f"[DEBUG] Employee encontrado: {employee is not None}")
         
         if not employee:
-            print(f"[DEBUG] Employee com ID {user_id} não encontrado no banco")
             return jsonify({'error': 'Usuário não encontrado'}), 404
         
         return jsonify(employee.to_dict()), 200
         
     except Exception as e:
-        print(f"[DEBUG ERROR] {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @auth_bp.route('/profile', methods=['PUT'])

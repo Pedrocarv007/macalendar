@@ -11,6 +11,9 @@
     <!-- Font Awesome Icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
     <!-- Apple System Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -137,21 +140,21 @@
                                 <div class="user-avatar me-2">
                                     <i class="fas fa-user-circle fa-lg"></i>
                                 </div>
-                                <div class="d-none d-lg-block">
+                                <div class="d-none d-lg-block" id="userNavInfo">
                                     <div class="user-name" style="font-weight: 600; font-size: 0.9rem;">
-                                        {{ session.user_name }}
+                                        <span id="userNavName">-</span>
                                     </div>
                                     <div class="user-role" style="font-size: 0.75rem; color: var(--mac-secondary-label);">
-                                        {{ session.user_role|title }}
+                                        <span id="userNavRole">-</span>
                                     </div>
                                 </div>
                             </div>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                            <li class="dropdown-header">
-                                <strong>{{ session.user_name }}</strong>
+                            <li class="dropdown-header" id="userDropdownHeader">
+                                <strong id="userDropdownName">-</strong>
                                 <br>
-                                <small class="text-muted">{{ session.user_email }}</small>
+                                <small class="text-muted" id="userDropdownEmail">-</small>
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
@@ -276,6 +279,26 @@
             var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
                 return new bootstrap.Popover(popoverTriggerEl);
             });
+        });
+    </script>
+
+    <!-- Update user info dynamically -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof appState !== 'undefined' && appState.user) {
+                const userName = appState.user.name || 'Usuário';
+                const userEmail = appState.user.email || '';
+                const userRole = appState.user.role || '';
+                
+                document.getElementById('userNavName').textContent = userName;
+                document.getElementById('userNavRole').textContent = (userRole.charAt(0).toUpperCase() + userRole.slice(1));
+                document.getElementById('userDropdownName').textContent = userName;
+                document.getElementById('userDropdownEmail').textContent = userEmail;
+                
+                if (typeof userRestaurantId === 'undefined' || userRestaurantId === null) {
+                    window.userRestaurantId = appState.user.restaurant_id || null;
+                }
+            }
         });
     </script>
 </body>

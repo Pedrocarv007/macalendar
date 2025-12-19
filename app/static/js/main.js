@@ -43,7 +43,7 @@ class AppState {
                 this.settings = JSON.parse(settings);
             }
         } catch (error) {
-            console.error('Error loading from storage:', error);
+            // Silenciar erro
         }
     }
 
@@ -51,7 +51,7 @@ class AppState {
         try {
             localStorage.setItem(key, JSON.stringify(data));
         } catch (error) {
-            console.error('Error saving to storage:', error);
+            // Silenciar erro
         }
     }
 
@@ -245,7 +245,6 @@ class Utils {
 
             return await response.json();
         } catch (error) {
-            console.error('Request failed:', error);
             Utils.showAlert('Erro na requisição: ' + error.message, 'error');
             throw error;
         }
@@ -730,7 +729,6 @@ class FormHandler {
             Utils.showToast('Formulário enviado com sucesso!', 'success');
 
         } catch (error) {
-            console.error('Form submission error:', error);
             Utils.showAlert('Erro ao enviar formulário: ' + error.message, 'error');
         } finally {
             // Restore button state
@@ -772,7 +770,7 @@ class FormHandler {
                     Utils.showAlert('Dados anteriores restaurados automaticamente', 'info');
                 }
             } catch (error) {
-                console.error('Error loading autosave:', error);
+                // Silenciar erro
             }
         }
     }
@@ -817,8 +815,6 @@ const appState = new AppState();
 
 // Global initialization
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('MAC Calendar System initialized');
-
     // Initialize tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -833,13 +829,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Setup global error handling
     window.addEventListener('error', function(event) {
-        console.error('Global error:', event.error);
         Utils.showAlert('Ocorreu um erro inesperado. Tente novamente.', 'error');
     });
 
     // Setup AJAX error handling
     window.addEventListener('unhandledrejection', function(event) {
-        console.error('Unhandled promise rejection:', event.reason);
         Utils.showAlert('Erro de conexão. Verifique sua internet.', 'error');
     });
 
@@ -849,7 +843,7 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 await AuthAPI.refreshToken();
             } catch (error) {
-                console.error('Token refresh failed:', error);
+                // Silenciar erro
             }
         }, 30 * 60 * 1000);
     }

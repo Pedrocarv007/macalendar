@@ -22,7 +22,6 @@ const RestaurantsModule = {
      * Inicializar o módulo
      */
     init() {
-        console.log('🏢 Inicializando Restaurants Module...');
         this.setupHandlers();
         this.loadRestaurants();
     },
@@ -51,10 +50,8 @@ const RestaurantsModule = {
                 window.filteredRestaurants = [...this.data];
             }
             
-            console.log('✓ Restaurantes carregados:', this.data);
             this.filterAndDisplay();
         } catch (error) {
-            console.error('❌ Erro ao carregar restaurantes:', error);
             this.notify('Erro ao carregar restaurantes', 'error');
         } finally {
             if (loading) loading.style.display = 'none';
@@ -72,7 +69,6 @@ const RestaurantsModule = {
         const tbody = document.getElementById('restaurantsTableBody');
         
         if (!tbody) {
-            console.warn('⚠️ Elementos da tabela não encontrados');
             return;
         }
         
@@ -126,8 +122,6 @@ const RestaurantsModule = {
         if (totalEl) totalEl.textContent = this.data.length;
         if (activeEl) activeEl.textContent = this.data.filter(r => r.is_active).length;
         if (employeesEl) employeesEl.textContent = this.data.reduce((total, r) => total + (r.employees_count || 0), 0);
-        
-        console.log('✓ Restaurantes renderizados:', this.data.length);
     },
     
     /**
@@ -140,7 +134,6 @@ const RestaurantsModule = {
                 this.notify('Restaurante deletado com sucesso', 'success');
                 this.loadRestaurants();
             } catch (error) {
-                console.error('Erro ao deletar restaurante:', error);
                 this.notify('Erro ao deletar restaurante', 'error');
             }
         }
@@ -150,7 +143,6 @@ const RestaurantsModule = {
      * Editar restaurante
      */
     async editRestaurant(id) {
-        console.log('Editar restaurante:', id);
         // Será implementado conforme necessário
     }
 };
@@ -238,7 +230,6 @@ function renderRestaurantGrid() {
  * Editar restaurante (versão global)
  */
 function editRestaurant(id) {
-    console.log('Editando restaurante:', id);
     // Será implementado conforme necessário
 }
 
@@ -246,7 +237,6 @@ function editRestaurant(id) {
  * Ver funcionários do restaurante
  */
 function viewEmployees(id) {
-    console.log('Ver funcionários do restaurante:', id);
     // Será implementado conforme necessário
 }
 
