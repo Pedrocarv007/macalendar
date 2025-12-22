@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 
 from flask import Flask, session, send_from_directory
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from flask_cors import CORS
 
@@ -54,7 +55,11 @@ def create_app(config_name=None):
     app.config.from_object(config_class)
     config_class.init_app(app)
     
-    # Adicionar middleware WSGI para proxy reverso
+    # Ajustes quando atrás de proxy (IIS/ARR): respeitar X-Forwarded-*
+    if os.getenv('RUNNING_ON_IIS', '0') in ('1', 'true', 'True') or os.getenv('BEHIND_PROXY', '0') in ('1', 'true', 'True'):
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+    # Adicionar middleware WSGI para proxy reverso com subpath (ex.: /mac)
     app_root = app.config.get('APPLICATION_ROOT', '/mac')
     app.wsgi_app = ScriptNameMiddleware(app.wsgi_app, app_root)
     
@@ -84,7 +89,7 @@ def create_app(config_name=None):
     @app.context_processor
     def inject_valid_roles():
         return {
-            'VALID_ROLES': app.config.get('VALID_ROLES', ['admin', 'rh', 'marketing', 'manager', 'employee'])
+            'VALID_ROLES': app.config.get('VALID_ROLES')
         }
 
     @app.context_processor

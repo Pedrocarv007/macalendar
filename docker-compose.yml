@@ -38,6 +38,8 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
       - ./uploads:/app/uploads:ro
+      - ./app/static:/app/static:ro
+      - ./certs:/etc/nginx/certs:ro
     depends_on:
       - app
     restart: unless-stopped

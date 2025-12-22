@@ -45,6 +45,9 @@ class IISConfig:
     SESSION_COOKIE_SECURE = True  # HTTPS em produção via IIS
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+
+    # Preferir geração de URLs https ao usar url_for
+    PREFERRED_URL_SCHEME = 'https'
     
     # Configurações de email
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
