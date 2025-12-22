@@ -203,6 +203,7 @@
             </div>
             <div class="modal-body">
                 <form id="eventForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" id="eventId" name="eventId">
                     
                     <div class="mb-3">
@@ -428,6 +429,21 @@ function renderMonthView(container) {
         const dayCell = createDayCell(cellDate, month);
         container.appendChild(dayCell);
     }
+
+    // Empty-state para mês sem eventos visíveis
+    try {
+        const hasEvents = Array.isArray(window.events) && window.events.length > 0;
+        if (!hasEvents) {
+            const empty = document.createElement('div');
+            empty.className = 'col-12';
+            empty.innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-calendar-minus text-muted" style="font-size: 2rem;"></i>
+                    <p class="text-muted mt-2 mb-0">Sem eventos neste período para este restaurante</p>
+                </div>`;
+            container.appendChild(empty);
+        }
+    } catch (_) {}
 }
 
 function createDayCell(date, currentMonth) {

@@ -2,8 +2,10 @@
 Configurações da aplicação MAC Calendar
 """
 import os
+import json
 from datetime import timedelta
 from pathlib import Path
+
 
 # Diretório base do projeto
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -12,13 +14,12 @@ class Config:
     """Configuração base da aplicação"""
     
     # Configurações básicas do Flask
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'mac-calendar-secret-key-2024-dev'
-    DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    APPLICATION_ROOT = os.environ.get('APPLICATION_ROOT', '/mac')
+    SECRET_KEY = os.getenv('SECRET_KEY') 
+    DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    APPLICATION_ROOT = os.getenv('APPLICATION_ROOT')
     
     # Configurações do banco de dados
-    _default_sqlite_path = (BASE_DIR / 'instance' / 'macalendar.db').resolve()
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f"sqlite:///{_default_sqlite_path.as_posix()}"
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL') 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
@@ -26,7 +27,7 @@ class Config:
     }
     
     # Configurações JWT
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-mac-2024'
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY') 
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
     JWT_ALGORITHM = 'HS256'
@@ -37,13 +38,13 @@ class Config:
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
     
     # Configurações de roles de usuário (podem ser sobrescritas por env)
-    _roles_env = os.environ.get('VALID_ROLES')
+    _roles_env = os.getenv('VALID_ROLES')
     if _roles_env:
         VALID_ROLES = [r.strip().lower() for r in _roles_env.split(',') if r.strip()]
     else:
         VALID_ROLES = ['admin', 'rh', 'marketing', 'manager', 'employee', 'shift_manager', 'sub_manager', 'rp', 'coucher']
 
-    _default_role_env = os.environ.get('DEFAULT_ROLE', 'employee').strip().lower()
+    _default_role_env = os.getenv('DEFAULT_ROLE', 'employee').strip().lower()
     DEFAULT_ROLE = _default_role_env if _default_role_env in VALID_ROLES else (VALID_ROLES[0] if VALID_ROLES else 'employee')
     
     # Configurações de sessão
@@ -55,22 +56,48 @@ class Config:
     SESSION_COOKIE_SECURE = False  # True apenas em produção com HTTPS
     SESSION_COOKIE_HTTPONLY = True  # Previne acesso via JavaScript
     SESSION_COOKIE_SAMESITE = 'Lax'  # Proteção contra CSRF
-    SESSION_COOKIE_PATH = os.environ.get('APPLICATION_ROOT', '/mac')  # Path do cookie deve corresponder ao APPLICATION_ROOT
+    SESSION_COOKIE_PATH = os.getenv('APPLICATION_ROOT')  # Path do cookie deve corresponder ao APPLICATION_ROOT
     SESSION_COOKIE_NAME = 'mac_session'  # Nome específico para evitar conflitos
     
     # Configurações de email
-    MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-    MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
-    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
-    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
-    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
-    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@mac.com')
+    MAIL_SERVER = os.getenv('MAIL_SERVER') 
+    MAIL_PORT = os.getenv('MAIL_PORT')
+    MAIL_USE_TLS = os.getenv('MAIL_USE_TLS')  # Padrão para TLS
+    MAIL_USERNAME = os.getenv('MAIL_USERNAME') 
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER')
+    _mail_profiles_env = os.getenv('MAIL_PROFILES')
+    try:
+        MAIL_PROFILES = json.loads(_mail_profiles_env) if _mail_profiles_env else {}
+    except Exception:
+        MAIL_PROFILES = {}
+
+    # Perfis padrão: thecarv (default) e noreply, podem ser sobrescritos por MAIL_PROFILES.
+    if not MAIL_PROFILES:
+        MAIL_PROFILES = {
+            "default": {
+                "server": MAIL_SERVER,
+                "port": MAIL_PORT,
+                "use_tls": MAIL_USE_TLS,
+                "username": os.getenv('MAIL_USERNAME'),
+                "password": os.getenv('MAIL_PASSWORD') ,
+                "default_sender": os.getenv('MAIL_DEFAULT_SENDER'),
+            },
+            "noreply": {
+                "server":  MAIL_SERVER,
+                "port": MAIL_PORT,
+                "use_tls":  MAIL_USE_TLS,
+                "username": os.getenv('MAIL_USERNAME_NOREPLY'),
+                "password": os.getenv('MAIL_PASSWORD'),
+                "default_sender": os.getenv('MAIL_DEFAULT_SENDER'),
+            },
+        }
     
     # Configurações de timezone
     TIMEZONE = 'Europe/Lisbon'
     
     # Configurações de logging
-    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     LOG_FILE = BASE_DIR / 'logs' / 'app.log'
     
     # Configurações de templates
@@ -109,7 +136,7 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SECURE = True  # HTTPS obrigatório
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
-    SESSION_COOKIE_PATH = os.environ.get('APPLICATION_ROOT', '/mac')
+    SESSION_COOKIE_PATH = os.getenv('APPLICATION_ROOT')
     SESSION_COOKIE_DOMAIN = None  # Let Flask handle it automatically
     
     # Logging mais detalhado

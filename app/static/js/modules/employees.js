@@ -7,6 +7,7 @@ const EmployeesModule = {
     employees: [],
     restaurants: [],
     currentFilter: '',
+    stats: {},
 
     /**
      * Inicializar módulo
@@ -15,7 +16,51 @@ const EmployeesModule = {
         this.setupHandlers();
         this.loadRestaurants();
         this.loadEmployees();
+        // Inicializar preview se o formulário já estiver presente
+        setTimeout(() => updateRolePreview(), 0);
     },
+
+    
+    /**
+     * Atualizar UI de estatísticas
+     */
+    updateStatsUI() {
+        // Derivar estatísticas a partir da lista carregada
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        const derived = {
+            totalEmployees: this.employees.length,
+            activeEmployees: this.employees.filter(emp => emp.is_active).length,
+            birthdaysThisMonth: this.employees.filter(emp => {
+                if (!emp.birth_date) return false;
+                const d = new Date(emp.birth_date);
+                return !Number.isNaN(d) && d.getMonth() === currentMonth;
+            }).length,
+            newThisMonth: this.employees.filter(emp => {
+                const dateStr = emp.hire_date || emp.created_at;
+                if (!dateStr) return false;
+                const d = new Date(dateStr);
+                return !Number.isNaN(d) && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+            }).length
+        };
+
+        this.stats = derived;
+
+        const elements = {
+            totalEmployees: derived.totalEmployees,
+            activeEmployees: derived.activeEmployees,
+            birthdaysThisMonth: derived.birthdaysThisMonth,
+            newThisMonth: derived.newThisMonth
+        };
+
+        Object.entries(elements).forEach(([elementId, value]) => {
+            const el = document.getElementById(elementId);
+            if (el) el.textContent = value;
+        });
+    },
+    
 
     /**
      * Setup event handlers
@@ -50,6 +95,7 @@ const EmployeesModule = {
             
             const response = await api.get('/employees');
             this.employees = response.employees || [];
+            this.updateStatsUI();
             
             // Esconder loading
             if (loadingDiv) loadingDiv.style.display = 'none';
@@ -116,10 +162,10 @@ const EmployeesModule = {
         const listView = DOM.$('#employeesList');
         const noResults = DOM.$('#noEmployees');
         const currentUser = appState?.user || {};
-        const isPrivileged = ['admin', 'rh'].includes((currentUser.role || '').toLowerCase());
+        const isPrivileged = ['admin', 'rh', 'marketing', 'manager'].includes((currentUser.role || '').toLowerCase());
         
         if (!tbody) return;
-
+        
         // Mostrar/ocultar seções
         if (employees.length === 0) {
             if (listView) listView.style.display = 'none';
@@ -201,7 +247,7 @@ const EmployeesModule = {
         const gridView = DOM.$('#employeesGrid');
         const noResults = DOM.$('#noEmployees');
         const currentUser = appState?.user || {};
-        const isPrivileged = ['admin', 'rh'].includes((currentUser.role || '').toLowerCase());
+        const isPrivileged = ['admin', 'rh', 'marketing', 'manager'].includes((currentUser.role || '').toLowerCase());
         
         if (!gridContainer) return;
 
@@ -289,6 +335,9 @@ const EmployeesModule = {
             const bsModal = new bootstrap.Modal(modal);
             bsModal.show();
         }
+
+        // Resetar preview de role
+        updateRolePreview();
     },
 
     /**
@@ -309,8 +358,9 @@ const EmployeesModule = {
                 DOM.$('#employeeName').value = employee.name || '';
                 DOM.$('#employeeEmail').value = employee.email || '';
                 DOM.$('#employeePhone').value = employee.phone || '';
-                DOM.$('#employeePosition').value = employee.position || employee.role || '';
-                DOM.$('#employeeDepartment').value = employee.department || '';
+                DOM.$('#employeePosition').value = employee.position || employee.department || employee.role || '';
+                const deptHidden = DOM.$('#employeeDepartmentHidden');
+                if (deptHidden) deptHidden.value = employee.department || employee.position || '';
                 DOM.$('#employeeBirthDate').value = employee.birth_date ? employee.birth_date.split('T')[0] : '';
                 DOM.$('#employeeActive').checked = employee.is_active !== false;
                 DOM.$('#employeeAddress').value = employee.address || '';
@@ -344,6 +394,8 @@ const EmployeesModule = {
                 if (roleSelect) {
                     roleSelect.value = employee.role || '';
                 }
+                // Atualizar preview de role com o valor atual
+                updateRolePreview(employee.role || undefined);
                 
                 // Mostrar botão de deletar
                 const deleteBtn = DOM.$('#deleteEmployeeBtn');
@@ -604,21 +656,46 @@ function removePhoto() {
  */
 function syncPositionToDepartment() {
     const positionSelect = DOM.$('#employeePosition');
-    const departmentSelect = DOM.$('#employeeDepartment');
-    
-    if (positionSelect && departmentSelect && positionSelect.value) {
-        departmentSelect.value = positionSelect.value;
+    const departmentHidden = DOM.$('#employeeDepartmentHidden');
+    if (positionSelect && departmentHidden) {
+        departmentHidden.value = positionSelect.value || '';
     }
+    updateRolePreview();
 }
 
 /**
  * Sincroniza Departamento para Cargo
  */
 function syncDepartmentToPosition() {
-    const departmentSelect = DOM.$('#employeeDepartment');
-    const positionSelect = DOM.$('#employeePosition');
-    
-    if (departmentSelect && positionSelect && departmentSelect.value) {
-        positionSelect.value = departmentSelect.value;
+    // Mantido por compatibilidade; não usado pois só há um seletor visível
+}
+
+/**
+ * Infere o role a partir de um texto (cargo/departamento)
+ */
+function inferRoleFromText(text) {
+    const t = (text || '').toString().trim().toLowerCase().replace(/_/g, ' ');
+    if (!t) return 'employee';
+    if (t.includes('rh') || t.includes('recursos humanos')) return 'rh';
+    if (t.includes('gerente')) return 'manager';
+    if (t.includes('manager')) return 'manager';
+    if (t.includes('relações públicas') || t.includes('relacoes publicas') || t.includes('rp') || t.includes('marketing')) return 'marketing';
+    if (t.includes('admin') || t.includes('administração') || t.includes('administracao')) return 'admin';
+    if (t.includes('desenvolvedor') || t.includes('developer') || t.includes('dev')) return 'admin';
+    return 'employee';
+}
+
+/**
+ * Atualiza o preview visual do role previsto
+ */
+function updateRolePreview(roleFromEmployee) {
+    const previewEl = DOM.$('#inferredRolePreview');
+    if (!previewEl) return;
+    let role = roleFromEmployee;
+    if (!role) {
+        const pos = DOM.$('#employeePosition')?.value || '';
+        const dept = DOM.$('#employeeDepartmentHidden')?.value || '';
+        role = inferRoleFromText(`${pos} ${dept}`);
     }
+    previewEl.textContent = role ? role : '-';
 }

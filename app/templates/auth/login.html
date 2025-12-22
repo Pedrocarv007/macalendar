@@ -13,6 +13,7 @@
         </div>
 
         <form id="loginForm" class="auth-form" method="POST" action="{{ url_for('auth_web.login') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-3">
                 <label for="email" class="form-label">Email</label>
                 <div class="input-group">

@@ -24,6 +24,8 @@
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
+    <!-- CSRF Token for JS requests -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     
     {% block extra_head %}{% endblock %}
 </head>
@@ -285,21 +287,51 @@
     <!-- Update user info dynamically -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            if (typeof appState !== 'undefined' && appState.user) {
-                const userName = appState.user.name || 'Usuário';
-                const userEmail = appState.user.email || '';
-                const userRole = appState.user.role || '';
-                
-                document.getElementById('userNavName').textContent = userName;
-                document.getElementById('userNavRole').textContent = (userRole.charAt(0).toUpperCase() + userRole.slice(1));
-                document.getElementById('userDropdownName').textContent = userName;
-                document.getElementById('userDropdownEmail').textContent = userEmail;
-                
+            function renderUser(user) {
+                if (!user) return;
+                const userName = user.name || 'Usuário';
+                const userEmail = user.email || '';
+                const userRole = user.role || '';
+
+                const navNameEl = document.getElementById('userNavName');
+                const navRoleEl = document.getElementById('userNavRole');
+                const ddNameEl = document.getElementById('userDropdownName');
+                const ddEmailEl = document.getElementById('userDropdownEmail');
+
+                if (navNameEl) navNameEl.textContent = userName;
+                if (navRoleEl) navRoleEl.textContent = (userRole ? (userRole.charAt(0).toUpperCase() + userRole.slice(1)) : '');
+                if (ddNameEl) ddNameEl.textContent = userName;
+                if (ddEmailEl) ddEmailEl.textContent = userEmail;
+
                 if (typeof userRestaurantId === 'undefined' || userRestaurantId === null) {
-                    window.userRestaurantId = appState.user.restaurant_id || null;
+                    window.userRestaurantId = user.restaurant_id || null;
                 }
             }
+
+            // 1) Immediate update if user already available
+            if (typeof appState !== 'undefined' && appState.user) {
+                renderUser(appState.user);
+            } else {
+                // 2) Short fallback poll to catch async auth
+                let attempts = 20; // ~3s at 150ms
+                const timer = setInterval(() => {
+                    if (typeof appState !== 'undefined' && appState.user) {
+                        clearInterval(timer);
+                        renderUser(appState.user);
+                    } else if (--attempts <= 0) {
+                        clearInterval(timer);
+                    }
+                }, 150);
+            }
+
+            // 3) React to future updates via custom event
+            window.addEventListener('app:userUpdated', (e) => renderUser(e.detail));
         });
+
+
+
+        
     </script>
+
 </body>
 </html>

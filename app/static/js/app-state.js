@@ -125,6 +125,11 @@ class AppState {
     setUser(user) {
         this.user = user;
         this.saveToStorage(STORAGE_KEYS.USER_DATA, user);
+        try {
+            window.dispatchEvent(new CustomEvent('app:userUpdated', { detail: user }));
+        } catch (e) {
+            // Silenciar erros de dispatch em ambientes sem window
+        }
     }
 
     /**

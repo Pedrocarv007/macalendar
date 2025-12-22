@@ -28,7 +28,8 @@ const CalendarModule = {
      */
     async loadEvents() {
         try {
-            const res = await api.get('/calendar/events');
+            // Incluir eventos globais (restaurant_id null) junto com os do restaurante
+            const res = await api.get('/calendar/events?include_global=true');
             this.events = res.events || [];
             if (typeof events !== 'undefined') {
                 events = this.events;
@@ -197,6 +198,14 @@ async function saveEvent() {
         data.is_recurring = data.recurring === 'on';
         delete data.allDay;
         delete data.recurring;
+
+        // Garantir restaurant_id: usar o do usuário da sessão se não houver no formulário
+        if (!data.restaurant_id) {
+            const userRest = (typeof appState !== 'undefined' && appState.user) ? appState.user.restaurant_id : null;
+            if (userRest) {
+                data.restaurant_id = userRest;
+            }
+        }
         
         let response;
         let message;

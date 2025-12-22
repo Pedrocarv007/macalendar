@@ -7,17 +7,17 @@
     <!-- Header Section -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
                 <div>
                     <h1 class="text-gradient mb-1">Colaboradores</h1>
                     <p class="text-muted mb-0">Gerencie sua equipe e informações dos funcionários</p>
                 </div>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-outline-primary" onclick="exportEmployees()">
-                        <i class="fas fa-download me-1"></i>Exportar
-                    </button>
+                <div class="ms-auto d-flex gap-2 align-items-center">
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#employeeModal">
                         <i class="fas fa-plus me-1"></i>Novo Colaborador
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="exportEmployees()">
+                        <i class="fas fa-download me-1"></i>Exportar
                     </button>
                 </div>
             </div>
@@ -232,6 +232,7 @@
             </div>
             <div class="modal-body">
                 <form id="employeeForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" id="employeeId" name="employeeId">
                     
                     <div class="row g-3">
@@ -273,7 +274,7 @@
                         </div>
                         
                         <div class="col-md-6">
-                            <label for="employeePosition" class="form-label">Cargo *</label>
+                            <label for="employeePosition" class="form-label">Cargo/Departamento *</label>
                             <select class="form-select" id="employeePosition" name="position" required onchange="syncPositionToDepartment()">
                                 <option value="">Selecione...</option>
                                 <option value="Desenvolvedor">Desenvolvedor</option>
@@ -285,21 +286,8 @@
                                 <option value="treinador">Treinador</option>
                                 <option value="RP">Relações Públicas</option>
                             </select>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label for="employeeDepartment" class="form-label">Departamento *</label>
-                            <select class="form-select" id="employeeDepartment" name="department" required onchange="syncDepartmentToPosition()">
-                                <option value="">Selecione...</option>
-                                <option value="Desenvolvedor">Desenvolvedor</option>
-                                <option value="RH">Recursos Humanos</option>
-                                <option value="Gerente_loja">Gerente de Loja</option>
-                                <option value="Sub_gerente">Sub Gerente</option>
-                                <option value="Gerente_turno">Gerente de Turno</option>
-                                <option value="colaborador">Colaborador</option>
-                                <option value="treinador">Treinador</option>
-                                <option value="RP">Relações Públicas</option>
-                            </select>
+                            <!-- Campo de departamento oculto para manter compatibilidade com a API -->
+                            <input type="hidden" id="employeeDepartmentHidden" name="department">
                         </div>
                         
                         <div class="col-md-6">

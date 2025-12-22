@@ -30,16 +30,29 @@ const DashboardModule = {
      */
     async loadDashboardData() {
         try {
+            const currentUser = appState?.user || {};
+            const userRole = (currentUser.role || '').toLowerCase();
+            const userRestaurantId = currentUser.restaurant_id;
+            
+            // Se não for admin, filtrar por restaurante
+            const queryParams = {};
+            if (!['admin', 'rh'].includes(userRole) && userRestaurantId) {
+                queryParams.restaurant_id = userRestaurantId;
+            }
+            
             // Load stats via API
-            this.stats = await api.get('/dashboard/stats');
+            const statsUrl = '/dashboard/stats' + (Object.keys(queryParams).length ? '?' + new URLSearchParams(queryParams).toString() : '');
+            this.stats = await api.get(statsUrl);
             this.updateStatsUI();
             
             // Load recent events
-            this.events = await api.get('/dashboard/events/recent');
+            const eventsUrl = '/dashboard/events/recent' + (Object.keys(queryParams).length ? '?' + new URLSearchParams(queryParams).toString() : '');
+            this.events = await api.get(eventsUrl);
             this.renderRecentEvents();
             
             // Load activity feed
-            this.activities = await api.get('/dashboard/activities');
+            const activitiesUrl = '/dashboard/activities' + (Object.keys(queryParams).length ? '?' + new URLSearchParams(queryParams).toString() : '');
+            this.activities = await api.get(activitiesUrl);
             this.renderActivityFeed();
             
             appState.notify('Dashboard atualizado', 'success');
@@ -73,12 +86,23 @@ const DashboardModule = {
      */
     renderRecentEvents() {
         const container = document.getElementById('recentEvents');
-            if (!container) return;
+        if (!container) return;
 
-            const events = Array.isArray(this.events) ? this.events : [];
-            if (!events.length) { /* placeholder */ return; }
+        const events = Array.isArray(this.events) ? this.events : [];
+        if (!events.length) {
+            container.innerHTML = `
+                <div class="col-12">
+                    <div class="card glass-card">
+                        <div class="card-body text-center py-4">
+                            <i class="fas fa-calendar-alt text-muted" style="font-size: 2.5rem;"></i>
+                            <p class="text-muted mt-2 mb-0">Sem eventos recentes para este restaurante</p>
+                        </div>
+                    </div>
+                </div>`;
+            return;
+        }
 
-            container.innerHTML = events.map(event => {
+        container.innerHTML = events.map(event => {
             const start = new Date(event.start || event.start_date || event.date);
             if (Number.isNaN(start)) {
                 return `<div class="col-12 text-danger small">Evento sem data válida</div>`;
@@ -103,7 +127,7 @@ const DashboardModule = {
                 </div>
                 </div>
             `;
-            }).join('');
+        }).join('');
     },
     
     /**

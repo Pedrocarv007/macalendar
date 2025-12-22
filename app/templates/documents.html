@@ -366,6 +366,7 @@
             </div>
             <div class="modal-body">
                 <form id="documentForm" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" id="documentId" name="documentId">
                     
                     <div class="mb-3">
@@ -838,15 +839,9 @@ function confirmDeleteDocument(id) {
 
 async function deleteDocumentById(id) {
     try {
-        const response = await fetch(`/api/documents/${id}`, {
-            method: 'DELETE'
-        });
-        
-        if (!response.ok) throw new Error('Erro ao excluir');
-        
+        await api.delete(`/documents/${id}`);
         Utils.showToast('Documento excluído!', 'success');
         loadDocuments();
-        
     } catch (error) {
         Utils.showAlert('Erro ao excluir documento: ' + error.message, 'error');
     }
@@ -1108,29 +1103,12 @@ async function generateAndDownloadDocument() {
         // Obter restaurant_id do funcionário selecionado
         const restaurantId = selectedEmployee.restaurant_id;
         
-        // Chamar API para gerar documento
-        const apiBase = window.API_BASE_URL || '/api';
-        const response = await fetch(`${apiBase}/documents/generate-auto`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-                document_type: docType,
-                employee_id: parseInt(employeeId),
-                restaurant_id: restaurantId
-            })
+        // Chamar API para gerar documento (via cliente API com CSRF)
+        const result = await api.post('/documents/generate-auto', {
+            document_type: docType,
+            employee_id: parseInt(employeeId),
+            restaurant_id: restaurantId
         });
-        
-        if (!response.ok) {
-            const text = await response.text();
-            let parsed = null;
-            try { parsed = JSON.parse(text); } catch (e) { /* ignore */ }
-            throw new Error((parsed && (parsed.error || parsed.message)) || text || 'Erro ao gerar documento');
-        }
-        
-        const result = await response.json().catch(() => ({}));
         if (!result || !result.document || !result.document.filename) {
             throw new Error('Resposta inválida da API');
         }
@@ -1225,25 +1203,10 @@ async function generateAiPost() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';
 
     try {
-        const response = await fetch(`${window.API_BASE_URL || '/mac/api'}/ai/posts`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            credentials: 'include',
-            body: JSON.stringify({ topic, tone, length, language })
-        });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-            throw new Error(data.error || 'Erro ao gerar texto');
-        }
-
-        if (!data.text) {
+        const data = await api.post('/ai/posts', { topic, tone, length, language });
+        if (!data || !data.text) {
             throw new Error('Resposta vazia da IA');
         }
-
         output.value = data.text;
         copyBtn.disabled = false;
         Utils.showToast('Post gerado com IA', 'success');

@@ -13,6 +13,7 @@ from app.models.employee import Employee
 from app.middleware.security import api_login_required, role_required
 import random
 import string
+from sqlalchemy import or_
 
 calendar_bp = Blueprint('calendar', __name__)
 
@@ -38,6 +39,7 @@ def get_events():
         # Parâmetros de data
         start_date = request.args.get('start')
         end_date = request.args.get('end')
+        include_global = (request.args.get('include_global') or '').lower() == 'true'
         
         # Query base
         query = CalendarEvent.query
@@ -47,11 +49,19 @@ def get_events():
             # RH e Marketing podem ver todos os eventos
             pass
         elif user_role == 'manager' and user_restaurant_id:
-            # Gerente só vê eventos do seu restaurante
-            query = query.filter(CalendarEvent.restaurant_id == user_restaurant_id)
+            # Gerente só vê eventos do seu restaurante (+ opcionais globais)
+            if include_global:
+                query = query.filter(or_(CalendarEvent.restaurant_id == user_restaurant_id,
+                                         CalendarEvent.restaurant_id.is_(None)))
+            else:
+                query = query.filter(CalendarEvent.restaurant_id == user_restaurant_id)
         else:
-            # Funcionários só veem eventos do seu restaurante
-            query = query.filter(CalendarEvent.restaurant_id == user_restaurant_id)
+            # Funcionários só veem eventos do seu restaurante (+ opcionais globais)
+            if include_global:
+                query = query.filter(or_(CalendarEvent.restaurant_id == user_restaurant_id,
+                                         CalendarEvent.restaurant_id.is_(None)))
+            else:
+                query = query.filter(CalendarEvent.restaurant_id == user_restaurant_id)
         
         # Filtrar por período
         if start_date:
@@ -94,8 +104,8 @@ def create_event():
                 return jsonify({'error': f'{field} é obrigatório'}), 400
         
         # Verificar permissões
-        restaurant_id = data.get('restaurant_id')
-        if user_role not in ['admin', 'rh', 'marketing']:
+        restaurant_id = data.get('restaurant_id') or user_restaurant_id
+        if user_role not in ['admin', 'rh', 'marketing', 'manager']:
             if not user_restaurant_id or restaurant_id != user_restaurant_id:
                 return jsonify({'error': 'Permissão negada'}), 403
         

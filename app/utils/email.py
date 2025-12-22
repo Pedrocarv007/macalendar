@@ -3,7 +3,7 @@ import re
 import smtplib
 import ssl
 from email.message import EmailMessage
-from typing import Iterable, Optional, Union
+from typing import Dict, Iterable, Optional, Union
 from flask import current_app
 from threading import Thread
 import mimetypes
@@ -76,6 +76,49 @@ def _build_message(
 	return msg
 
 
+def _resolve_mail_settings(cfg, profile: Optional[str]) -> Dict[str, Union[str, int, bool, None]]:
+	"""Resolve SMTP settings, optionally from a named profile."""
+	# Profiles come from settings.MAIL_PROFILES or env MAIL_PROFILES (JSON string)
+	profiles = cfg.get('MAIL_PROFILES') or {}
+	selected = profiles.get(profile) if profile else None
+
+	# Allow a "default" profile name to be used implicitly
+	if not selected and not profile and 'default' in profiles:
+		selected = profiles.get('default')
+
+	server = None
+	port = None
+	use_tls = None
+	username = None
+	password = None
+	default_sender = None
+
+	if isinstance(selected, dict):
+		server = selected.get('server')
+		port = selected.get('port')
+		use_tls = selected.get('use_tls')
+		username = selected.get('username')
+		password = selected.get('password')
+		default_sender = selected.get('default_sender')
+
+	server = server or cfg.get('MAIL_SERVER') or os.environ.get('MAIL_SERVER') or 'smtp.zoho.eue'
+	port = int(port or cfg.get('MAIL_PORT') or os.environ.get('MAIL_PORT') or 587)
+	use_tls_raw = use_tls if use_tls is not None else (cfg.get('MAIL_USE_TLS') or os.environ.get('MAIL_USE_TLS', 'true'))
+	use_tls = str(use_tls_raw).lower() in ['true', 'on', '1']
+	username = username or cfg.get('MAIL_USERNAME') or os.environ.get('MAIL_USERNAME') or "thecarv@thecarv.com"
+	password = password or cfg.get('MAIL_PASSWORD') or os.environ.get('MAIL_PASSWORD') or "5d77iUBJiviV"
+	default_sender = default_sender or cfg.get('MAIL_DEFAULT_SENDER') or os.environ.get('MAIL_DEFAULT_SENDER')
+
+	return {
+		'server': server,
+		'port': port,
+		'use_tls': use_tls,
+		'username': username,
+		'password': password,
+		'default_sender': default_sender,
+	}
+
+
 def send_email(
 	*,
 	to: Union[str, Iterable[str]],
@@ -86,35 +129,36 @@ def send_email(
 	bcc: Optional[Union[str, Iterable[str]]] = None,
 	reply_to: Optional[str] = None,
 	attachments: Optional[Union[str, Iterable[str]]] = None,
+	mail_profile: Optional[str] = None,
 ) -> None:
-	"""Send an email using SMTP settings from Flask config or environment.
+	"""Send an email using SMTP settings.
 
-	Reads from Flask config first, then falls back to environment variables.
+	You can configure multiple profiles via MAIL_PROFILES (JSON) in env or app config.
+	Pass mail_profile="profile_name" to pick one; otherwise uses the base config or
+	a profile named "default" when present.
 	"""
-	# Try Flask config first, then fall back to environment
 	cfg = current_app.config
-	server = cfg.get('MAIL_SERVER') or os.environ.get('MAIL_SERVER') or 'smtp.gmail.com'
-	port = int(cfg.get('MAIL_PORT') or os.environ.get('MAIL_PORT') or 587)
-	use_tls = str(cfg.get('MAIL_USE_TLS') or os.environ.get('MAIL_USE_TLS', 'true')).lower() in ['true', 'on', '1']
-	username = cfg.get('MAIL_USERNAME') or os.environ.get('MAIL_USERNAME')
-	password = cfg.get('MAIL_PASSWORD') or os.environ.get('MAIL_PASSWORD')
-	
-	# Always send using the authenticated Gmail address to avoid 530 errors.
-	# Preserve friendly display name from MAIL_DEFAULT_SENDER if provided.
-	sender_cfg = cfg.get('MAIL_DEFAULT_SENDER') or os.environ.get('MAIL_DEFAULT_SENDER')
+	resolved = _resolve_mail_settings(cfg, mail_profile)
+
+	server = resolved['server']
+	port = resolved['port']
+	use_tls = resolved['use_tls']
+	username = resolved['username']
+	password = resolved['password']
+
+	# Always send using the authenticated address to avoid 530 errors.
+	sender_cfg = resolved['default_sender']
 	display_name = None
 	if sender_cfg:
-		# Extract display name if in format: Name <email>
 		m = re.match(r"\s*([^<]+?)\s*<([^>]+)>\s*", str(sender_cfg))
 		if m:
 			display_name = m.group(1).strip()
 		else:
-			# If sender_cfg is a plain email or plain text, use as display name only if not an email
 			if '@' not in str(sender_cfg):
 				display_name = str(sender_cfg).strip()
-	
-	# Construct final sender as "Name <username>" or just username
-	sender = f"{display_name} <{username}>" if display_name else username
+
+	sender_address = username
+	sender = f"{display_name} <{sender_address}>" if display_name else sender_address
 
 	if not server:
 		raise RuntimeError('MAIL_SERVER não configurado')

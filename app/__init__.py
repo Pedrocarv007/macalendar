@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 
 from flask import Flask, session, send_from_directory
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 from flask_cors import CORS
 
 from app.api.auth import auth_bp
@@ -59,6 +60,9 @@ def create_app(config_name=None):
     
     # Inicializar extensões
     init_db(app)
+    # CSRF Protection
+    csrf = CSRFProtect()
+    csrf.init_app(app)
     
     # Configurar CORS (permitir qualquer origem via proxy)
     CORS(app)
@@ -82,6 +86,11 @@ def create_app(config_name=None):
         return {
             'VALID_ROLES': app.config.get('VALID_ROLES', ['admin', 'rh', 'marketing', 'manager', 'employee'])
         }
+
+    @app.context_processor
+    def inject_csrf_token():
+        # Disponibiliza csrf_token() para templates
+        return {'csrf_token': generate_csrf}
 
     # Registrar middlewares
     init_security(app)

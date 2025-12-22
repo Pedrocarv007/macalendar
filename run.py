@@ -9,10 +9,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from app import create_app
-from app.config.iis_settings import IISConfig
-from app.extensions.database import db
-
 # Carregar variáveis do arquivo .env na raiz do projeto
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -42,18 +38,17 @@ def load_env_file(env_path: Path) -> None:
 
 load_env_file(BASE_DIR / '.env')
 
-# Debug: verify critical env vars are loaded
-if os.environ.get('FLASK_DEBUG'):
-    print(f"[DEBUG] MAIL_USERNAME={os.environ.get('MAIL_USERNAME')!r}")
-    print(f"[DEBUG] MAIL_PASSWORD={'***' if os.environ.get('MAIL_PASSWORD') else 'NOT SET'}")
-    print(f"[DEBUG] MAIL_DEFAULT_SENDER={os.environ.get('MAIL_DEFAULT_SENDER')!r}")
+# Importar após carregar .env para que os.getenv() funcione em settings.py
+from app import create_app
+from app.config.iis_settings import IISConfig
+from app.extensions.database import db
 
 
 def resolve_config_name() -> str:
     """Determinar qual configuração utilizar."""
     if len(sys.argv) > 1:
         return sys.argv[1]
-    return os.environ.get('APP_CONFIG') or os.environ.get('FLASK_CONFIG') or 'development'
+    return os.getenv('APP_CONFIG') 
 
 
 CONFIG_NAME = resolve_config_name()
@@ -61,15 +56,17 @@ CONFIG_NAME = resolve_config_name()
 # Criar aplicação com a configuração selecionada
 app = create_app(CONFIG_NAME)
 
+
+
 # Ajustes específicos quando executado atrás do IIS
-if os.environ.get('RUNNING_ON_IIS'):
+if os.getenv('RUNNING_ON_IIS'):
     app.config.from_object(IISConfig)
 
 
 if __name__ == '__main__':
-    debug_mode = app.config.get('DEBUG', False)
-    port = int(os.environ.get('PORT', 6005))
-    host = os.environ.get('HOST', '127.0.0.1')
+    debug_mode = app.config.get('DEBUG')
+    port = os.getenv('PORT')
+    host = os.getenv('HOST')
 
     # Criar tabelas se não existirem
     with app.app_context():

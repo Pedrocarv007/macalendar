@@ -64,13 +64,24 @@ class APIClient {
         
         const config = {
             method,
-            headers: isFormData ? {} : {
+            headers: isFormData ? { ...options.headers } : {
                 'Content-Type': 'application/json',
                 ...options.headers
             },
             credentials: 'include',  // ✅ Enviar cookies/session
             ...options
         };
+
+        // Adicionar CSRF Token no header para métodos que modificam estado
+        try {
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : null;
+            const needsCsrf = ['POST', 'PUT', 'DELETE'].includes(method.toUpperCase());
+            if (csrfToken && needsCsrf) {
+                config.headers = config.headers || {};
+                config.headers['X-CSRFToken'] = csrfToken;
+            }
+        } catch (_) {}
 
         if (data) {
             if (isFormData) {

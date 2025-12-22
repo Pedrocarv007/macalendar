@@ -77,22 +77,16 @@ def create_employee():
         user_role = g.get('current_user_role')
         user_restaurant_id = g.get('current_user_restaurant_id')
         
-        print(f'[DEBUG CREATE] Content-Type: {request.content_type}')
-        print(f'[DEBUG CREATE] request.is_json: {request.is_json}')
-        print(f'[DEBUG CREATE] request.files: {list(request.files.keys())}')
-        print(f'[DEBUG CREATE] request.form: {list(request.form.keys())}')
         
         # Suportar tanto JSON quanto FormData
         if request.is_json:
             data = request.get_json()
-            print(f'[DEBUG CREATE] Usando JSON')
         else:
             # FormData
             data = request.form.to_dict()
-            print(f'[DEBUG CREATE] Usando FormData')
+           
 
         if not data:
-            print(f'[DEBUG CREATE] Dados vazios!')
             return jsonify({'error': 'Dados não fornecidos'}), 400
         
         # Validar dados obrigatórios
@@ -147,18 +141,17 @@ def create_employee():
                 return jsonify({'error': 'Gerentes só podem criar colaboradores com role "employee"'}), 403
             role_to_set = requested_role
         else:
-            # Inferir role a partir de position/department (heurística simples)
-            pos = (data.get('position') or '').lower()
-            dept = (data.get('department') or '').lower()
-            if 'rh' in pos or 'rh' in dept:
+            # Inferir role a partir de position/department (mapeamento atualizado)
+            pos = (data.get('position') or '').strip().lower()
+            dept = (data.get('department') or '').strip().lower()
+            text = f"{pos} {dept}".replace('_', ' ')
+            if any(k in text for k in ['rh', 'recursos humanos']):
                 role_to_set = 'rh'
-            elif 'gerente' in pos or 'manager' in pos:
+            elif any(k in text for k in ['gerente', 'sub gerente', 'gerente de turno', 'manager']):
                 role_to_set = 'manager'
-            elif 'marketing' in pos or 'marketing' in dept:
+            elif any(k in text for k in ['rp', 'relações públicas', 'relacoes publicas', 'marketing']):
                 role_to_set = 'marketing'
-            elif 'admin' in pos or 'administração' in dept:
-                role_to_set = 'admin'
-            elif 'desenvolvedor' in pos or 'desenvolvedor' in dept:
+            elif any(k in text for k in ['admin', 'administração', 'administracao', 'desenvolvedor', 'developer', 'dev']):
                 role_to_set = 'admin'
             else:
                 role_to_set = 'employee'
@@ -191,13 +184,8 @@ def create_employee():
         employee.set_password(temp_password)
         
         # Processar upload de foto se fornecido
-        print(f'[DEBUG] request.files keys: {list(request.files.keys())}')
-        print(f'[DEBUG] photo in request.files: {"photo" in request.files}')
         if 'photo' in request.files:
             file = request.files['photo']
-            print(f'[DEBUG] file: {file}')
-            print(f'[DEBUG] file.filename: {file.filename}')
-            print(f'[DEBUG] file.filename bool: {bool(file.filename)}')
             if file and file.filename and allowed_file(file.filename, ALLOWED_EXTENSIONS):
                 try:
                     # Salvar foto
@@ -218,8 +206,6 @@ def create_employee():
                     img.thumbnail((500, 500))
                     img.save(upload_path, 'PNG')
                     
-                    print(f'[DEBUG] Foto salva em: {upload_path}')
-                    print(f'[DEBUG] Arquivo existe: {os.path.exists(upload_path)}')
                     
                     # Atualizar URL da foto
                     employee.photo_url = f'/uploads/employees/{filename}'
@@ -369,7 +355,8 @@ def create_employee():
             send_email_async(
                 to=employee.email,
                 subject='Bem-vindo(a) ao MAC Calendar - Credenciais temporárias',
-                html=html_content
+                html=html_content,
+                mail_profile="noreply"
             )
         except Exception as e:
             current_app.logger.exception(f'Falha ao enviar email de boas-vindas: {e}')
@@ -381,7 +368,6 @@ def create_employee():
         
     except Exception as e:
         db.session.rollback()
-        print(f"DEBUG - Erro ao criar colaborador: {str(e)}")
         traceback.print_exc()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
@@ -425,10 +411,7 @@ def update_employee(employee_id):
             if employee.restaurant_id != user_restaurant_id:
                 return jsonify({'error': 'Permissão negada'}), 403
         
-        print(f'[DEBUG UPDATE] Content-Type: {request.content_type}')
-        print(f'[DEBUG UPDATE] request.is_json: {request.is_json}')
-        print(f'[DEBUG UPDATE] request.files: {list(request.files.keys())}')
-        print(f'[DEBUG UPDATE] request.form: {list(request.form.keys())}')
+       
         
         # Suportar tanto JSON quanto FormData
         if request.is_json:
@@ -450,20 +433,42 @@ def update_employee(employee_id):
             employee.email = data['email']
         if 'phone' in data:
             employee.phone = data['phone']
+        position_changed = False
+        department_changed = False
         if 'position' in data:
             employee.position = data['position']
+            position_changed = True
         if 'department' in data:
             employee.department = data['department']
+            department_changed = True
         if 'address' in data:
             employee.address = data['address']
         if 'role' in data and data['role']:
             requested_role = data['role'].strip().lower()
-            valid_roles = current_app.config.get('VALID_ROLES', ['admin', 'rh', 'marketing', 'manager', 'employee'])
+            valid_roles = current_app.config.get('VALID_ROLES')
             if requested_role not in valid_roles:
                 return jsonify({'error': f"Role inválido. Deve ser um de: {', '.join(valid_roles)}"}), 400
             if user_role == 'manager' and requested_role != 'employee':
                 return jsonify({'error': 'Gerentes só podem definir role "employee"'}), 403
             employee.role = requested_role
+        elif position_changed or department_changed:
+            # Inferir novo role automaticamente quando cargo/departamento mudarem
+            pos = (employee.position or '').strip().lower()
+            dept = (employee.department or '').strip().lower()
+            text = f"{pos} {dept}".replace('_', ' ')
+            inferred_role = 'employee'
+            if any(k in text for k in ['rh', 'recursos humanos']):
+                inferred_role = 'rh'
+            elif any(k in text for k in ['gerente', 'sub gerente', 'gerente de turno', 'manager']):
+                inferred_role = 'manager'
+            elif any(k in text for k in ['rp', 'relações públicas', 'relacoes publicas', 'marketing']):
+                inferred_role = 'marketing'
+            elif any(k in text for k in ['admin', 'administração', 'administracao', 'desenvolvedor', 'developer', 'dev']):
+                inferred_role = 'admin'
+            # Restrições: manager não pode elevar
+            if user_role == 'manager' and inferred_role != 'employee':
+                inferred_role = 'employee'
+            employee.role = inferred_role
         if 'birth_date' in data and data['birth_date']:
             employee.birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
         if 'hire_date' in data and data['hire_date']:
