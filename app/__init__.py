@@ -22,7 +22,9 @@ from app.auth.routes import auth_web_bp
 from app.config.settings import Config, config as CONFIG_MAP
 from app.extensions.database import init_db
 from app.middleware.security import init_security
+from app.middleware.security_headers import add_security_headers, configure_https
 from app.web.routes import web_bp
+from app.errors import register_error_handlers
 
 class ScriptNameMiddleware:
     """Middleware WSGI que define SCRIPT_NAME para proxy reverso"""
@@ -60,8 +62,9 @@ def create_app(config_name=None):
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
     # Adicionar middleware WSGI para proxy reverso com subpath (ex.: /mac)
-    app_root = app.config.get('APPLICATION_ROOT', '/mac')
-    app.wsgi_app = ScriptNameMiddleware(app.wsgi_app, app_root)
+    app_root = app.config.get('APPLICATION_ROOT') or '/mac'
+    if app_root and isinstance(app_root, str):
+        app.wsgi_app = ScriptNameMiddleware(app.wsgi_app, app_root)
     
     # Inicializar extensões
     init_db(app)
@@ -99,6 +102,8 @@ def create_app(config_name=None):
 
     # Registrar middlewares
     init_security(app)
+    add_security_headers(app)
+    configure_https(app)
     
     # Registrar blueprints da API
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -144,8 +149,8 @@ def create_app(config_name=None):
             return send_from_directory(uploads_dir, filename, as_attachment=False)
         except FileNotFoundError:
             return {'error': 'Arquivo não encontrado'}, 404
-        except Exception as e:
-            return {'error': f'Erro ao servir arquivo: {str(e)}'}, 500
+        except Exception:
+            return {'error': 'Erro ao servir arquivo'}, 500
     
     # Servir fotos de colaboradores via rota estática
     @app.route('/uploads/employees/<filename>')
@@ -156,27 +161,13 @@ def create_app(config_name=None):
         
         try:
             uploads_dir = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'employees')
-            print(f'[DEBUG] Servindo foto: {filename}')
-            print(f'[DEBUG] Diretório: {uploads_dir}')
-            print(f'[DEBUG] Caminho completo: {os.path.join(uploads_dir, filename)}')
-            print(f'[DEBUG] Arquivo existe: {os.path.exists(os.path.join(uploads_dir, filename))}')
             return send_from_directory(uploads_dir, filename, as_attachment=False)
-        except FileNotFoundError as e:
-            print(f'[DEBUG] Arquivo não encontrado: {filename} - {str(e)}')
+        except FileNotFoundError:
             return {'error': 'Arquivo não encontrado'}, 404
-        except Exception as e:
-            print(f'[DEBUG] Erro ao servir arquivo: {str(e)}')
-            import traceback
-            traceback.print_exc()
-            return {'error': f'Erro ao servir arquivo: {str(e)}'}, 500
+        except Exception:
+            return {'error': 'Erro ao servir arquivo'}, 500
     
-    # Manipuladores de erro
-    @app.errorhandler(404)
-    def not_found(error):
-        return {'error': 'Recurso não encontrado'}, 404
-    
-    @app.errorhandler(500)
-    def internal_error(error):
-        return {'error': 'Erro interno do servidor'}, 500
+    # Registar error handlers centralizados
+    register_error_handlers(app)
     
     return app

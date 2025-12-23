@@ -31,9 +31,7 @@ def init_security(app):
             
             # Permitir rotas da API que requerem autenticação mas já verificam via session
             # (a verificação será feita pelo before_request que checa session primeiro)
-            session_authenticated_routes = [
-                '/api/ai/posts'
-            ]
+            session_authenticated_routes = []
             
             if request.path not in public_routes and request.path not in session_authenticated_routes:
                 # Tentar autenticação por sessão primeiro

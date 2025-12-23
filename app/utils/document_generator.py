@@ -102,8 +102,8 @@ class DocumentGenerator:
                     foto = Image.open(employee_photo_path).resize((621, 834)).convert('RGBA')
                     foto_arredondada = self._apply_rounded_corners(foto, radius=50)
                     fundo.paste(foto_arredondada, (centro_x - 621 // 2, centro_y - 800 // 2 - 50), mask=foto_arredondada)
-                except Exception as e:
-                    print(f"Aviso ao carregar foto: {str(e)}")
+                except Exception:
+                    pass
             else:
                 # Usar placeholder se não houver foto
                 placeholder = self._get_or_create_placeholder((621, 834))
@@ -120,8 +120,8 @@ class DocumentGenerator:
                 # Posição: centro_y + 400 (exatamente como no canva.py)
                 draw.text((centro_x - largura_nome // 2, centro_y + 400), 
                          employee_name, font=fonte_nome, fill=(255, 255, 255, 255))
-            except Exception as e:
-                print(f"Aviso ao desenhar nome: {str(e)}")
+            except Exception:
+                pass
             try:
                 data = datetime.now().strftime('%d/%m/%Y')
                 fonte_data = self._load_font(size=55)
@@ -130,8 +130,8 @@ class DocumentGenerator:
                 # Posição: centro_y + 505 (exatamente como no canva.py para bem_vindo)
                 draw.text((centro_x - largura_data // 2, centro_y + 505), 
                          data, font=fonte_data, fill=(255, 255, 255, 255))
-            except Exception as e:
-                print(f"Aviso ao desenhar data: {str(e)}")
+            except Exception:
+                pass
             
             # Salvar
             filename = f"cartao_bemvindo_{int(datetime.now().timestamp())}.png"
@@ -140,8 +140,7 @@ class DocumentGenerator:
             
             return str(filepath), filename
             
-        except Exception as e:
-            print(f"Erro ao gerar cartão de boas-vindas: {str(e)}")
+        except Exception:
             raise
     
     def generate_birthday_card(self, employee_name, birth_date, employee_photo_path=None):
@@ -160,8 +159,8 @@ class DocumentGenerator:
                     foto = Image.open(employee_photo_path).resize((621, 834)).convert('RGBA')
                     foto_arredondada = self._apply_rounded_corners(foto, radius=50)
                     fundo.paste(foto_arredondada, (centro_x - 621 // 2, centro_y - 800 // 2 - 50), mask=foto_arredondada)
-                except Exception as e:
-                    print(f"Aviso ao carregar foto: {str(e)}")
+                except Exception:
+                    pass
             else:
                 # Usar placeholder se não houver foto
                 placeholder = self._get_or_create_placeholder((621, 834))
@@ -179,8 +178,8 @@ class DocumentGenerator:
                 # Posição: centro_y + 400 (exatamente como no canva.py)
                 draw.text((centro_x - largura_nome // 2, centro_y + 400), 
                          employee_name, font=fonte_nome, fill=(255, 255, 255, 255))
-            except Exception as e:
-                print(f"Aviso ao desenhar nome: {str(e)}")
+            except Exception:
+                pass
             
             # Data
             try:
@@ -198,8 +197,8 @@ class DocumentGenerator:
                 # Posição: centro_y + 530 (exatamente como no canva.py para aniversario)
                 draw.text((centro_x - largura_data // 2, centro_y + 530), 
                          data_str, font=fonte_data, fill=(255, 255, 255, 255))
-            except Exception as e:
-                print(f"Aviso ao desenhar data: {str(e)}")
+            except Exception:
+                pass
             
             # Salvar
             filename = f"cartao_aniversario_{int(datetime.now().timestamp())}.png"
@@ -208,8 +207,7 @@ class DocumentGenerator:
             
             return str(filepath), filename
             
-        except Exception as e:
-            print(f"Erro ao gerar cartão de aniversário: {str(e)}")
+        except Exception:
             raise
     
     def generate_custom_card(self, title, employee_name, template='bem_vindo', 
@@ -228,8 +226,8 @@ class DocumentGenerator:
                     foto = Image.open(employee_photo_path).resize((621, 834)).convert('RGBA')
                     foto_arredondada = self._apply_rounded_corners(foto, radius=50)
                     fundo.paste(foto_arredondada, (centro_x - 621 // 2, centro_y - 800 // 2 - 50), mask=foto_arredondada)
-                except Exception as e:
-                    print(f"Aviso ao carregar foto: {str(e)}")
+                except Exception:
+                    pass
             else:
                 # Usar placeholder se não houver foto
                 placeholder = self._get_or_create_placeholder((621, 834))
@@ -246,8 +244,8 @@ class DocumentGenerator:
                 # Posição: centro_y + 400 (como no canva.py)
                 draw.text((centro_x - largura_nome // 2, centro_y + 400), 
                          employee_name, font=fonte_nome, fill=(255, 255, 255, 255))
-            except Exception as e:
-                print(f"Aviso ao desenhar nome: {str(e)}")
+            except Exception:
+                pass
             
             # Data (título é usado como data)
             try:
@@ -257,8 +255,8 @@ class DocumentGenerator:
                 # Posição: centro_y + 530 (como no canva.py)
                 draw.text((centro_x - largura_data // 2, centro_y + 530), 
                          title, font=fonte_data, fill=(255, 255, 255, 255))
-            except Exception as e:
-                print(f"Aviso ao desenhar data: {str(e)}")
+            except Exception:
+                pass
             
             # Salvar
             filename = f"cartao_custom_{int(datetime.now().timestamp())}.png"
@@ -267,6 +265,5 @@ class DocumentGenerator:
             
             return str(filepath), filename
             
-        except Exception as e:
-            print(f"Erro ao gerar cartão customizado: {str(e)}")
+        except Exception:
             raise

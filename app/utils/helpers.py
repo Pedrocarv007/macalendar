@@ -48,8 +48,7 @@ def resize_image(image_path, max_width=800, max_height=600, quality=85):
             img.save(image_path, 'JPEG', optimize=True, quality=quality)
             
         return True
-    except Exception as e:
-        print(f"Erro ao redimensionar imagem: {e}")
+    except Exception:
         return False
 
 def validate_date_format(date_string, format='%Y-%m-%d'):
@@ -130,8 +129,7 @@ def create_directory_if_not_exists(path):
     try:
         os.makedirs(path, exist_ok=True)
         return True
-    except Exception as e:
-        print(f"Erro ao criar diretório {path}: {e}")
+    except Exception:
         return False
 
 def get_file_extension(filename):

@@ -32,7 +32,7 @@ def get_profile():
         return jsonify(employee.to_dict()), 200
         
     except Exception as e:
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+        return jsonify({'error': 'Erro ao obter perfil'}), 500
 
 @profile_bp.route('/me', methods=['PUT'])
 @api_login_required
@@ -41,8 +41,6 @@ def update_profile():
     try:
         user_id = g.get('current_user_id')
         data = request.get_json()
-        
-        print(f"[PROFILE UPDATE] User ID: {user_id}, Data recebida: {data}")
         
         employee = Employee.query.get(user_id)
         if not employee:
@@ -79,34 +77,28 @@ def update_profile():
             if 'birthDate' in data and data['birthDate']:
                 try:
                     employee.birth_date = datetime.strptime(data['birthDate'], '%Y-%m-%d').date()
-                    print(f"[PROFILE UPDATE] Birth date atualizada para: {employee.birth_date}")
-                except ValueError as e:
-                    print(f"[PROFILE UPDATE] Erro ao parsear birthDate: {e}")
+                except ValueError:
                     return jsonify({'error': 'Formato de data de nascimento inválido'}), 400
             
             if 'hireDate' in data and data['hireDate']:
                 try:
                     employee.hire_date = datetime.strptime(data['hireDate'], '%Y-%m-%d').date()
-                    print(f"[PROFILE UPDATE] Hire date atualizada para: {employee.hire_date}")
-                except ValueError as e:
-                    print(f"[PROFILE UPDATE] Erro ao parsear hireDate: {e}")
+                except ValueError:
                     return jsonify({'error': 'Formato de data de contratação inválido'}), 400
         
         # Atualizar timestamp
         employee.updated_at = datetime.utcnow()
         
         db.session.commit()
-        print(f"[PROFILE UPDATE] Salvo com sucesso para user {user_id}")
         
         return jsonify({
             'message': 'Perfil atualizado com sucesso',
             'user': employee.to_dict()
         }), 200
         
-    except Exception as e:
-        print(f"[PROFILE UPDATE] Erro: {str(e)}")
+    except Exception:
         db.session.rollback()
-        return jsonify({'error': f'Erro ao atualizar perfil: {str(e)}'}), 500
+        return jsonify({'error': 'Erro ao atualizar perfil'}), 500
 
 @profile_bp.route('/me/photo', methods=['POST'])
 @api_login_required
@@ -170,7 +162,7 @@ def upload_profile_photo():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Erro ao processar foto: {str(e)}'}), 500
+        return jsonify({'error': 'Erro ao processar foto'}), 500
 
 @profile_bp.route('/me/photo', methods=['DELETE'])
 @api_login_required
@@ -195,7 +187,7 @@ def delete_profile_photo():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Erro ao deletar foto: {str(e)}'}), 500
+        return jsonify({'error': 'Erro ao deletar foto'}), 500
 
 @profile_bp.route('/me/password', methods=['POST'])
 @api_login_required
@@ -233,4 +225,4 @@ def change_password():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Erro ao alterar senha: {str(e)}'}), 500
+        return jsonify({'error': 'Erro ao alterar senha'}), 500

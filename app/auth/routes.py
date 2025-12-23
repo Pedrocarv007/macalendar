@@ -101,9 +101,7 @@ def login():
                 return redirect(next_page)
             return redirect(url_for('web.dashboard'))
             
-        except Exception as e:
-            print(f"[LOGIN ERROR] {str(e)}")
-            traceback.print_exc()
+        except Exception:
             db.session.rollback()
             flash('Erro ao processar login. Tente novamente.', 'danger')
             return render_template('auth/login.html')

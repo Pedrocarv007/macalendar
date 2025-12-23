@@ -1,7 +1,9 @@
 """AI endpoints for generating post text"""
 import os
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from openai import OpenAI
+from app.middleware.security import api_login_required
+from app.utils.rate_limiter import check_rate_limit, with_cache
 
 ai_bp = Blueprint("ai", __name__)
 
@@ -19,6 +21,9 @@ def get_client():
     return _client
 
 @ai_bp.route("/posts", methods=["POST"])
+@api_login_required
+@check_rate_limit
+@with_cache
 def generate_post():
     data = request.get_json() or {}
     topic = data.get("topic") or "Promoção especial"
@@ -46,6 +51,6 @@ def generate_post():
             max_tokens=220,
         )
         text = resp.choices[0].message.content.strip()
-        return jsonify({"text": text})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"text": text}), 200
+    except Exception:
+        return jsonify({"error": "Erro ao gerar post"}), 500

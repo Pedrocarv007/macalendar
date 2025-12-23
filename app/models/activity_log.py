@@ -71,8 +71,7 @@ class ActivityLog(db.Model):
                 return f'{days} dia{"s" if days > 1 else ""} atrás'
             else:
                 return created_at.strftime('%d/%m/%Y às %H:%M')
-        except Exception as e:
-            print(f"[ERRO] Erro ao calcular tempo relativo: {e}")
+        except Exception:
             return 'Data desconhecida'
     
     @staticmethod

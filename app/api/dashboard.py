@@ -135,8 +135,5 @@ def get_activities():
         activities = query.all()
         result = [activity.to_dict() for activity in activities]
         return jsonify(result), 200
-    except Exception as e:
-        print(f"❌ [ACTIVITIES] Erro: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        return jsonify({'error': 'Erro ao buscar atividades'}), 500
