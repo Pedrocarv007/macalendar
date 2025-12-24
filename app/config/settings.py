@@ -118,6 +118,7 @@ class Config:
         # Criar diretórios necessários
         os.makedirs(cls.UPLOAD_FOLDER, exist_ok=True)
         os.makedirs(cls.UPLOAD_FOLDER / 'employees', exist_ok=True)
+        os.makedirs(cls.UPLOAD_FOLDER / 'workers', exist_ok=True)
         os.makedirs(cls.UPLOAD_FOLDER / 'documents', exist_ok=True)
         os.makedirs(BASE_DIR / 'instance', exist_ok=True)
         os.makedirs(BASE_DIR / 'logs', exist_ok=True)

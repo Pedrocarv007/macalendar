@@ -473,11 +473,47 @@ body {
     .navbar-brand {
         font-size: 1.5rem;
     }
+    /* Compact nav links on tablets */
+    .navbar-nav .nav-link {
+        padding: 0.5rem 0.75rem;
+    }
 }
 
 @media (max-width: 576px) {
     .btn {
         padding: var(--space-sm) var(--space-md);
         font-size: 0.9rem;
+    }
+    /* Reduce table cell padding and font on phones */
+    .table thead th,
+    .table tbody td {
+        padding: var(--space-sm);
+        font-size: 0.9rem;
+    }
+    /* Compact forms on phones */
+    .form-control {
+        padding: var(--space-sm) var(--space-md);
+        font-size: 0.95rem;
+    }
+    .form-label {
+        font-size: 0.95rem;
+    }
+    /* Prevent excessive hover movement on small screens */
+    .card:hover {
+        transform: none;
+        box-shadow: 0 4px 16px rgba(0, 166, 81, 0.12);
+    }
+    /* Tighter navbar for phones */
+    .navbar {
+        padding: 0.5rem 0;
+    }
+    .navbar-nav .nav-link {
+        padding: 0.5rem;
+    }
+    /* Ensure containers breathe slightly on phones */
+    .container,
+    .container-fluid {
+        padding-left: var(--space-md);
+        padding-right: var(--space-md);
     }
 }

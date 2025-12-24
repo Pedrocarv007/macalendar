@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}MAC Calendar - Sistema de Gestão{% endblock %}</title>
+    <title>{% block title %}Thecarv Dashboard  - Sistema de Gestão McDonalds{% endblock %}</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -36,7 +36,7 @@
             <!-- Brand/Logo -->
             <a class="navbar-brand" href="{{ url_for('web.index') }}">
                 <i class="fas fa-calendar-alt"></i>
-                MC Calendar
+                {{ nome}}
             </a>
             
             <!-- Mobile Toggle Button -->
@@ -86,32 +86,6 @@
                         </a>
                     </li>
                     
-                    <!-- Menu Administrativo - Apenas Admin -->
-                    {% if session.user_role == 'admin' %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-cog me-1"></i>Administração
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="adminDropdown">
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('web.settings') }}">
-                                    <i class="fas fa-sliders-h me-2"></i>Configurações do Sistema
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item" href="/api">
-                                    <i class="fas fa-code me-2"></i>API Documentation
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="/api/health">
-                                    <i class="fas fa-heartbeat me-2"></i>Status do Sistema
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-                    {% endif %}
                 </ul>
                 
                 <!-- User Menu (Right Side) -->

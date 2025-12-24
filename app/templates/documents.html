@@ -7,12 +7,12 @@
     <!-- Header Section -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center document-actions">
                 <div>
                     <h1 class="text-gradient mb-1">Documentos</h1>
                     <p class="text-muted mb-0">Gerencie arquivos e documentos importantes</p>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 document-actions-right">
                     <button class="btn btn-outline-primary" onclick="bulkDownload()">
                         <i class="fas fa-download me-1"></i>Download em Lote
                     </button>
@@ -230,7 +230,7 @@
 
 <!-- Generate Document Modal (Novo) -->
 <div class="modal fade" id="generateDocumentModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
@@ -264,6 +264,7 @@
                             <!-- Funcionários serão listados aqui -->
                         </div>
                         <input type="hidden" id="genEmployeeId" value="">
+                        <input type="hidden" id="genEmployeeIsWorker" value="false">
                         <small id="selectedEmployeeName" class="form-text text-success" style="display: none;"></small>
                     </div>
 
@@ -290,7 +291,7 @@
 
 <!-- Document Modal (Original) -->
 <div class="modal fade" id="documentModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="documentModalTitle">Novo Documento</h5>
@@ -368,7 +369,7 @@
 
 <!-- Preview Modal -->
 <div class="modal fade" id="previewModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="previewModalTitle">Visualizar Documento</h5>
@@ -729,7 +730,8 @@ function previewDocument(id) {
 }
 
 function downloadDocument(id) {
-    window.open(`/api/documents/${id}/download`, '_blank');
+    const prefix = window.APP_PREFIX || '';
+    window.open(`${prefix}/api/documents/${id}/download`, '_blank');
 }
 
 function editDocument(id) {
@@ -786,7 +788,8 @@ function bulkDownload() {
     }
     
     const ids = Array.from(selectedDocuments);
-    const url = `/api/documents/bulk-download?ids=${ids.join(',')}`;
+    const prefix = window.APP_PREFIX || '';
+    const url = `${prefix}/api/documents/bulk-download?ids=${ids.join(',')}`;
     window.open(url, '_blank');
 }
 
@@ -908,8 +911,10 @@ async function loadEmployeesForGeneration() {
         });
         if (!response.ok) throw new Error('Erro ao carregar');
         const data = await response.json();
-        allEmployees = data.employees || [];
-        console.log('Funcionários carregados:', allEmployees.length);
+        const employees = data.employees || [];
+        const workers = (data.workers || []).map(w => ({ ...w, is_worker: true }));
+        allEmployees = [...employees.map(e => ({ ...e, is_worker: false })), ...workers];
+        console.log('Colaboradores carregados para geração:', allEmployees.length);
     } catch (error) {
         console.error('Erro ao carregar funcionários:', error);
         Utils.showAlert('Erro ao carregar funcionários', 'error');
@@ -940,12 +945,17 @@ document.getElementById('genEmployeeSearch').addEventListener('input', function(
             const item = document.createElement('button');
             item.type = 'button';
             item.className = 'list-group-item list-group-item-action';
+            const roleLabel = emp.is_worker ? 'Trabalhador' : (emp.role || 'N/A');
+            const emailText = emp.email ? emp.email : 'Sem email cadastrado';
+            const typeBadge = emp.is_worker ? '<span class="badge bg-warning text-dark ms-2">Worker</span>' : '';
             item.innerHTML = `
-                <div class="d-flex w-100 justify-content-between">
-                    <strong>${emp.name}</strong>
-                    <small class="text-muted">${emp.role || 'N/A'}</small>
+                <div class="d-flex w-100 justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <strong>${emp.name}</strong>${typeBadge}
+                    </div>
+                    <small class="text-muted">${roleLabel}</small>
                 </div>
-                <small class="text-muted">${emp.email}</small>
+                <small class="text-muted">${emailText}</small>
             `;
             item.onclick = (e) => {
                 e.preventDefault();
@@ -963,6 +973,7 @@ document.getElementById('clearSearchBtn').addEventListener('click', function() {
     document.getElementById('genEmployeeSearch').value = '';
     document.getElementById('employeeDropdown').style.display = 'none';
     document.getElementById('genEmployeeId').value = '';
+    document.getElementById('genEmployeeIsWorker').value = 'false';
     selectedEmployee = null;
     document.getElementById('employeeInfo').style.display = 'none';
     document.getElementById('selectedEmployeeName').style.display = 'none';
@@ -972,11 +983,13 @@ document.getElementById('clearSearchBtn').addEventListener('click', function() {
 function selectEmployee(employee) {
     selectedEmployee = employee;
     document.getElementById('genEmployeeId').value = employee.id;
+    document.getElementById('genEmployeeIsWorker').value = employee.is_worker ? 'true' : 'false';
     document.getElementById('genEmployeeSearch').value = employee.name;
     document.getElementById('employeeDropdown').style.display = 'none';
     
     // Mostrar informações do funcionário
-    document.getElementById('infoEmployeeName').textContent = employee.name;
+    const typeLabel = employee.is_worker ? ' (worker)' : '';
+    document.getElementById('infoEmployeeName').textContent = `${employee.name}${typeLabel}`;
     document.getElementById('infoEmployeePhoto').textContent = 
         employee.photo_filename ? '✓ Tem foto' : '⚠ Sem foto (usará placeholder)';
     
@@ -992,7 +1005,7 @@ function selectEmployee(employee) {
     
     document.getElementById('employeeInfo').style.display = 'block';
     document.getElementById('selectedEmployeeName').style.display = 'block';
-    document.getElementById('selectedEmployeeName').textContent = `✓ ${employee.name} selecionado`;
+    document.getElementById('selectedEmployeeName').textContent = `✓ ${employee.name}${typeLabel} selecionado`;
 }
 
 // Atualizar tipo de documento
@@ -1014,6 +1027,7 @@ document.getElementById('genDocumentType').addEventListener('change', function()
 async function generateAndDownloadDocument() {
     const docType = document.getElementById('genDocumentType').value;
     const employeeId = document.getElementById('genEmployeeId').value;
+    const isWorker = document.getElementById('genEmployeeIsWorker').value === 'true';
     
     if (!docType) {
         Utils.showAlert('Selecione um tipo de cartão', 'warning');
@@ -1039,7 +1053,8 @@ async function generateAndDownloadDocument() {
         const result = await api.post('/documents/generate-auto', {
             document_type: docType,
             employee_id: parseInt(employeeId),
-            restaurant_id: restaurantId
+            restaurant_id: restaurantId,
+            is_worker: isWorker
         });
         if (!result || !result.document || !result.document.filename) {
             throw new Error('Resposta inválida da API');

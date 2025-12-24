@@ -128,6 +128,7 @@ class Employee(db.Model):
             'restaurant_id': self.restaurant_id,
             'restaurant_name': self.restaurant.name if self.restaurant else None,
             'is_active': self.is_active,
+            'is_worker': False,
             'address': self.address,
             'notes': self.notes,
             'role': self.role,

@@ -100,6 +100,15 @@ def create_app(config_name=None):
         # Disponibiliza csrf_token() para templates
         return {'csrf_token': generate_csrf}
 
+    @app.context_processor
+    def inject_current_year():
+        return {"year": datetime.now().year}
+    
+    @app.context_processor
+    def inject_app_name():
+        return {"nome": "Mc Calendar"}
+
+
     # Registrar middlewares
     init_security(app)
     add_security_headers(app)
@@ -161,6 +170,19 @@ def create_app(config_name=None):
         
         try:
             uploads_dir = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'employees')
+            return send_from_directory(uploads_dir, filename, as_attachment=False)
+        except FileNotFoundError:
+            return {'error': 'Arquivo não encontrado'}, 404
+        except Exception:
+            return {'error': 'Erro ao servir arquivo'}, 500
+
+    # Servir fotos de workers (não usuários)
+    @app.route('/uploads/workers/<filename>')
+    def serve_worker_photo(filename):
+        if '..' in filename or filename.startswith('/'):
+            return {'error': 'Acesso negado'}, 403
+        try:
+            uploads_dir = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'workers')
             return send_from_directory(uploads_dir, filename, as_attachment=False)
         except FileNotFoundError:
             return {'error': 'Arquivo não encontrado'}, 404

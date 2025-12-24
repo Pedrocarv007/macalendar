@@ -16,9 +16,6 @@
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#employeeModal">
                         <i class="fas fa-plus me-1"></i>Novo Colaborador
                     </button>
-                    <button class="btn btn-outline-primary" onclick="exportEmployees()">
-                        <i class="fas fa-download me-1"></i>Exportar
-                    </button>
                 </div>
             </div>
         </div>
@@ -224,7 +221,7 @@
 
 <!-- Employee Modal -->
 <div class="modal fade" id="employeeModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="employeeModalTitle">Novo Colaborador</h5>
@@ -234,6 +231,20 @@
                 <form id="employeeForm">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" id="employeeId" name="employeeId">
+                    <input type="hidden" id="isWorkerFlag" name="isWorkerFlag" value="false">
+
+                    <div class="row g-3 mb-2">
+                        <div class="col-12">
+                            <label class="form-label mb-1">Tipo de registro</label>
+                            <div class="d-flex align-items-center flex-wrap type-toggle">
+                                <input class="btn-check" type="radio" name="employeeType" id="typeEmployee" value="employee" autocomplete="off" checked>
+                                <label class="btn btn-outline-primary" for="typeEmployee">Connect</label>
+
+                                <input class="btn-check" type="radio" name="employeeType" id="typeWorker" value="worker" autocomplete="off">
+                                <label class="btn btn-outline-secondary" for="typeWorker">Colaborador</label>
+                            </div>
+                        </div>
+                    </div>
                     
                     <div class="row g-3">
                         <!-- Photo Upload Section -->
@@ -262,20 +273,20 @@
                             <input type="text" class="form-control" id="employeeName" name="name" required>
                         </div>
                         
-                        <div class="col-md-6">
+                        <div class="col-md-6" data-mode="employee">
                             <label for="employeeEmail" class="form-label">Email *</label>
                             <input type="email" class="form-control" id="employeeEmail" name="email" required>
                         </div>
                         
-                        <div class="col-md-6">
+                        <div class="col-md-6" data-mode="employee">
                             <label for="employeePhone" class="form-label">Telefone</label>
                             <input type="tel" class="form-control" id="employeePhone" name="phone" 
                                    placeholder="+351 912 345 678">
                         </div>
                         
-                        <div class="col-md-6">
+                        <div class="col-md-6" data-mode="employee">
                             <label for="employeePosition" class="form-label">Cargo/Departamento *</label>
-                            <select class="form-select" id="employeePosition" name="position" required onchange="syncPositionToDepartment()">
+                            <select class="form-control select-like-input" id="employeePosition" name="position" required onchange="syncPositionToDepartment()">
                                 <option value="">Selecione...</option>
                                 <option value="Desenvolvedor">Desenvolvedor</option>
                                 <option value="RH">Recursos Humanos</option>
@@ -292,7 +303,7 @@
                         
                         <div class="col-md-6">
                             <label for="employeeRestaurant" class="form-label">Restaurante *</label>
-                            <select class="form-select" id="employeeRestaurant" name="restaurant_id" required>
+                            <select class="form-control select-like-input" id="employeeRestaurant" name="restaurant_id" required>
                                 <option value="">Selecione o restaurante...</option>
                             </select>
                         </div>
@@ -307,7 +318,7 @@
                             <input type="date" class="form-control" id="employeeHireDate" name="hire_date">
                         </div>
                         
-                        <div class="col-md-6">
+                        <div class="col-md-6" data-mode="employee">
                             <label class="form-label">Status</label>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="employeeActive" name="is_active" checked>
@@ -317,12 +328,12 @@
                             </div>
                         </div>
                         
-                        <div class="col-12">
+                        <div class="col-12" data-mode="employee">
                             <label for="employeeAddress" class="form-label">Endereço</label>
                             <textarea class="form-control" id="employeeAddress" name="address" rows="2"></textarea>
                         </div>
                         
-                        <div class="col-12">
+                        <div class="col-12" data-mode="employee">
                             <label for="employeeNotes" class="form-label">Observações</label>
                             <textarea class="form-control" id="employeeNotes" name="notes" rows="2"></textarea>
                         </div>

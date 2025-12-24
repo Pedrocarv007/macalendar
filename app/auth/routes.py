@@ -3,10 +3,8 @@ Rotas de autenticação web (interface HTML)
 """
 from datetime import datetime
 import traceback
-
 from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify
 from flask_jwt_extended import create_access_token
-
 from app.extensions.database import db
 from app.middleware.security import validate_email
 from app.models.employee import Employee
@@ -105,7 +103,7 @@ def login():
             db.session.rollback()
             flash('Erro ao processar login. Tente novamente.', 'danger')
             return render_template('auth/login.html')
-    
+
     return render_template('auth/login.html')
 
 @auth_web_bp.route('/logout')

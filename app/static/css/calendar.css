@@ -11,6 +11,8 @@
     padding: var(--space-xl);
     margin-bottom: var(--space-xl);
     border: 1px solid rgba(255, 199, 44, 0.2);
+    /* Allow horizontal scroll on small screens */
+    overflow-x: auto;
 }
 
 /* ========== Calendar Grid ========== */
@@ -21,6 +23,8 @@
     background: rgba(255, 199, 44, 0.2);
     border-radius: 8px;
     overflow: hidden;
+    /* Fit all 7 columns within the viewport on mobile */
+    width: 100%;
 }
 
 .day-header {
@@ -176,6 +180,11 @@
 
 /* ========== Responsive Calendar ========== */
 @media (max-width: 768px) {
+    /* Wrap header controls nicely on tablets */
+    .card-header .d-flex {
+        flex-wrap: wrap;
+        gap: var(--space-sm);
+    }
     .calendar-day {
         min-height: 60px;
         padding: 4px;
@@ -188,5 +197,32 @@
     .event {
         font-size: 0.6rem;
         padding: 1px 4px;
+    }
+    /* Top page actions: wrap and compact buttons */
+    .calendar-actions {
+        flex-wrap: wrap;
+        gap: var(--space-sm);
+    }
+    .calendar-actions-right .btn {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.9rem;
+    }
+    .calendar-actions-right .btn i {
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 576px) {
+    /* Further compacting for phones */
+    .day-header {
+        padding: 6px;
+        font-size: 0.75rem;
+    }
+    .calendar-day {
+        min-height: 50px;
+        padding: 3px;
+    }
+    .event-item {
+        padding: 8px;
     }
 }

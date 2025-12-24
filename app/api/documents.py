@@ -5,14 +5,18 @@ import os
 import traceback
 from datetime import datetime
 from datetime import date as date_module
-from flask import Blueprint, request, jsonify, send_file, g
+from flask import Blueprint, request, jsonify, send_file, g, current_app
+import io
+import zipfile
 from flask_jwt_extended import get_jwt_identity, get_jwt
 from werkzeug.utils import secure_filename
+from pathlib import Path
 
 from app.extensions.database import db
 from app.middleware.security import api_login_required, role_required
 from app.models.document import Document
 from app.models.employee import Employee
+from app.models.workers import Worker
 from app.models.restaurant import Restaurant
 from app.models.activity_log import ActivityLog
 from app.utils.document_generator import DocumentGenerator
@@ -126,13 +130,14 @@ def create_document():
         if not restaurant:
             return jsonify({'error': 'Restaurante não encontrado'}), 404
         
-        # Criar diretório de upload se não existir
-        upload_folder = os.path.join('uploads', 'documents', str(restaurant_id))
-        os.makedirs(upload_folder, exist_ok=True)
+        # Criar diretório de upload absoluto (BASE_DIR/uploads/documents/<restaurant_id>)
+        uploads_root = Path(current_app.config.get('UPLOAD_FOLDER'))
+        upload_folder = uploads_root / 'documents' / str(restaurant_id)
+        upload_folder.mkdir(parents=True, exist_ok=True)
         
         # Gerar nome de arquivo seguro
         filename = secure_filename(f"{int(datetime.now().timestamp())}_{file.filename}")
-        file_path = os.path.join(upload_folder, filename)
+        file_path = str(upload_folder / filename)
         
         # Salvar arquivo
         file.save(file_path)
@@ -294,6 +299,66 @@ def download_document(document_id):
     except Exception as e:
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
+@documents_bp.route('/bulk-download', methods=['GET'])
+@api_login_required
+def bulk_download_documents():
+    """Download em lote: retorna um arquivo ZIP com os documentos selecionados.
+
+    Query params:
+      - ids: lista separada por vírgulas de IDs de documentos (ex.: ?ids=1,2,3)
+    """
+    try:
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+
+        ids_param = request.args.get('ids', '').strip()
+        if not ids_param:
+            return jsonify({'error': 'Parâmetro ids é obrigatório'}), 400
+
+        try:
+            ids = [int(x) for x in ids_param.split(',') if x.strip().isdigit()]
+        except Exception:
+            return jsonify({'error': 'Parâmetro ids inválido'}), 400
+
+        if not ids:
+            return jsonify({'error': 'Nenhum ID válido fornecido'}), 400
+
+        documents = Document.query.filter(Document.id.in_(ids)).all()
+        if not documents:
+            return jsonify({'error': 'Nenhum documento encontrado'}), 404
+
+        # Filtrar por permissões e existência de arquivo
+        allowed_docs = []
+        for doc in documents:
+            # Permissões: roles elevadas podem baixar qualquer restaurante; senão, restringe ao restaurante do usuário
+            if user_role not in ['admin', 'rh', 'marketing'] and doc.restaurant_id != user_restaurant_id:
+                continue
+            # Verificar arquivo
+            if not doc.file_path or not os.path.exists(doc.file_path):
+                continue
+            allowed_docs.append(doc)
+
+        if not allowed_docs:
+            return jsonify({'error': 'Nenhum documento disponível para download'}), 404
+
+        # Criar ZIP em memória
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+            for doc in allowed_docs:
+                arcname = f"{doc.id}_{doc.filename or 'documento'}"
+                try:
+                    zf.write(doc.file_path, arcname=arcname)
+                except Exception:
+                    # Se falhar em adicionar um arquivo, apenas pula
+                    continue
+
+        zip_buffer.seek(0)
+        zip_name = f"documentos_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.zip"
+        return send_file(zip_buffer, as_attachment=True, download_name=zip_name, mimetype='application/zip')
+
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
 @documents_bp.route('/templates', methods=['GET'])
 @api_login_required
 def get_templates():
@@ -369,12 +434,12 @@ def generate_document():
         # Por enquanto, simular a geração
         
         # Criar diretório se não existir
-        documents_folder = os.path.join('uploads', 'documents')
-        os.makedirs(documents_folder, exist_ok=True)
+        documents_folder = Path(current_app.config.get('UPLOAD_FOLDER')) / 'documents'
+        documents_folder.mkdir(parents=True, exist_ok=True)
         
         # Simular geração do arquivo
         filename = f"document_{document_id}_{int(datetime.now().timestamp())}.pdf"
-        file_path = os.path.join(documents_folder, filename)
+        file_path = str(documents_folder / filename)
         
         # Aqui seria chamada a função de geração real do PDF
         # generate_pdf_from_template(document, file_path)
@@ -420,6 +485,17 @@ def generate_document_auto():
             restaurant_id = int(data.get('restaurant_id', 0)) if data.get('restaurant_id') else None
         except (ValueError, TypeError):
             return jsonify({'error': 'Employee ID e Restaurant ID devem ser números'}), 400
+
+        # Interpret flag robustly (supports bool, string, numbers)
+        raw_is_worker = data.get('is_worker')
+        if isinstance(raw_is_worker, bool):
+            is_worker = raw_is_worker
+        elif isinstance(raw_is_worker, (int, float)):
+            is_worker = raw_is_worker != 0
+        elif isinstance(raw_is_worker, str):
+            is_worker = raw_is_worker.strip().lower() in ['1', 'true', 'yes', 'on']
+        else:
+            is_worker = False
         
         if not document_type:
             return jsonify({'error': 'Tipo de documento é obrigatório'}), 400
@@ -431,13 +507,28 @@ def generate_document_auto():
         if user_role not in ['admin', 'rh'] and restaurant_id != user_restaurant_id:
             return jsonify({'error': 'Permissão negada para este restaurante'}), 403
         
-        # Obter dados do colaborador
-        employee = Employee.query.get(employee_id)
-        if not employee:
-            return jsonify({'error': 'Colaborador não encontrado'}), 404
-        
-        if employee.restaurant_id != restaurant_id:
-            return jsonify({'error': 'Colaborador não pertence a este restaurante'}), 400
+        # Obter dados do colaborador ou worker
+        employee = None
+        worker = None
+        if is_worker:
+            worker = Worker.query.get(employee_id)
+            if not worker:
+                return jsonify({'error': 'Trabalhador não encontrado'}), 404
+            if worker.restaurant_id != restaurant_id:
+                return jsonify({'error': 'Trabalhador não pertence a este restaurante'}), 400
+        else:
+            employee = Employee.query.get(employee_id)
+            if not employee:
+                # fallback: se não é employee, mas existe worker com o mesmo id, tratar como worker
+                worker = Worker.query.get(employee_id)
+                if worker:
+                    is_worker = True
+                else:
+                    return jsonify({'error': 'Colaborador não encontrado'}), 404
+            if employee and employee.restaurant_id != restaurant_id:
+                return jsonify({'error': 'Colaborador não pertence a este restaurante'}), 400
+            if is_worker and worker and worker.restaurant_id != restaurant_id:
+                return jsonify({'error': 'Trabalhador não pertence a este restaurante'}), 400
         
         # Verificar restaurante
         restaurant = Restaurant.query.get(restaurant_id)
@@ -447,15 +538,21 @@ def generate_document_auto():
         # Gerar documento
         generator = DocumentGenerator()
         photo_path = None
-        
-        # Obter caminho da foto se existir
-        if employee.photo_filename:
-            photo_path = os.path.join('app/static/uploads/employees', employee.photo_filename)
+        photo_filename = None
+        # Obter caminho absoluto da foto se existir
+        if employee and employee.photo_filename:
+            photo_filename = employee.photo_filename
+            photo_path = str(Path(current_app.root_path) / 'static' / 'uploads' / 'employees' / photo_filename)
+        elif worker and worker.photo_filename:
+            photo_filename = worker.photo_filename
+            photo_path = str(Path(current_app.root_path) / 'static' / 'uploads' / 'workers' / photo_filename)
         
         try:
+            target_name = employee.name if employee else worker.name
+
             if document_type.lower() == 'bem_vindo':
                 file_path, filename = generator.generate_welcome_card(
-                    employee_name=employee.name,
+                    employee_name=target_name,
                     employee_photo_path=photo_path,
                     restaurant_name=restaurant.name
                 )
@@ -464,16 +561,16 @@ def generate_document_auto():
             elif document_type.lower() == 'aniversario':
                 # Usar data de aniversário no ano atual, não o ano de nascimento
 
-                birth_date_current_year = employee.birth_date
+                birth_date_current_year = employee.birth_date if employee else worker.birth_date
                 if birth_date_current_year:
                     try:
-                        birth_date_current_year = employee.birth_date.replace(year=date_module.today().year)
+                        birth_date_current_year = birth_date_current_year.replace(year=date_module.today().year)
                     except ValueError:
                         # Lidar com 29/02 em anos não bissextos
-                        birth_date_current_year = employee.birth_date.replace(year=date_module.today().year, day=28)
+                        birth_date_current_year = birth_date_current_year.replace(year=date_module.today().year, day=28)
                 
                 file_path, filename = generator.generate_birthday_card(
-                    employee_name=employee.name,
+                    employee_name=target_name,
                     birth_date=birth_date_current_year,
                     employee_photo_path=photo_path
                 )
@@ -487,8 +584,22 @@ def generate_document_auto():
         
         # Obter tamanho do arquivo
         file_size = os.path.getsize(file_path)
-        
-        # Criar documento no banco de dados
+
+        # Se alvo é worker, apenas retornar o arquivo gerado sem persistir documento
+        if is_worker:
+            return jsonify({
+                'message': 'Cartão gerado com sucesso',
+                'document': {
+                    'filename': filename,
+                    'file_path': file_path,
+                    'file_size': file_size,
+                    'document_type': doc_category,
+                    'template_name': document_type,
+                    'is_worker': True
+                }
+            }), 201
+
+        # Criar documento no banco de dados (employee)
         document = Document(
             title=f'Cartão - {employee.name}',
             document_type=doc_category,
@@ -504,14 +615,24 @@ def generate_document_auto():
             is_public=False,
             status='generated'
         )
-        
+
         db.session.add(document)
+
+        # Registrar atividade
+        ActivityLog.log_activity(
+            activity_type='document_generated',
+            description=f'Documento gerado automaticamente ({doc_category}) para {employee.name}',
+            user_id=current_user_id,
+            restaurant_id=restaurant_id,
+            target_id=document.id,
+            target_type='document'
+        )
+
         db.session.commit()
-        
+
         return jsonify({
             'message': 'Documento gerado com sucesso',
-            'document': document.to_dict(),
-            'file_path': file_path
+            'document': document.to_dict()
         }), 201
         
     except Exception as e:

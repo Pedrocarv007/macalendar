@@ -8,6 +8,7 @@ const EmployeesModule = {
     restaurants: [],
     currentFilter: '',
     stats: {},
+    currentFormMode: 'employee',
 
     /**
      * Inicializar módulo
@@ -81,6 +82,14 @@ const EmployeesModule = {
             this.showAddForm();
         });
 
+        // Trocar tipo (employee vs worker) – aplicar listener em todos os radios
+        DOM.$$('input[name="employeeType"]').forEach((el) => {
+            DOM.on(el, 'change', (e) => {
+                const mode = e.target.value === 'worker' ? 'worker' : 'employee';
+                this.setFormMode(mode);
+            });
+        });
+
         // Os event listeners para editar e deletar agora usam onclick direto nos botões
     },
 
@@ -94,7 +103,18 @@ const EmployeesModule = {
             if (loadingDiv) loadingDiv.style.display = 'block';
             
             const response = await api.get('/employees');
-            this.employees = response.employees || [];
+            const employees = (response.employees || []).map(e => ({ ...e, is_worker: false }));
+            const workers = (response.workers || []).map(w => ({
+                ...w,
+                is_worker: true,
+                position: w.position || 'Worker',
+                department: w.department || 'Template',
+                email: w.email || '',
+                phone: w.phone || '',
+                role: 'worker',
+                is_active: w.is_active !== false,
+            }));
+            this.employees = [...employees, ...workers];
             this.updateStatsUI();
             
             // Esconder loading
@@ -203,35 +223,36 @@ const EmployeesModule = {
         tbody.innerHTML = employees.map(emp => {
             const isOwn = currentUser && emp.id === currentUser.id;
             const canSeeSensitive = isPrivileged || isOwn;
+            const baseUpload = emp.is_worker ? '/uploads/workers/' : '/uploads/employees/';
             const photoUrl = emp.photo_url 
                 ? `${prefix}${emp.photo_url}` 
-                : (emp.photo_filename ? `${prefix}/uploads/employees/${emp.photo_filename}` : `${prefix}/static/images/placeholder-user.jpg`);
+                : (emp.photo_filename ? `${prefix}${baseUpload}${emp.photo_filename}` : `${prefix}/static/images/placeholder-user.jpg`);
             if (isPrivileged) {
                 return `
-                <tr data-id="${emp.id}">
+                <tr data-id="${emp.id}" data-is-worker="${emp.is_worker ? 'true' : 'false'}">
                     <td>
                         <img src="${photoUrl}" 
                              alt="${emp.name}" class="employee-avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" onerror="this.src='${prefix}/static/images/placeholder-user.jpg'">
                     </td>
-                    <td>${emp.name}</td>
+                    <td>${emp.name} ${emp.is_worker ? '<span class="badge bg-secondary ms-1">Worker</span>' : ''}</td>
                     <td>${emp.position || '-'}</td>
                     <td>${emp.department || '-'}</td>
                     <td>${emp.phone || '-'}</td>
                     <td><span class="badge ${emp.is_active ? 'bg-success' : 'bg-danger'}">${emp.is_active ? 'Ativo' : 'Inativo'}</span></td>
                     <td>
-                        <button class="btn btn-sm btn-primary btn-edit-employee" data-id="${emp.id}" onclick="EmployeesModule.editEmployee(${emp.id})"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-danger btn-delete-employee" data-id="${emp.id}" onclick="EmployeesModule.deleteEmployee(${emp.id})"><i class="fas fa-trash"></i></button>
+                        <button class="btn btn-sm btn-primary btn-edit-employee" data-id="${emp.id}" onclick="EmployeesModule.editEmployee(${emp.id}, ${emp.is_worker ? 'true' : 'false'})"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-danger btn-delete-employee" data-id="${emp.id}" onclick="EmployeesModule.deleteEmployee(${emp.id}, ${emp.is_worker ? 'true' : 'false'})"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
             `;
             }
             return `
-                <tr data-id="${emp.id}">
+                <tr data-id="${emp.id}" data-is-worker="${emp.is_worker ? 'true' : 'false'}">
                     <td>
                         <img src="${photoUrl}" 
                              alt="${emp.name}" class="employee-avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" onerror="this.src='${prefix}/static/images/placeholder-user.jpg'">
                     </td>
-                    <td>${emp.name}</td>
+                    <td>${emp.name} ${emp.is_worker ? '<span class="badge bg-secondary ms-1">Worker</span>' : ''}</td>
                     <td>${emp.position || '-'}</td>
                     <td>${emp.department || '-'}</td>
                 </tr>
@@ -265,23 +286,24 @@ const EmployeesModule = {
         gridContainer.innerHTML = employees.map(emp => {
             const isOwn = currentUser && emp.id === currentUser.id;
             const canSeeSensitive = isPrivileged || isOwn;
+            const baseUpload = emp.is_worker ? '/uploads/workers/' : '/uploads/employees/';
             const photoUrl = emp.photo_url 
                 ? `${prefix}${emp.photo_url}` 
-                : (emp.photo_filename ? `${prefix}/uploads/employees/${emp.photo_filename}` : `${prefix}/static/images/placeholder-user.jpg`);
+                : (emp.photo_filename ? `${prefix}${baseUpload}${emp.photo_filename}` : `${prefix}/static/images/placeholder-user.jpg`);
             if (isPrivileged) {
                 return `
-                <div class="col-lg-3 col-md-4 col-sm-6">
+                <div class="col-lg-3 col-md-4 col-sm-6" data-id="${emp.id}" data-is-worker="${emp.is_worker ? 'true' : 'false'}">
                     <div class="card h-100 employee-card">
                         <div class="card-body text-center">
                             <img src="${photoUrl}" 
                                  alt="${emp.name}" class="rounded-circle mb-3" style="width: 100px; height: 100px; object-fit: cover;" onerror="this.src='${prefix}/static/images/placeholder-user.jpg'">
-                            <h5 class="card-title">${emp.name}</h5>
+                            <h5 class="card-title">${emp.name} ${emp.is_worker ? '<span class="badge bg-secondary ms-1">Worker</span>' : ''}</h5>
                             <p class="text-muted small">${emp.department || '-'}</p>
                             <p class="text-muted small">${emp.role || '-'}</p>
                             <p class="text-muted small"><i class="fas fa-phone"></i> ${emp.phone || '-'}</p>
                             <div class="mt-3 d-flex gap-2 justify-content-center">
-                                <button class="btn btn-sm btn-primary btn-edit-employee" data-id="${emp.id}" onclick="EmployeesModule.editEmployee(${emp.id})"><i class="fas fa-edit"></i></button>
-                                <button class="btn btn-sm btn-danger btn-delete-employee" data-id="${emp.id}" onclick="EmployeesModule.deleteEmployee(${emp.id})"><i class="fas fa-trash"></i></button>
+                                <button class="btn btn-sm btn-primary btn-edit-employee" data-id="${emp.id}" onclick="EmployeesModule.editEmployee(${emp.id}, ${emp.is_worker ? 'true' : 'false'})"><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-sm btn-danger btn-delete-employee" data-id="${emp.id}" onclick="EmployeesModule.deleteEmployee(${emp.id}, ${emp.is_worker ? 'true' : 'false'})"><i class="fas fa-trash"></i></button>
                             </div>
                         </div>
                     </div>
@@ -289,12 +311,12 @@ const EmployeesModule = {
             `;
             }
             return `
-                <div class="col-lg-3 col-md-4 col-sm-6">
+                <div class="col-lg-3 col-md-4 col-sm-6" data-id="${emp.id}" data-is-worker="${emp.is_worker ? 'true' : 'false'}">
                     <div class="card h-100 employee-card">
                         <div class="card-body text-center">
                             <img src="${photoUrl}" 
                                  alt="${emp.name}" class="rounded-circle mb-3" style="width: 100px; height: 100px; object-fit: cover;" onerror="this.src='${prefix}/static/images/placeholder-user.jpg'">
-                            <h5 class="card-title">${emp.name}</h5>
+                            <h5 class="card-title">${emp.name} ${emp.is_worker ? '<span class="badge bg-secondary ms-1">Worker</span>' : ''}</h5>
                             <p class="text-muted small">${emp.department || '-'}</p>
                             <p class="text-muted small">${emp.role || '-'}</p>
                         </div>
@@ -303,6 +325,8 @@ const EmployeesModule = {
             `;
         }).join('');
     },
+
+ 
 
     /**
      * Exibir formulário de adicionar
@@ -316,6 +340,8 @@ const EmployeesModule = {
         if (form) {
             form.reset();
             DOM.$('#employeeId').value = '';
+            const isWorkerFlag = DOM.$('#isWorkerFlag');
+            if (isWorkerFlag) isWorkerFlag.value = 'false';
             
             // Resetar foto para padrão
             DOM.$('#employeePhotoPreview').src = 'https://www.thecarv.com/mac/static/images/user_demo.jpg';
@@ -326,6 +352,10 @@ const EmployeesModule = {
         }
         
         if (title) title.textContent = 'Novo Colaborador';
+        // reset mode to employee by default
+        const typeEmployee = DOM.$('#typeEmployee');
+        if (typeEmployee) typeEmployee.checked = true;
+        this.setFormMode('employee');
         
         // Recarregar restaurantes antes de abrir modal
         this.loadRestaurants();
@@ -343,10 +373,17 @@ const EmployeesModule = {
     /**
      * Editar colaborador
      */
-    async editEmployee(id) {
+    async editEmployee(id, isWorker = false) {
         try {
-            const response = await api.get(`/employees/${id}`);
-            const employee = response.employee;
+            let employee;
+            if (isWorker) {
+                employee = this.employees.find(e => e.id === id && e.is_worker);
+                if (!employee) throw new Error('Worker não encontrado');
+            } else {
+                const response = await api.get(`/employees/${id}`);
+                employee = response.employee;
+                employee.is_worker = false;
+            }
             
             const modal = DOM.$('#employeeModal');
             const form = DOM.$('#employeeForm');
@@ -355,6 +392,9 @@ const EmployeesModule = {
             if (form && employee) {
                 // Preencher todos os campos que existem
                 DOM.$('#employeeId').value = employee.id || '';
+                const isWorkerFlag = DOM.$('#isWorkerFlag');
+                if (isWorkerFlag) isWorkerFlag.value = isWorker ? 'true' : 'false';
+
                 DOM.$('#employeeName').value = employee.name || '';
                 DOM.$('#employeeEmail').value = employee.email || '';
                 DOM.$('#employeePhone').value = employee.phone || '';
@@ -378,9 +418,10 @@ const EmployeesModule = {
                 // Mostrar foto se existir
                 if (employee.photo_url || employee.photo_filename) {
                     const prefix = window.APP_PREFIX || '';
+                    const baseUpload = employee.is_worker ? '/uploads/workers/' : '/uploads/employees/';
                     const photoUrl = employee.photo_url 
                         ? `${prefix}${employee.photo_url}` 
-                        : `${prefix}/uploads/employees/${employee.photo_filename}`;
+                        : `${prefix}${baseUpload}${employee.photo_filename}`;
                     DOM.$('#employeePhotoPreview').src = photoUrl;
                     DOM.$('#removePhotoBtn').style.display = 'inline-block';
                 } else {
@@ -389,19 +430,26 @@ const EmployeesModule = {
                     DOM.$('#removePhotoBtn').style.display = 'none';
                 }
 
-                // Preencher role se campo existir
-                const roleSelect = DOM.$('#employeeRole');
-                if (roleSelect) {
-                    roleSelect.value = employee.role || '';
-                }
-                // Atualizar preview de role com o valor atual
                 updateRolePreview(employee.role || undefined);
                 
                 // Mostrar botão de deletar
                 const deleteBtn = DOM.$('#deleteEmployeeBtn');
                 if (deleteBtn) deleteBtn.style.display = 'inline-block';
                 
-                if (title) title.textContent = `Editar Colaborador - ${employee.name}`;
+                // Ajustar modal conforme worker/employee
+                if (isWorker) {
+                    const typeWorker = DOM.$('#typeWorker');
+                    const typeEmployee = DOM.$('#typeEmployee');
+                    if (typeWorker) typeWorker.checked = true;
+                    if (typeEmployee) typeEmployee.checked = false;
+                    this.setFormMode('worker');
+                    if (title) title.textContent = `Editar Worker - ${employee.name}`;
+                } else {
+                    const typeEmployee = DOM.$('#typeEmployee');
+                    if (typeEmployee) typeEmployee.checked = true;
+                    this.setFormMode('employee');
+                    if (title) title.textContent = `Editar Colaborador - ${employee.name}`;
+                }
                 
                 // Mostrar modal via Bootstrap
                 if (modal) {
@@ -423,20 +471,24 @@ const EmployeesModule = {
     /**
      * Deletar colaborador
      */
-    async deleteEmployee(id) {
+    async deleteEmployee(id, isWorker = false) {
         if (!confirm('Tem certeza que deseja remover este colaborador?')) {
             return;
         }
 
         try {
-            await api.delete(`/employees/${id}`);
+            if (isWorker) {
+                await api.delete(`/employees/workers/${id}`);
+            } else {
+                await api.delete(`/employees/${id}`);
+            }
             if (window.App && window.App.notify) {
-                window.App.notify('Colaborador removido com sucesso', 'success');
+                window.App.notify(isWorker ? 'Worker removido com sucesso' : 'Colaborador removido com sucesso', 'success');
             }
             this.loadEmployees();
         } catch (error) {
             if (window.App && window.App.notify) {
-                window.App.notify('Erro ao remover colaborador', 'danger');
+                window.App.notify('Erro ao remover', 'danger');
             }
         }
     }
@@ -448,6 +500,7 @@ const EmployeesModule = {
 async function saveEmployee() {
     const form = DOM.$('#employeeForm');
     const employeeId = DOM.$('#employeeId')?.value;
+    const mode = document.querySelector('input[name="employeeType"]:checked')?.value || 'employee';
     
     if (!form.checkValidity()) {
         form.reportValidity();
@@ -459,12 +512,18 @@ async function saveEmployee() {
         // Normalizar datas
         if (formData.has('hire_date') && !formData.get('hire_date')) formData.delete('hire_date');
         if (formData.has('birth_date') && !formData.get('birth_date')) formData.delete('birth_date');
+        const isWorkerFlag = (DOM.$('#isWorkerFlag')?.value || 'false') === 'true';
         
-        // Converter is_active para booleano
-        if (formData.has('is_active')) {
-            formData.set('is_active', formData.get('is_active') === 'on' ? 'true' : 'false');
+        if (mode === 'employee') {
+            // Converter is_active para booleano
+            if (formData.has('is_active')) {
+                formData.set('is_active', formData.get('is_active') === 'on' ? 'true' : 'false');
+            } else {
+                formData.set('is_active', 'false');
+            }
         } else {
-            formData.set('is_active', 'false');
+            // Worker: remover campos que não existem no modelo
+            ['email','phone','position','department','address','notes','is_active','role','password','confirm_password'].forEach(k => formData.delete(k));
         }
         
         // Remover campos vazios (exceto arquivo de foto e is_active)
@@ -481,17 +540,26 @@ async function saveEmployee() {
         keysToDelete.forEach(key => formData.delete(key));
         
         let response;
-        if (employeeId && employeeId !== '') {
-            // Atualizar
-            response = await api.put(`/employees/${employeeId}`, formData);
-            if (window.App && window.App.notify) {
-                window.App.notify('Colaborador atualizado com sucesso', 'success');
+        if (mode === 'employee') {
+            if (isWorkerFlag && employeeId) {
+                // converter worker para employee
+                response = await api.post(`/employees/workers/${employeeId}/convert`, formData);
+                if (window.App && window.App.notify) window.App.notify('Worker convertido para employee com OTP enviada', 'success');
+            } else if (employeeId && employeeId !== '') {
+                response = await api.put(`/employees/${employeeId}`, formData);
+                if (window.App && window.App.notify) window.App.notify('Colaborador atualizado com sucesso', 'success');
+            } else {
+                response = await api.post('/employees', formData);
+                if (window.App && window.App.notify) window.App.notify('Colaborador criado com sucesso', 'success');
             }
         } else {
-            // Criar novo
-            response = await api.post('/employees', formData);
-            if (window.App && window.App.notify) {
-                window.App.notify('Colaborador criado com sucesso', 'success');
+            // worker create or update
+            if (employeeId) {
+                response = await api.put(`/employees/workers/${employeeId}`, formData);
+                if (window.App && window.App.notify) window.App.notify('Worker atualizado com sucesso', 'success');
+            } else {
+                response = await api.post('/employees/workers', formData);
+                if (window.App && window.App.notify) window.App.notify('Worker criado com sucesso', 'success');
             }
         }
 
@@ -530,6 +598,31 @@ function deleteEmployee() {
 
     EmployeesModule.deleteEmployee(employeeId);
 }
+
+// Alternar campos employee/worker
+EmployeesModule.setFormMode = function(mode) {
+    this.currentFormMode = mode;
+    const employeeFields = document.querySelectorAll('[data-mode="employee"]');
+    employeeFields.forEach(el => {
+        el.style.display = mode === 'employee' ? '' : 'none';
+        const inputs = el.querySelectorAll('input, select, textarea');
+        inputs.forEach(inp => {
+            if (mode === 'employee') {
+                if (inp.dataset.originalRequired === 'true') inp.required = true;
+            } else {
+                // guardar required original
+                if (inp.required && !inp.dataset.originalRequired) inp.dataset.originalRequired = 'true';
+                inp.required = false;
+            }
+        });
+    });
+
+    // Ajustar título
+    const title = DOM.$('#employeeModalTitle');
+    if (title) {
+        title.textContent = mode === 'worker' ? 'Novo Worker (template)' : 'Novo Colaborador';
+    }
+};
 
 /**
  * Alterna entre view de lista e grid
@@ -699,3 +792,5 @@ function updateRolePreview(roleFromEmployee) {
     }
     previewEl.textContent = role ? role : '-';
 }
+
+// Removido: binding global de exportEmployees; use link para /api/employees/export
