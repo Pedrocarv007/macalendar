@@ -22,6 +22,7 @@ from app.models.workers import Worker
 from app.models.restaurant import Restaurant
 from app.models.activity_log import ActivityLog
 from app.utils.email import send_email_async
+from app.utils.notifications import notify_employee_change
 
 employees_bp = Blueprint('employees', __name__)
 
@@ -385,6 +386,12 @@ def create_employee():
             )
         except Exception as e:
             current_app.logger.exception(f'Falha ao enviar email de boas-vindas: {e}')
+
+        # Notificar criação
+        try:
+            notify_employee_change('criado', employee, current_user)
+        except Exception:
+            pass
         
         return jsonify({
             'message': 'Colaborador criado com sucesso',
@@ -545,6 +552,13 @@ def update_employee(employee_id):
         
         employee.updated_at = datetime.utcnow()
         db.session.commit()
+
+        # Notificar atualização
+        try:
+            actor = Employee.query.get(g.get('current_user_id'))
+            notify_employee_change('atualizado', employee, actor)
+        except Exception:
+            pass
         
         return jsonify({
             'message': 'Colaborador atualizado com sucesso',
@@ -647,6 +661,13 @@ def delete_employee(employee_id):
         employee.is_active = False
         employee.updated_at = datetime.utcnow()
         db.session.commit()
+
+        # Notificar desativação
+        try:
+            actor = Employee.query.get(g.get('current_user_id'))
+            notify_employee_change('desativado', employee, actor)
+        except Exception:
+            pass
         
         return jsonify({'message': 'Colaborador removido com sucesso'}), 200
         

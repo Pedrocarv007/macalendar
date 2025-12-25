@@ -14,6 +14,7 @@ from flask_jwt_extended import (
 
 from app.extensions.database import db
 from app.middleware.security import validate_email, validate_password_strength, role_required
+from app.utils.notifications import notify_login
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
 
@@ -80,6 +81,12 @@ def login():
             identity=str(employee.id),
             additional_claims=additional_claims
         )
+
+        # Notificação de login (opcional, respeita user settings)
+        try:
+            notify_login(employee)
+        except Exception:
+            pass
         
         return jsonify({
             'access_token': access_token,

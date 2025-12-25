@@ -7,6 +7,8 @@ from app.models.calendar_event import CalendarEvent
 from app.models.document import Document
 from app.models.activity_log import ActivityLog
 from app.models.workers import Worker
+from app.models.notification import Notification
+from app.models.settings import UserSettings
 
 __all__ = [
     'Restaurant', 
@@ -14,5 +16,7 @@ __all__ = [
     'CalendarEvent',
     'Document',
     'ActivityLog',
-    'Worker'
+    'Worker',
+    'Notification',
+    'UserSettings'
 ]

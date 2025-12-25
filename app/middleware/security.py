@@ -2,6 +2,7 @@
 Middleware de segurança e validações
 """
 from flask import request, jsonify, g, session, redirect, url_for, flash
+from datetime import datetime
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_jwt
 from functools import wraps
 import re
@@ -17,6 +18,44 @@ def init_security(app):
         if app.config.get('LOG_REQUESTS'):
             app.logger.info(f"{request.method} {request.path} - IP: {request.remote_addr}")
         
+        # Implementar timeout de sessão por inatividade, respeitando configurações do usuário
+        try:
+            if 'user_id' in session:
+                # Ignorar em rotas de autenticação e estáticos
+                path = request.path or ''
+                skip_paths = {'/auth/login', '/auth/logout'}
+                if not (path.startswith('/static/') or path in skip_paths):
+                    # Obter configurações do usuário
+                    try:
+                        from app.models.settings import UserSettings
+                        settings = UserSettings.query.filter_by(user_id=session.get('user_id')).first()
+                    except Exception:
+                        settings = None
+
+                    auto_enabled = bool(getattr(settings, 'auto_logout_enabled', False))
+                    timeout_minutes = int(getattr(settings, 'session_timeout_minutes', 0) or 0)
+
+                    # Atualizar / verificar carimbo de última atividade
+                    now = datetime.utcnow()
+                    last_ts = session.get('last_activity')
+                    last_dt = datetime.utcfromtimestamp(last_ts) if isinstance(last_ts, (int, float)) else None
+
+                    if auto_enabled and timeout_minutes > 0 and last_dt:
+                        idle_seconds = (now - last_dt).total_seconds()
+                        if idle_seconds > timeout_minutes * 60:
+                            # Sessão expirada por inatividade: limpar e responder adequadamente
+                            session.clear()
+                            if path.startswith('/api/'):
+                                return jsonify({'error': 'Sessão expirada'}), 401
+                            flash('Sessão expirada por inatividade. Faça login novamente.', 'warning')
+                            return redirect(url_for('auth_web.login'))
+
+                    # Atualizar marcação de atividade
+                    session['last_activity'] = int(now.timestamp())
+        except Exception:
+            # Em caso de erro, não bloquear a request
+            pass
+
         # Verificar se é uma rota da API que precisa de autenticação
         if request.path.startswith('/api/') and request.endpoint != 'auth.login':
             # Pular verificação para rotas públicas

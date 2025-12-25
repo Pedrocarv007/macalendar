@@ -5,13 +5,15 @@ from datetime import datetime
 import traceback
 from flask import Blueprint, render_template, request, flash, redirect, url_for, session, jsonify
 from flask_jwt_extended import create_access_token
-from app.extensions.database import db
+from app.extensions.database import db, csrf
 from app.middleware.security import validate_email
+from app.utils.notifications import notify_login
 from app.models.employee import Employee
 
 auth_web_bp = Blueprint('auth_web', __name__)
 
 @auth_web_bp.route('/login', methods=['GET', 'POST'])
+@csrf.exempt
 def login():
     """Página de login web"""
     # Se já está logado, redireciona para dashboard
@@ -90,6 +92,12 @@ def login():
                 session.pop('must_change_pw', None)
             
             flash(f'Bem-vindo(a), {employee.name}!', 'success')
+
+            # Notificar login
+            try:
+                notify_login(employee)
+            except Exception:
+                pass
             
             # Redirecionar para a página solicitada ou dashboard
             next_page = request.args.get('next')

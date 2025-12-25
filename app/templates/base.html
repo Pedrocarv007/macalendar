@@ -90,24 +90,32 @@
                 
                 <!-- User Menu (Right Side) -->
                 <ul class="navbar-nav ms-auto">
+                    {% if notifications_enabled %}
                     <!-- Notificações -->
                     <li  class="nav-item dropdown">
                         <a class="nav-link position-relative" href="#" id="notificationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="margin-right: 20px;">
                             <i class="fas fa-bell"></i>
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
-                                0
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notificationsBadge" style="font-size: 0.6rem; display: {{ 'inline-block' if notifications_unread_count > 0 else 'none' }};">
+                                {{ notifications_unread_count if notifications_unread_count <= 99 else '99+' }}
                             </span>
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown" style="min-width: 300px;">
-                            <li class="dropdown-header">Notificações</li>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown" style="min-width: 320px; max-height: 420px; overflow-y: auto;" id="notificationsMenu">
+                            <li class="dropdown-header d-flex justify-content-between align-items-center">
+                                <span>Notificações</span>
+                                <small class="text-muted" id="notificationsHint">Recente</small>
+                            </li>
                             <li><hr class="dropdown-divider"></li>
-                            <li>
+                            <li id="notificationsEmpty">
                                 <a class="dropdown-item text-muted text-center py-3" href="#">
                                     <i class="fas fa-inbox me-2"></i>Nenhuma notificação
                                 </a>
                             </li>
+                            <li class="p-0">
+                                <ul class="list-unstyled mb-0" id="notificationsList"></ul>
+                            </li>
                         </ul>
                     </li>
+                    {% endif %}
                     
                     <!-- User Profile Dropdown -->
                     <li class="nav-item dropdown">
@@ -228,6 +236,14 @@
     
     {% if 'profile' in request.path %}
     <script src="{{ url_for('static', filename='js/modules/profile.js') }}"></script>
+    {% endif %}
+
+    {% if notifications_enabled %}
+    <script src="{{ url_for('static', filename='js/modules/notifications.js') }}"></script>
+    <script>
+        window.NOTIFICATIONS_UNREAD = {{ notifications_unread_count or 0 }};
+        window.NOTIFICATIONS_ENABLED = true;
+    </script>
     {% endif %}
     
     <!-- 6. Main App Initialization -->

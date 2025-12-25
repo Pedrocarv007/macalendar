@@ -7,7 +7,7 @@ from datetime import datetime
 
 from flask import Flask, session, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_wtf.csrf import generate_csrf
 from flask_cors import CORS
 
 from app.api.auth import auth_bp
@@ -15,6 +15,7 @@ from app.api.calendar import calendar_bp
 from app.api.dashboard import dashboard_bp
 from app.api.documents import documents_bp
 from app.api.employees import employees_bp
+from app.api.notifications import notifications_bp
 from app.api.profile import profile_bp
 from app.api.restaurants import restaurants_bp
 from app.api.ai import ai_bp
@@ -68,8 +69,8 @@ def create_app(config_name=None):
     
     # Inicializar extensões
     init_db(app)
-    # CSRF Protection
-    csrf = CSRFProtect()
+    # CSRF Protection (initialized via extensions)
+    from app.extensions.database import csrf
     csrf.init_app(app)
     
     # Configurar CORS (permitir qualquer origem via proxy)
@@ -108,6 +109,23 @@ def create_app(config_name=None):
     def inject_app_name():
         return {"nome": "Mc Calendar"}
 
+    @app.context_processor
+    def inject_notifications():
+        from app.models.settings import UserSettings
+        from app.models.notification import Notification
+        user_id = session.get('user_id')
+        user_role = session.get('user_role')
+        restaurant_id = session.get('restaurant_id')
+        settings = UserSettings.query.filter_by(user_id=user_id).first() if user_id else None
+        enabled = settings.notifications_enabled if settings else True
+        unread_count = 0
+        if user_id and enabled:
+            unread_count = Notification.unread_count_for(user_id, user_role, restaurant_id)
+        return {
+            'notifications_enabled': enabled if user_id else False,
+            'notifications_unread_count': unread_count
+        }
+
 
     # Registrar middlewares
     init_security(app)
@@ -120,6 +138,7 @@ def create_app(config_name=None):
     app.register_blueprint(employees_bp, url_prefix='/api/employees')
     app.register_blueprint(restaurants_bp, url_prefix='/api/restaurants')
     app.register_blueprint(documents_bp, url_prefix='/api/documents')
+    app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
     app.register_blueprint(profile_bp, url_prefix='/api/profile')
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
     app.register_blueprint(ai_bp, url_prefix='/api/ai')

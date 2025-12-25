@@ -15,6 +15,8 @@ from app.middleware.security import (
     validate_password_strength,
 )
 from app.models.employee import Employee
+from app.models.settings import UserSettings
+from app.extensions.database import csrf
 
 profile_bp = Blueprint('profile', __name__)
 
@@ -226,3 +228,72 @@ def change_password():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Erro ao alterar senha'}), 500
+
+@profile_bp.route('/settings', methods=['GET'])
+@api_login_required
+def get_user_settings():
+    """Obter configurações do usuário atual."""
+    try:
+        user_id = g.get('current_user_id')
+        settings = UserSettings.query.filter_by(user_id=user_id).first()
+        if not settings:
+            # Não criar ainda; apenas retornar defaults
+            defaults = UserSettings(user_id=user_id)  # usa defaults do modelo
+            return jsonify({'settings': defaults.to_dict()}), 200
+        return jsonify({'settings': settings.to_dict()}), 200
+    except Exception:
+        return jsonify({'error': 'Erro ao obter configurações'}), 500
+
+@profile_bp.route('/settings', methods=['PUT'])
+@api_login_required
+@csrf.exempt
+def update_user_settings():
+    """Criar/atualizar configurações do usuário atual."""
+    try:
+        user_id = g.get('current_user_id')
+        data = request.get_json() or {}
+
+        settings = UserSettings.query.filter_by(user_id=user_id).first()
+        created = False
+        if not settings:
+            settings = UserSettings(user_id=user_id)
+            created = True
+
+        # Mapear campos recebidos
+        if 'timezone' in data:
+            settings.timezone = str(data['timezone']) or settings.timezone
+        if 'notifications_enabled' in data:
+            raw = data['notifications_enabled']
+            settings.notifications_enabled = (str(raw).lower() in ['true','1','yes','on']) if isinstance(raw, str) else bool(raw)
+        if 'email_notifications' in data:
+            raw = data['email_notifications']
+            settings.email_notifications = (str(raw).lower() in ['true','1','yes','on']) if isinstance(raw, str) else bool(raw)
+        if 'two_factor_enabled' in data:
+            raw = data['two_factor_enabled']
+            settings.two_factor_enabled = (str(raw).lower() in ['true','1','yes','on']) if isinstance(raw, str) else bool(raw)
+        if 'auto_logout_enabled' in data:
+            raw = data['auto_logout_enabled']
+            settings.auto_logout_enabled = (str(raw).lower() in ['true','1','yes','on']) if isinstance(raw, str) else bool(raw)
+        if 'session_timeout_minutes' in data:
+            try:
+                settings.session_timeout_minutes = int(data['session_timeout_minutes'])
+            except Exception:
+                pass
+        if 'items_per_page' in data:
+            try:
+                settings.items_per_page = int(data['items_per_page'])
+            except Exception:
+                pass
+        if 'dark_mode' in data:
+            raw = data['dark_mode']
+            settings.dark_mode = (str(raw).lower() in ['true','1','yes','on']) if isinstance(raw, str) else bool(raw)
+
+        settings.updated_at = datetime.utcnow()
+        if created:
+            db.session.add(settings)
+        db.session.commit()
+
+        return jsonify({'message': 'Configurações salvas', 'settings': settings.to_dict()}), 200
+    except Exception:
+        db.session.rollback()
+        return jsonify({'error': 'Erro ao salvar configurações'}), 500

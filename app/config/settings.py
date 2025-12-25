@@ -16,7 +16,8 @@ class Config:
     # Configurações básicas do Flask
     SECRET_KEY = os.getenv('SECRET_KEY') 
     DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-    APPLICATION_ROOT = os.getenv('APPLICATION_ROOT')
+    APPLICATION_ROOT = os.getenv('APPLICATION_ROOT', '/mac')
+    APP_BASE_URL = os.getenv('APP_BASE_URL', 'https://www.thecarv.com/mac')
     
     # Configurações do banco de dados
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL') 

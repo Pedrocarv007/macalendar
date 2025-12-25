@@ -148,17 +148,20 @@ def send_email(
 
 	# Always send using the authenticated address to avoid 530 errors.
 	sender_cfg = resolved['default_sender']
+	sender_cfg_clean = str(sender_cfg).strip().strip('\"\'') if sender_cfg else None
 	display_name = None
-	if sender_cfg:
-		m = re.match(r"\s*([^<]+?)\s*<([^>]+)>\s*", str(sender_cfg))
+	if sender_cfg_clean:
+		m = re.match(r"\s*([^<]+?)\s*<([^>]+)>\s*", sender_cfg_clean)
 		if m:
-			display_name = m.group(1).strip()
+			display_name = m.group(1).strip().strip('\"\'')
 		else:
-			if '@' not in str(sender_cfg):
-				display_name = str(sender_cfg).strip()
+			if '@' not in sender_cfg_clean:
+				display_name = sender_cfg_clean.strip('\"\'')
 
 	sender_address = username
-	sender = f"{display_name} <{sender_address}>" if display_name else sender_address
+	sender_display = display_name.strip('\"\'') if display_name else None
+	sender = f"{sender_display} <{sender_address}>" if sender_display else sender_address
+	envelope_from = sender_address
 
 	if not server:
 		raise RuntimeError('MAIL_SERVER não configurado')
@@ -187,13 +190,13 @@ def send_email(
 			smtp.ehlo()
 			if username and password:
 				smtp.login(username, password)
-			smtp.send_message(msg, from_addr=sender, to_addrs=all_recipients)
+			smtp.send_message(msg, from_addr=envelope_from, to_addrs=all_recipients)
 	else:
 		with smtplib.SMTP(server, port) as smtp:
 			smtp.ehlo()
 			if username and password:
 				smtp.login(username, password)
-			smtp.send_message(msg, from_addr=sender, to_addrs=all_recipients)
+			smtp.send_message(msg, from_addr=envelope_from, to_addrs=all_recipients)
 
 
 def send_email_async(**kwargs) -> Thread:

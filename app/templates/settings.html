@@ -167,6 +167,14 @@
                         <div class="row g-3">
                             <div class="col-12">
                                 <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="notificationsEnabled" checked>
+                                    <label class="form-check-label" for="notificationsEnabled">
+                                        Mostrar notificações na barra superior
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="emailNotifications" checked>
                                     <label class="form-check-label" for="emailNotifications">
                                         Notificações por email
@@ -381,38 +389,51 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function loadSettings() {
     // Load settings from localStorage or API
-    const savedSettings = localStorage.getItem('mac_settings');
-    if (savedSettings) {
-        try {
-            const settings = JSON.parse(savedSettings);
-            Object.entries(settings).forEach(([key, value]) => {
-                const element = document.getElementById(key);
-                if (element) {
-                    if (element.type === 'checkbox') {
-                        element.checked = value;
-                    } else {
-                        element.value = value;
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('Error loading settings:', error);
-        }
-    }
+    // Load from API
+    api.get('/profile/settings').then((data) => {
+        const s = (data && data.settings) ? data.settings : {};
+        // Map API fields to UI ids
+        const map = [
+            ['timezone', 'timezone'],
+            ['notifications_enabled', 'notificationsEnabled'],
+            ['email_notifications', 'emailNotifications'],
+            ['two_factor_enabled', 'twoFactor'],
+            ['auto_logout_enabled', 'sessionTimeout'],
+            ['session_timeout_minutes', 'sessionDuration'],
+            ['dark_mode', 'theme'],
+        ];
+        map.forEach(([apiKey, elId]) => {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            const val = s[apiKey];
+            if (typeof val === 'undefined' || val === null) return;
+            if (el.type === 'checkbox') {
+                el.checked = !!val;
+            } else if (elId === 'theme') {
+                el.value = val ? 'dark' : 'light';
+            } else if (elId === 'sessionDuration') {
+                el.value = parseInt(val, 10);
+            } else {
+                el.value = val;
+            }
+        });
+    }).catch(() => {})
 }
 
 function saveAllSettings() {
-    const settings = {};
-    const inputs = document.querySelectorAll('input, select');
-    
-    inputs.forEach(input => {
-        if (input.id) {
-            settings[input.id] = input.type === 'checkbox' ? input.checked : input.value;
-        }
-    });
-    
-    localStorage.setItem('mac_settings', JSON.stringify(settings));
-    Utils.showToast('Configurações salvas com sucesso!', 'success');
+    // Collect relevant fields for API
+    const payload = {
+        timezone: document.getElementById('timezone')?.value,
+        notifications_enabled: document.getElementById('notificationsEnabled')?.checked,
+        email_notifications: document.getElementById('emailNotifications')?.checked,
+        two_factor_enabled: document.getElementById('twoFactor')?.checked,
+        auto_logout_enabled: document.getElementById('sessionTimeout')?.checked,
+        session_timeout_minutes: parseInt(document.getElementById('sessionDuration')?.value || '30', 10),
+        dark_mode: (document.getElementById('theme')?.value === 'dark'),
+    };
+    api.put('/profile/settings', payload)
+        .then(() => Utils.showToast('Configurações salvas com sucesso!', 'success'))
+        .catch(err => Utils.showToast('Falha ao salvar configurações', 'error'))
 }
 
 function exportSettings() {
