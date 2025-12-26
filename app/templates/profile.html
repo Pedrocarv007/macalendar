@@ -337,9 +337,20 @@ async function uploadProfilePhoto(file) {
         const formData = new FormData();
         formData.append('file', file);
         
+        // Obter CSRF token
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : null;
+        
+        const headers = {};
+        if (csrfToken) {
+            headers['X-CSRFToken'] = csrfToken;
+        }
+        
         const response = await fetch(`${window.API_BASE_URL}/profile/me/photo`, {
             method: 'POST',
-            body: formData
+            headers: headers,
+            body: formData,
+            credentials: 'include'
         });
         
         const result = await response.json();
@@ -353,6 +364,9 @@ async function uploadProfilePhoto(file) {
         currentUser.photo_filename = result.photo_filename;
         document.getElementById('removePhotoBtn').style.display = 'inline-block';
         
+        // Atualizar navbar também
+        loadProfile();
+        
     } catch (error) {
         console.error('Erro ao upload:', error);
         Utils.showAlert('Erro ao fazer upload da foto', 'error');
@@ -363,8 +377,19 @@ async function removeProfilePhoto() {
     if (!confirm('Tem certeza que deseja remover sua foto?')) return;
     
     try {
+        // Obter CSRF token
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : null;
+        
+        const headers = {};
+        if (csrfToken) {
+            headers['X-CSRFToken'] = csrfToken;
+        }
+        
         const response = await fetch(`${window.API_BASE_URL}/profile/me/photo`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: headers,
+            credentials: 'include'
         });
         
         const result = await response.json();
@@ -374,10 +399,14 @@ async function removeProfilePhoto() {
             return;
         }
         
-        document.getElementById('userAvatar').src = '/static/images/placeholder-user.jpg';
+        const prefix = window.APP_PREFIX || '';
+        document.getElementById('userAvatar').src = `${prefix}/static/images/placeholder-user.jpg`;
         document.getElementById('removePhotoBtn').style.display = 'none';
         currentUser.photo_filename = null;
         Utils.showToast('Foto removida com sucesso!', 'success');
+        
+        // Atualizar navbar também
+        loadProfile();
         
     } catch (error) {
         console.error('Erro ao remover foto:', error);

@@ -122,14 +122,21 @@
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <div class="d-flex align-items-center">
                                 <div class="user-avatar me-2">
-                                    <i class="fas fa-user-circle fa-lg"></i>
+                                    {% if current_user and current_user.photo_filename %}
+                                    <img src="{{ url_for('static', filename='uploads/employees/' + current_user.photo_filename) }}" 
+                                         alt="{{ current_user.name }}" 
+                                         class="rounded-circle" 
+                                         style="width: 40px; height: 40px; object-fit: cover;">
+                                    {% else %}
+                                    <i class="fas fa-user-circle fa-2x text-muted"></i>
+                                    {% endif %}
                                 </div>
                                 <div class="d-none d-lg-block" id="userNavInfo">
                                     <div class="user-name" style="font-weight: 600; font-size: 0.9rem;">
-                                        <span id="userNavName">-</span>
+                                        <span id="userNavName">{{ current_user.name if current_user else '-' }}</span>
                                     </div>
                                     <div class="user-role" style="font-size: 0.75rem; color: var(--mac-secondary-label);">
-                                        <span id="userNavRole">-</span>
+                                        <span id="userNavRole">{{ current_user.role|capitalize if current_user else '-' }}</span>
                                     </div>
                                 </div>
                             </div>

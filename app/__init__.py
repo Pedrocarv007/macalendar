@@ -79,13 +79,18 @@ def create_app(config_name=None):
     @app.context_processor
     def inject_current_user():
         if 'user_id' in session:
+            from app.models.employee import Employee
+            user_id = session.get('user_id')
+            employee = Employee.query.get(user_id) if user_id else None
+            
             return {
                 'current_user': {
                     'id': session.get('user_id'),
                     'name': session.get('user_name'),
                     'email': session.get('user_email'),
                     'role': session.get('user_role'),
-                    'restaurant_id': session.get('restaurant_id')
+                    'restaurant_id': session.get('restaurant_id'),
+                    'photo_filename': employee.photo_filename if employee else None
                 }
             }
         return {'current_user': None}
