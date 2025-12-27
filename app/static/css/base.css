@@ -330,6 +330,10 @@ body {
     color: var(--mac-red);
 }
 
+#alert-container{
+    z-index: 999999;
+}
+
 /* ========== Navigation ========== */
 .nav-pills .nav-link {
     border-radius: var(--radius-md);

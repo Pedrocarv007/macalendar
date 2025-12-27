@@ -4,6 +4,29 @@
 
 {% block content %}
 <div class="container-fluid">
+    <style>
+        /* Harmonize selects to look like inputs */
+        .form-select.input-like {
+            background-image: none !important; /* remove caret bg to look like input */
+            padding-right: .75rem !important;
+            border-color: var(--bs-border-color, #ced4da);
+        }
+        .input-group .form-select.input-like { height: 100%; }
+
+        /* Make disabled selectedDate look like a normal input */
+        #selectedDate[disabled] {
+            opacity: 1;
+            background-color: var(--bs-body-bg);
+            color: inherit;
+        }
+
+        /* Time inputs: align numbers and balance width */
+        .time-only {
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .input-group-text i { width: 1.1rem; text-align: center; }
+    </style>
     <!-- Header Section -->
     <div class="row mb-4">
         <div class="col-12">
@@ -164,9 +187,12 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Restaurante</label>
-                        <select class="form-select" id="mysteryRestaurant" required>
-                            <option value="">Carregando...</option>
-                        </select>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-store"></i></span>
+                            <select class="form-select input-like" id="mysteryRestaurant" required>
+                                <option value="">Carregando...</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">URL da Imagem</label>
@@ -207,18 +233,43 @@
                     <input type="hidden" id="eventId" name="eventId">
                     
                     <div class="mb-3">
+                        <label for="category" class="form-label">Tipo de Evento *</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-tags"></i></span>
+                            <select class="form-select input-like" id="category" name="category" required>
+                                <option value="meeting">Reunião</option>
+                                <option value="training">Treinamento</option>
+                                <option value="event">Evento</option>
+                                <option value="urgent">Urgente</option>
+                                <option value="desafio_misterio">Desafio Mistério</option>
+                                <option value="birthday_party">Festa de aniversário</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Campos específicos de Festa de Aniversário -->
+                    <div class="mb-3" id="birthdayFields" style="display: none;">
+                        <label for="peopleCount" class="form-label">Número de Pessoas</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-users"></i></span>
+                            <input type="number" class="form-control" id="peopleCount" name="peopleCount" min="1" step="1" placeholder="Ex.: 20">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
                         <label for="title" class="form-label">Título *</label>
                         <input type="text" class="form-control" id="title" name="title" required>
                     </div>
                     
                     <div class="mb-3">
                         <label for="description" class="form-label">Descrição</label>
-                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="Descrição do evento."></textarea>
                     </div>
 
                     <div class="mb-3">
                         <label for="location" class="form-label">Link/Imagem</label>
                         <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-link"></i></span>
                             <input type="url" class="form-control" id="location" name="location" placeholder="https://...">
                             <a class="btn btn-outline-secondary" id="locationPreview" href="#" target="_blank" rel="noopener" style="display: none;">Abrir</a>
                         </div>
@@ -227,26 +278,32 @@
                     
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <label for="startDate" class="form-label">Data de Início *</label>
-                            <input type="datetime-local" class="form-control" id="startDate" name="startDate" required>
+                            <label for="selectedDate" class="form-label">Dia selecionado</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                <input type="date" class="form-control" id="selectedDate" disabled>
+                            </div>
                         </div>
-                        
-                        <div class="col-md-6">
-                            <label for="endDate" class="form-label">Data de Fim</label>
-                            <input type="datetime-local" class="form-control" id="endDate" name="endDate">
+                        <div class="col-md-3">
+                            <label for="startTime" class="form-label">Hora de Início *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-clock"></i></span>
+                                <input type="time" class="form-control time-only" id="startTime" step="3600" required>
+                            </div>
                         </div>
+                        <div class="col-md-3">
+                            <label for="endTime" class="form-label">Hora de Fim</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-clock"></i></span>
+                                <input type="time" class="form-control time-only" id="endTime" step="3600">
+                            </div>
+                        </div>
+                        <!-- Campos originais mantidos como ocultos para compatibilidade -->
+                        <input type="hidden" id="startDate" name="startDate">
+                        <input type="hidden" id="endDate" name="endDate">
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="category" class="form-label">Categoria</label>
-                        <select class="form-select" id="category" name="category">
-                            <option value="meeting">Reunião</option>
-                            <option value="training">Treinamento</option>
-                            <option value="event">Evento</option>
-                            <option value="urgent">Urgente</option>
-                            <option value="desafio_misterio">Desafio Mistério</option>
-                        </select>
-                    </div>
+                    
                     
                     <div class="mb-3">
                         <div class="form-check">
@@ -337,6 +394,9 @@ let events = [];
 let viewType = 'month';
 let userRestaurantId = null;
 let selectedEvent = null;
+let selectedDateOnly = null; // guarda apenas a data (YYYY-MM-DD)
+let openFromCalendar = false; // modal aberto ao clicar no dia do calendário
+let openFromEdit = false;     // modal aberto ao editar um evento
 
 document.addEventListener('DOMContentLoaded', function() {
     initCalendar();
@@ -361,11 +421,40 @@ document.addEventListener('DOMContentLoaded', function() {
         locationInput.addEventListener('input', (e) => updateLocationPreview(e.target.value));
     }
     
-    // Reset modal quando abrir para novo evento
+    // Mostrar/ocultar campos específicos por tipo de evento
+    const categoryEl = document.getElementById('category');
+    if (categoryEl) {
+        categoryEl.addEventListener('change', toggleBirthdayFields);
+        // Inicializa estado ao carregar
+        toggleBirthdayFields();
+    }
+    
+    // Listeners para campos de hora: forçam minutos :00 e atualizam hidden
+    const startTimeEl = document.getElementById('startTime');
+    const endTimeEl = document.getElementById('endTime');
+    if (startTimeEl) {
+        startTimeEl.addEventListener('change', () => { startTimeEl.value = normalizeHourOnly(startTimeEl.value); updateHiddenDateTimes(); });
+        startTimeEl.addEventListener('blur', () => { startTimeEl.value = normalizeHourOnly(startTimeEl.value); updateHiddenDateTimes(); });
+    }
+    if (endTimeEl) {
+        endTimeEl.addEventListener('change', () => { endTimeEl.value = normalizeHourOnly(endTimeEl.value); updateHiddenDateTimes(); });
+        endTimeEl.addEventListener('blur', () => { endTimeEl.value = normalizeHourOnly(endTimeEl.value); updateHiddenDateTimes(); });
+    }
+    
+    // Reset modal quando abrir pelo botão "Novo Evento" (não ao editar/selecionar dia)
     const eventModal = document.getElementById('eventModal');
     eventModal.addEventListener('show.bs.modal', function(event) {
-        // Se não foi acionado pelo botão de editar, resetar o formulário
-        if (!event.relatedTarget || event.relatedTarget.getAttribute('data-bs-toggle') === 'modal') {
+        // Se vier do calendário ou da edição, NÃO resetar
+        if (openFromCalendar || openFromEdit) {
+            // garantir sync dos hidden datetime
+            updateHiddenDateTimes();
+            // garantir campos condicionais
+            if (typeof toggleBirthdayFields === 'function') toggleBirthdayFields();
+            return;
+        }
+
+        // Abertura via botão "Novo Evento": resetar formulário e usar data de hoje
+        if (event.relatedTarget && event.relatedTarget.getAttribute('data-bs-target') === '#eventModal') {
             document.getElementById('eventForm').reset();
             document.getElementById('eventId').value = '';
             document.getElementById('deleteEventBtn').style.display = 'none';
@@ -373,7 +462,22 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('location').value = '';
             updateLocationPreview('');
             document.getElementById('markPostedBtn').style.display = 'none';
+
+            // Inicializa data/hora padrão (hoje 09:00 - 10:00)
+            const today = new Date();
+            setSelectedDateForModal(today);
+            setTimeFields('09:00', '10:00');
+            updateHiddenDateTimes();
+
+            // Garantir estado correto dos campos condicionais
+            if (typeof toggleBirthdayFields === 'function') toggleBirthdayFields();
         }
+    });
+
+    // Ao fechar o modal, limpar flags de contexto
+    eventModal.addEventListener('hidden.bs.modal', function() {
+        openFromCalendar = false;
+        openFromEdit = false;
     });
 
     // Carregar restaurantes quando o modal de desafio mistério abrir
@@ -532,11 +636,15 @@ function selectDate(date) {
     const endDate = new Date(date);
     endDate.setHours(10, 0); // 10:00 AM
     
-    document.getElementById('startDate').value = formatDateTimeLocal(startDate);
-    document.getElementById('endDate').value = formatDateTimeLocal(endDate);
+    // Define campos do modal: data bloqueada e horas
+    setSelectedDateForModal(date);
+    setTimeFields('09:00', '10:00');
+    // Atualiza hidden combinando data+hora
+    updateHiddenDateTimes();
     
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+    openFromCalendar = true;
     modal.show();
 }
 
@@ -545,9 +653,30 @@ function editEvent(event) {
     document.getElementById('eventId').value = event.id;
     document.getElementById('title').value = event.title;
     document.getElementById('description').value = event.description || '';
-    document.getElementById('startDate').value = formatDateTimeLocal(new Date(event.start));
-    document.getElementById('endDate').value = formatDateTimeLocal(new Date(event.end));
+    const start = new Date(event.start);
+    const end = event.end ? new Date(event.end) : new Date(event.start);
+    setSelectedDateForModal(start);
+    // Exibe apenas horas (minutos forçados para 00)
+    const startHour = String(start.getHours()).padStart(2, '0') + ':00';
+    const endHour = String(end.getHours()).padStart(2, '0') + ':00';
+    setTimeFields(startHour, endHour);
+    updateHiddenDateTimes();
     document.getElementById('category').value = event.extendedProps?.event_type || 'meeting';
+    // Atualiza visibilidade de campos específicos de acordo com categoria
+    toggleBirthdayFields();
+
+    // Tentar extrair número de pessoas da descrição, se houver (heurística)
+    try {
+        const desc = event.description || '';
+        const match = desc.match(/(?:Pessoas\s*:\s*|)(\d{1,3})\s*(?:pessoas)?/i);
+        const peopleInput = document.getElementById('peopleCount');
+        if (peopleInput && match && (event.extendedProps?.event_type === 'birthday_party')) {
+            const n = parseInt(match[1], 10);
+            if (!Number.isNaN(n) && n > 0) peopleInput.value = String(n);
+        } else if (peopleInput) {
+            peopleInput.value = '';
+        }
+    } catch (_) {}
     document.getElementById('allDay').checked = event.allDay || false;
     document.getElementById('recurring').checked = event.extendedProps?.is_recurring || false;
     const imageUrl = event.extendedProps?.location || '';
@@ -562,7 +691,62 @@ function editEvent(event) {
     document.getElementById('deleteEventBtn').style.display = 'inline-block';
     
     const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+    openFromEdit = true;
     modal.show();
+}
+function toggleBirthdayFields() {
+    const category = document.getElementById('category')?.value;
+    const box = document.getElementById('birthdayFields');
+    if (!box) return;
+    if (category === 'birthday_party') {
+        box.style.display = '';
+        const peopleInput = document.getElementById('peopleCount');
+        if (peopleInput) peopleInput.required = true;
+    } else {
+        box.style.display = 'none';
+        const peopleInput = document.getElementById('peopleCount');
+        if (peopleInput) {
+            peopleInput.value = '';
+            peopleInput.required = false;
+        }
+    }
+}
+
+// Atualiza os campos hidden (startDate/endDate) combinando a data selecionada com as horas
+function updateHiddenDateTimes() {
+    const dateStr = selectedDateOnly; // YYYY-MM-DD
+    if (!dateStr) return;
+    const startTime = normalizeHourOnly(document.getElementById('startTime')?.value || '09:00');
+    const endTime = normalizeHourOnly(document.getElementById('endTime')?.value || '10:00');
+    const startHidden = document.getElementById('startDate');
+    const endHidden = document.getElementById('endDate');
+    if (startHidden) startHidden.value = `${dateStr}T${startTime}`;
+    if (endHidden) endHidden.value = `${dateStr}T${endTime}`;
+}
+
+// Ajusta minutos para :00 e valida formato HH:MM
+function normalizeHourOnly(timeStr) {
+    if (!timeStr) return '00:00';
+    const [h] = timeStr.split(':');
+    const hh = String(Math.max(0, Math.min(23, parseInt(h || '0', 10)))).padStart(2, '0');
+    return `${hh}:00`;
+}
+
+function setTimeFields(startHHMM, endHHMM) {
+    const s = document.getElementById('startTime');
+    const e = document.getElementById('endTime');
+    if (s) s.value = normalizeHourOnly(startHHMM);
+    if (e) e.value = normalizeHourOnly(endHHMM);
+}
+
+function setSelectedDateForModal(date) {
+    const d = (date instanceof Date) ? date : new Date(date);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    selectedDateOnly = `${y}-${m}-${day}`;
+    const dateField = document.getElementById('selectedDate');
+    if (dateField) dateField.value = selectedDateOnly;
 }
 
 async function loadRestaurantsForMystery() {

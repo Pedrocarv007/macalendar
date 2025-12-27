@@ -14,6 +14,8 @@ from app.middleware.security import api_login_required, role_required
 import random
 import string
 from sqlalchemy import or_
+import re
+from app.models.restaurant import Restaurant
 
 calendar_bp = Blueprint('calendar', __name__)
 
@@ -116,6 +118,49 @@ def create_event():
         except ValueError:
             return jsonify({'error': 'Formato de data inválido'}), 400
         
+        if data['event_type'] == 'birthday_party':
+           print("Evento de festa de aniversário criado.")                                          
+        # Extrair número de pessoas da descrição
+        people_count = 0
+        if data.get('description'):
+            match = re.search(r'Pessoas:\s*(\d+)', data['description'], re.IGNORECASE)
+            if match:
+                people_count = int(match.group(1))
+
+        if data['event_type'] == 'birthday_party' and people_count > 0:
+            # Buscar restaurante para obter capacidade
+            restaurant = Restaurant.query.get(restaurant_id)
+            if not restaurant:
+                return jsonify({'error': 'Restaurante não encontrado'}), 404
+            
+            max_capacity = restaurant.capacity 
+            allowed_capacity = max_capacity * 0.20
+            
+            # Buscar festas na mesma hora com espaço de 1:30
+            time_buffer = timedelta(hours=1, minutes=30)
+            conflicting_events = CalendarEvent.query.filter(
+                CalendarEvent.restaurant_id == restaurant_id,
+                CalendarEvent.event_type == 'birthday_party',
+                CalendarEvent.start_date < end_date + time_buffer,
+                CalendarEvent.end_date + time_buffer > start_date
+            ).all()
+            
+            # Calcular capacidade total ocupada
+            occupied_capacity = sum(
+                int(re.search(r'Pessoas:\s*(\d+)', e.description or '', re.IGNORECASE).group(1) or 0)
+                for e in conflicting_events
+                if re.search(r'Pessoas:\s*(\d+)', e.description or '', re.IGNORECASE)
+            )
+            
+            if people_count + occupied_capacity > allowed_capacity:
+                return jsonify({
+                    'error': f'Capacidade insuficiente. Capacidade disponível: {int(allowed_capacity - occupied_capacity)} pessoas. '
+                             f'Por favor escolha outro horário com pelo menos 1h30 de espaço entre festas.'
+                }), 400
+            
+
+
+
         # Criar evento
         event = CalendarEvent(
             title=data['title'],

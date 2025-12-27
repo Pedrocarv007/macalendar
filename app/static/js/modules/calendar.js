@@ -188,10 +188,25 @@ async function saveEvent() {
             data.end_date = new Date(data.endDate).toISOString();
         }
         
+        // Se for festa de aniversário, incluir número de pessoas na descrição
+        const peopleCount = data.peopleCount ? parseInt(data.peopleCount, 10) : null;
+        if (data.event_type === 'birthday_party' && peopleCount && peopleCount > 0) {
+            const prefix = `Pessoas: ${peopleCount}`;
+            if (data.description) {
+                // Evitar duplicar a informação
+                if (!/Pessoas\s*:\s*\d+/i.test(data.description)) {
+                    data.description = `${prefix}\n${data.description}`;
+                }
+            } else {
+                data.description = prefix;
+            }
+        }
+
         // Remover campos desnecessários
         delete data.eventId;
         delete data.startDate;
         delete data.endDate;
+        delete data.peopleCount;
         
         // Mapear checkboxes booleanos
         data.is_all_day = data.allDay === 'on';

@@ -14,6 +14,7 @@ from app.middleware.security import api_login_required, role_required, allowed_f
 from app.models.calendar_event import CalendarEvent
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
+from app.models.workers import Worker
 
 restaurants_bp = Blueprint('restaurants', __name__)
 
@@ -39,9 +40,19 @@ def get_restaurants():
                 return jsonify({'restaurants': []}), 200
         
         restaurants = query.all()
-        
+        # Incluir workers_count junto com employees_count
+        result = []
+        for restaurant in restaurants:
+            data = restaurant.to_dict()
+            try:
+                workers_count = Worker.query.filter_by(restaurant_id=restaurant.id, is_active=True).count()
+            except Exception:
+                workers_count = 0
+            data['workers_count'] = workers_count
+            result.append(data)
+
         return jsonify({
-            'restaurants': [restaurant.to_dict() for restaurant in restaurants]
+            'restaurants': result
         }), 200
         
     except Exception as e:
@@ -93,9 +104,12 @@ def create_restaurant():
         db.session.add(restaurant)
         db.session.commit()
         
+        # Incluir workers_count = 0 no retorno de criação
+        data = restaurant.to_dict()
+        data['workers_count'] = 0
         return jsonify({
             'message': 'Restaurante criado com sucesso',
-            'restaurant': restaurant.to_dict()
+            'restaurant': data
         }), 201
         
     except Exception as e:
@@ -163,9 +177,15 @@ def update_restaurant(restaurant_id):
         restaurant.updated_at = datetime.utcnow()
         db.session.commit()
         
+        # Incluir workers_count no retorno de atualização
+        data = restaurant.to_dict()
+        try:
+            data['workers_count'] = Worker.query.filter_by(restaurant_id=restaurant.id, is_active=True).count()
+        except Exception:
+            data['workers_count'] = 0
         return jsonify({
             'message': 'Restaurante atualizado com sucesso',
-            'restaurant': restaurant.to_dict()
+            'restaurant': data
         }), 200
         
     except Exception as e:
@@ -216,6 +236,11 @@ def get_restaurant_stats(restaurant_id):
             is_active=True
         ).count()
         
+        total_workers = Worker.query.filter_by(
+            restaurant_id=restaurant_id,
+            is_active=True
+        ).count()
+
         # Aniversariantes do mês
         current_month = datetime.now().month
         birthdays_this_month = Employee.query.filter(
@@ -235,7 +260,7 @@ def get_restaurant_stats(restaurant_id):
         return jsonify({
             'restaurant': restaurant.to_dict(),
             'stats': {
-                'total_employees': total_employees,
+                'total_employees': total_employees + total_workers,
                 'birthdays_this_month': birthdays_this_month,
                 'events_this_month': events_this_month
             }
