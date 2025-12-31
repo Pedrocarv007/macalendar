@@ -247,6 +247,7 @@
                             <option value="">Selecione...</option>
                             <option value="bem_vindo">Bem-vindo</option>
                             <option value="aniversario">Aniversário</option>
+                            <option value="funcionario_mes">Funcionário do Mês</option>
                         </select>
                     </div>
 
@@ -275,6 +276,13 @@
                             <div><strong>Foto:</strong> <span id="infoEmployeePhoto"></span></div>
                             <div id="infoBirthDate" style="display: none;"><strong>Data de Nascimento:</strong> <span id="infoEmployeeBirthDate"></span></div>
                         </div>
+                    </div>
+                    <!-- Campos extras para Funcionário do Mês -->
+                    <div id="employeeOfMonthFields" style="display: none;" class="mb-3">
+                        <label for="genMonthYear" class="form-label">Mês/Ano *</label>
+                        <input type="text" class="form-control" id="genMonthYear" placeholder="Ex: Dezembro/2025">
+                        <label for="genReason" class="form-label mt-2">Motivo (opcional)</label>
+                        <input type="text" class="form-control" id="genReason" placeholder="Motivo do destaque">
                     </div>
                 </form>
             </div>
@@ -1021,6 +1029,12 @@ document.getElementById('genDocumentType').addEventListener('change', function()
             document.getElementById('infoBirthDate').style.display = 'none';
         }
     }
+    // Mostrar campos extras para Funcionário do Mês
+    if (this.value === 'funcionario_mes') {
+        document.getElementById('employeeOfMonthFields').style.display = 'block';
+    } else {
+        document.getElementById('employeeOfMonthFields').style.display = 'none';
+    }
 });
 
 // Gerar e baixar documento
@@ -1028,34 +1042,46 @@ async function generateAndDownloadDocument() {
     const docType = document.getElementById('genDocumentType').value;
     const employeeId = document.getElementById('genEmployeeId').value;
     const isWorker = document.getElementById('genEmployeeIsWorker').value === 'true';
-    
+    const monthYear = document.getElementById('genMonthYear') ? document.getElementById('genMonthYear').value : '';
+    const reason = document.getElementById('genReason') ? document.getElementById('genReason').value : '';
+
     if (!docType) {
         Utils.showAlert('Selecione um tipo de cartão', 'warning');
         return;
     }
-    
+
     if (!employeeId) {
         Utils.showAlert('Selecione um funcionário', 'warning');
         return;
     }
-    
+
+    if (docType === 'funcionario_mes' && !monthYear) {
+        Utils.showAlert('Informe o mês/ano para o Funcionário do Mês', 'warning');
+        return;
+    }
+
     // Mostrar loading
     const btn = event.target;
     const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';
-    
+
     try {
         // Obter restaurant_id do funcionário selecionado
         const restaurantId = selectedEmployee.restaurant_id;
-        
+
         // Chamar API para gerar documento (via cliente API com CSRF)
-        const result = await api.post('/documents/generate-auto', {
+        const payload = {
             document_type: docType,
             employee_id: parseInt(employeeId),
             restaurant_id: restaurantId,
             is_worker: isWorker
-        });
+        };
+        if (docType === 'funcionario_mes') {
+            payload.month_year = monthYear;
+            if (reason) payload.reason = reason;
+        }
+        const result = await api.post('/documents/generate-auto', payload);
         if (!result || !result.document || !result.document.filename) {
             throw new Error('Resposta inválida da API');
         }

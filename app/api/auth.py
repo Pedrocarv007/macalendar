@@ -3,7 +3,7 @@ Rotas de autenticação da API
 """
 from datetime import datetime
 
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, redirect, request, jsonify, session, url_for
 from flask_jwt_extended import (
     create_access_token,
     get_jwt,
@@ -404,3 +404,7 @@ def list_users():
         
     except Exception as e:
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+    
+
+
+

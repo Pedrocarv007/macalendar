@@ -8,7 +8,75 @@ from datetime import datetime
 from pathlib import Path
 
 class DocumentGenerator:
+    def _safe_text(self, text):
+        """Remove ou substitui caracteres não-ASCII por '?' para evitar erros de encoding ao desenhar texto."""
+        if not text:
+            return text
+        return ''.join(c if ord(c) < 128 else '?' for c in text)
+
+
     """Gerador de documentos com templates"""
+    def generate_employee_of_the_month_card(self, employee_name, month_year, reason=None, employee_photo_path=None):
+        """Gerar cartão de Funcionário do Mês com nome, mês/ano, motivo e foto"""
+        try:
+            fundo = self._get_template_image('funcionario_mes')
+            largura, altura = fundo.size
+            centro_x = largura // 2
+            centro_y = altura // 2
+
+            # Adicionar foto com tamanho exato (621x834)
+            if employee_photo_path and os.path.exists(employee_photo_path):
+                try:
+                    foto = Image.open(employee_photo_path).resize((621, 834)).convert('RGBA')
+                    foto_arredondada = self._apply_rounded_corners(foto, radius=50)
+                    fundo.paste(foto_arredondada, (centro_x - 621 // 2, centro_y - 800 // 2 + 50), mask=foto_arredondada)
+                except Exception:
+                    pass
+            else:
+                placeholder = self._get_or_create_placeholder((621, 834))
+                placeholder_arredondado = self._apply_rounded_corners(placeholder, radius=50)
+                fundo.paste(placeholder_arredondado, (centro_x - 621 // 2, centro_y - 800 // 2- 200 ), mask=placeholder_arredondado)
+
+            draw = ImageDraw.Draw(fundo)
+
+            # Nome do funcionário
+            try:
+                safe_name = self._safe_text(employee_name)
+                fonte_nome = self._load_font(size=60)
+                xmin, ymin, xmax, ymax = fonte_nome.getbbox(safe_name)
+                largura_nome = xmax - xmin
+                draw.text((centro_x - largura_nome // 2, centro_y + 540), safe_name, font=fonte_nome, fill=(255, 255, 255, 255))
+            except Exception:
+                pass
+
+            # Mês/Ano
+            try:
+                safe_month = self._safe_text(month_year)
+                fonte_mes = self._load_font(size=55)
+                xmin, ymin, xmax, ymax = fonte_mes.getbbox(safe_month)
+                largura_mes = xmax - xmin
+                draw.text((centro_x - largura_mes // 2, centro_y - 450), safe_month, font=fonte_mes, fill=(255, 255, 255, 255))
+            except Exception:
+                pass
+
+            # Motivo (opcional)
+            if reason:
+                try:
+                    safe_reason = self._safe_text(reason)
+                    fonte_motivo = self._load_font(size=40)
+                    xmin, ymin, xmax, ymax = fonte_motivo.getbbox(safe_reason)
+                    largura_motivo = xmax - xmin
+                    draw.text((centro_x - largura_motivo // 2, centro_y + 560), safe_reason, font=fonte_motivo, fill=(255, 255, 255, 255))
+                except Exception:
+                    pass
+
+            filename = f"cartao_funcionario_mes_{int(datetime.now().timestamp())}.png"
+            filepath = self.uploads_dir / filename
+            fundo.save(str(filepath), 'PNG')
+            return str(filepath), filename
+        except Exception:
+            raise
+
     
     def __init__(self):
         # Diretórios
@@ -43,16 +111,16 @@ class DocumentGenerator:
             'bem_vindo': 'bem_vindo.png',
             'aniversario': 'aniversario.png',
             'welcome': 'bem_vindo.png',
-            'birthday': 'aniversario.png'
+            'birthday': 'aniversario.png',
+            'funcionario_mes': 'funcionario_mes.png',
+            'funcionariomes': 'funcionario_mes.png',
+            'employee_of_the_month': 'funcionario_mes.png'
         }
-        
         filename = templates.get(template_name.lower(), 'bem_vindo.png')
         template_path = self.base_dir / filename
-        
         if not os.path.exists(template_path):
             # Se não existir template, criar imagem em branco
             return Image.new('RGBA', (1920, 1280), color=(240, 240, 240, 255))
-        
         return Image.open(template_path).convert('RGBA')
     
     def _apply_rounded_corners(self, image, radius=50):

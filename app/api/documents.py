@@ -35,6 +35,7 @@ def get_documents():
         restaurant_id = request.args.get('restaurant_id', type=int)
         document_type = request.args.get('document_type')
         employee_id = request.args.get('employee_id', type=int)
+        worker_id = request.args.get('worker_id', type=int)
         
         # Query base
         query = Document.query
@@ -43,9 +44,14 @@ def get_documents():
         if document_type:
             query = query.filter(Document.document_type == document_type)
         
+
         # Filtrar por funcionário
         if employee_id:
             query = query.filter(Document.employee_id == employee_id)
+
+        # Filtrar por worker
+        if worker_id:
+            query = query.filter(Document.worker_id == worker_id)
         
         # Filtrar por permissões
         if user_role in ['admin', 'rh', 'marketing']:
@@ -445,7 +451,7 @@ def generate_document():
         # generate_pdf_from_template(document, file_path)
         
         # Por enquanto, criar arquivo vazio para teste
-        with open(file_path, 'w') as f:
+        with open(file_path, 'w', encoding='utf-8') as f:
             f.write("PDF gerado")
         
         # Atualizar documento
@@ -510,12 +516,14 @@ def generate_document_auto():
         # Obter dados do colaborador ou worker
         employee = None
         worker = None
+        target_name = None
         if is_worker:
             worker = Worker.query.get(employee_id)
             if not worker:
                 return jsonify({'error': 'Trabalhador não encontrado'}), 404
             if worker.restaurant_id != restaurant_id:
                 return jsonify({'error': 'Trabalhador não pertence a este restaurante'}), 400
+            target_name = worker.name
         else:
             employee = Employee.query.get(employee_id)
             if not employee:
@@ -523,12 +531,15 @@ def generate_document_auto():
                 worker = Worker.query.get(employee_id)
                 if worker:
                     is_worker = True
+                    target_name = worker.name
                 else:
                     return jsonify({'error': 'Colaborador não encontrado'}), 404
             if employee and employee.restaurant_id != restaurant_id:
                 return jsonify({'error': 'Colaborador não pertence a este restaurante'}), 400
             if is_worker and worker and worker.restaurant_id != restaurant_id:
                 return jsonify({'error': 'Trabalhador não pertence a este restaurante'}), 400
+            if not target_name and employee:
+                target_name = employee.name
         
         # Verificar restaurante
         restaurant = Restaurant.query.get(restaurant_id)
@@ -548,80 +559,95 @@ def generate_document_auto():
             photo_path = str(Path(current_app.root_path) / 'static' / 'uploads' / 'workers' / photo_filename)
         
         try:
-            target_name = employee.name if employee else worker.name
-
-            if document_type.lower() == 'bem_vindo':
+            doc_type = document_type.lower()
+            if doc_type == 'bem_vindo':
                 file_path, filename = generator.generate_welcome_card(
                     employee_name=target_name,
                     employee_photo_path=photo_path,
                     restaurant_name=restaurant.name
                 )
                 doc_category = 'Boas-vindas'
-            
-            elif document_type.lower() == 'aniversario':
+            elif doc_type == 'aniversario':
                 # Usar data de aniversário no ano atual, não o ano de nascimento
-
-                birth_date_current_year = employee.birth_date if employee else worker.birth_date
+                birth_date_current_year = None
+                if employee and employee.birth_date:
+                    birth_date_current_year = employee.birth_date
+                elif worker and worker.birth_date:
+                    birth_date_current_year = worker.birth_date
                 if birth_date_current_year:
                     try:
                         birth_date_current_year = birth_date_current_year.replace(year=date_module.today().year)
                     except ValueError:
                         # Lidar com 29/02 em anos não bissextos
                         birth_date_current_year = birth_date_current_year.replace(year=date_module.today().year, day=28)
-                
                 file_path, filename = generator.generate_birthday_card(
                     employee_name=target_name,
                     birth_date=birth_date_current_year,
                     employee_photo_path=photo_path
                 )
                 doc_category = 'Aniversário'
-            
+            elif doc_type in ['funcionario_mes', 'funcionariomes', 'employee_of_the_month']:
+                # Espera campos: month_year (ex: 'Dezembro/2025'), reason (opcional)
+                month_year = data.get('month_year') or data.get('mes_ano')
+                reason = data.get('reason') or data.get('motivo')
+                if not month_year:
+                    return jsonify({'error': 'O campo month_year (mês/ano) é obrigatório para funcionário do mês.'}), 400
+                file_path, filename = generator.generate_employee_of_the_month_card(
+                    employee_name=target_name,
+                    month_year=month_year,
+                    reason=reason,
+                    employee_photo_path=photo_path
+                )
+                doc_category = 'Funcionário do Mês'
             else:
-                return jsonify({'error': f'Tipo de documento inválido: {document_type}. Use: bem_vindo, aniversario'}), 400
-            
+                return jsonify({'error': f'Tipo de documento inválido: {document_type}. Use: bem_vindo, aniversario, funcionario_mes'}), 400
         except Exception as e:
             return jsonify({'error': f'Erro ao gerar documento: {str(e)}'}), 500
         
         # Obter tamanho do arquivo
         file_size = os.path.getsize(file_path)
 
-        # Se alvo é worker, apenas retornar o arquivo gerado sem persistir documento
+        # Salvar documento usando target_name para ambos os casos
         if is_worker:
-            return jsonify({
-                'message': 'Cartão gerado com sucesso',
-                'document': {
-                    'filename': filename,
-                    'file_path': file_path,
-                    'file_size': file_size,
-                    'document_type': doc_category,
-                    'template_name': document_type,
-                    'is_worker': True
-                }
-            }), 201
-
-        # Criar documento no banco de dados (employee)
-        document = Document(
-            title=f'Cartão - {employee.name}',
-            document_type=doc_category,
-            template_name=document_type,
-            filename=filename,
-            file_path=file_path,
-            file_size=file_size,
-            restaurant_id=restaurant_id,
-            employee_id=employee_id,
-            created_by=current_user_id,
-            description=f'Documento gerado automaticamente - {document_type}',
-            tags=f'{document_type},{employee.name}',
-            is_public=False,
-            status='generated'
-        )
+            document = Document(
+                title=f'Cartão - {target_name}',
+                document_type=doc_category,
+                template_name=document_type,
+                filename=filename,
+                file_path=file_path,
+                file_size=file_size,
+                restaurant_id=restaurant_id,
+                employee_id=None,
+                created_by=current_user_id,
+                description=f'Documento gerado automaticamente - {document_type}',
+                tags=f'{document_type},{target_name}',
+                is_public=False,
+                status='generated',
+                worker_id=worker.id if worker else None
+            )
+        else:
+            document = Document(
+                title=f'Cartão - {target_name}',
+                document_type=doc_category,
+                template_name=document_type,
+                filename=filename,
+                file_path=file_path,
+                file_size=file_size,
+                restaurant_id=restaurant_id,
+                employee_id=employee_id,
+                created_by=current_user_id,
+                description=f'Documento gerado automaticamente - {document_type}',
+                tags=f'{document_type},{target_name}',
+                is_public=False,
+                status='generated'
+            )
 
         db.session.add(document)
 
         # Registrar atividade
         ActivityLog.log_activity(
             activity_type='document_generated',
-            description=f'Documento gerado automaticamente ({doc_category}) para {employee.name}',
+            description=f'Documento gerado automaticamente ({doc_category}) para {target_name}',
             user_id=current_user_id,
             restaurant_id=restaurant_id,
             target_id=document.id,

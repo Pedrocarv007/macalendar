@@ -495,11 +495,9 @@ def generate_mystery_tuesdays():
                 days_until_saturday = 7
             next_saturday = day + timedelta(days=days_until_saturday)
             
-            print(f"[DEBUG] Terça {day} ({day.weekday()}) → Sábado {next_saturday} ({next_saturday.weekday()})")
             
             # 🔹 Gerar texto de resposta via IA
             try:
-                print(f"[DEBUG] Gerando resposta para tema: {topic}")
                 resp_answer = client.chat.completions.create(
                     model=os.getenv('OPENAI_MODEL') or 'gpt-4o-mini',
                     messages=[
@@ -528,7 +526,6 @@ def generate_mystery_tuesdays():
                 answer_text = resp_answer.choices[0].message.content.strip()
                 if not answer_text.startswith('🔍Resposta do Desafio🎯'):
                     answer_text = f"🔍Resposta do Desafio🎯\n\n{answer_text}"
-                print(f"[DEBUG] Resposta gerada com sucesso")
             except Exception as e:
                 print(f"[ERRO] Falha ao gerar resposta: {str(e)}")
                 answer_text = (

@@ -7,8 +7,10 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from flask_jwt_extended import create_access_token
 from app.extensions.database import db, csrf
 from app.middleware.security import validate_email
+from app.models import employee
 from app.utils.notifications import notify_login
 from app.models.employee import Employee
+from flask_jwt_extended import decode_token
 
 auth_web_bp = Blueprint('auth_web', __name__)
 
@@ -120,3 +122,34 @@ def logout():
     session.clear()
     flash('Você foi desconectado com sucesso.', 'info')
     return redirect(url_for('auth_web.login'))
+
+
+
+
+@auth_web_bp.route('/callback', methods=['POST', 'GET'])
+def sso_callback():
+    token = request.args.get('token')
+
+    if not token:
+        return "Token não fornecido", 400
+ 
+    try:
+        data = decode_token(token)
+        user_id = data['sub']
+        user = Employee.query.get(user_id)
+        if user:
+            # Autenticar manualmente: salvar dados do usuário na sessão Flask
+            session['user_id'] = user.id
+            session['user_name'] = user.name
+            session['user_role'] = user.role
+            session['user_email'] = user.email
+            session['restaurant_id'] = user.restaurant_id
+            try:
+                notify_login(user)
+            except Exception:
+                pass
+            return redirect(url_for('web.dashboard'))  # ou para a página principal do sistema
+        else:
+            return "Usuário não encontrado", 404
+    except Exception as e:
+        return f"Token inválido: {e}", 401

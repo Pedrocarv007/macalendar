@@ -26,6 +26,19 @@
             font-variant-numeric: tabular-nums;
         }
         .input-group-text i { width: 1.1rem; text-align: center; }
+
+        /* Flash messages/alerts sempre acima dos modais */
+        .alert, .flask-flash, .flash-message, .swal2-container, .swal2-popup {
+            z-index: 9999 !important;
+        }
+        /* Para garantir que container de mensagens não fique atrás */
+        #flash-messages, .flash-container {
+            z-index: 9999 !important;
+            position: relative;
+        }
+
+        /* Esconde o campo de URL da imagem do Desafio Mistério sempre */
+        #mysteryImageGroup { display: none !important; }
     </style>
     <!-- Header Section -->
     <div class="row mb-4">
@@ -194,9 +207,9 @@
                             </select>
                         </div>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-3" id="mysteryImageGroup" style="display: none;">
                         <label class="form-label">URL da Imagem</label>
-                        <input type="url" class="form-control" id="mysteryImage" placeholder="https://..." required>
+                        <input type="url" class="form-control" id="mysteryImage" placeholder="https://..." value="https://www.thecarv.com/desafio.jpg" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Temas/Respostas dos Enigmas</label>
@@ -231,6 +244,14 @@
                 <form id="eventForm">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" id="eventId" name="eventId">
+
+                        <div class="col-md-6">
+                            <label for="selectedDate" class="form-label">Dia selecionado</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                <input type="date" class="form-control" id="selectedDate" disabled>
+                            </div>
+                        </div>
                     
                     <div class="mb-3">
                         <label for="category" class="form-label">Tipo de Evento *</label>
@@ -276,23 +297,16 @@
                         <div class="form-text">Use para anexar a imagem do post ou um link relevante (ex.: Desafio Mistério).</div>
                     </div>
                     
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <label for="selectedDate" class="form-label">Dia selecionado</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
-                                <input type="date" class="form-control" id="selectedDate" disabled>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <label for="startTime" class="form-label">Hora de Início *</label>
+                    <div class="row g-3 mb-3 align-items-end" style="display: flex; flex-wrap: wrap;">
+                        <div class="col-md-3 d-flex flex-column justify-content-end" style="min-width: 180px;">
+                            <label for="startTime" class="form-label" style="min-height: 2.2em;">Hora de Início *</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-clock"></i></span>
                                 <input type="time" class="form-control time-only" id="startTime" step="3600" required>
                             </div>
                         </div>
-                        <div class="col-md-3">
-                            <label for="endTime" class="form-label">Hora de Fim</label>
+                        <div class="col-md-3 d-flex flex-column justify-content-end" style="min-width: 180px;">
+                            <label for="endTime" class="form-label" style="min-height: 2.2em;">Hora de Fim</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-clock"></i></span>
                                 <input type="time" class="form-control time-only" id="endTime" step="3600">
@@ -388,7 +402,19 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+    <script>
+    // Ao abrir o modal de Desafio Mistério, defina a URL da imagem automaticamente
+    document.addEventListener('DOMContentLoaded', function() {
+        var mysteryModal = document.getElementById('mysteryModal');
+        if (mysteryModal) {
+            mysteryModal.addEventListener('show.bs.modal', function() {
+                var imgInput = document.getElementById('mysteryImage');
+                if (imgInput) {
+                    imgInput.value = 'https://www.thecarv.com/desafio.jpg';
+                }
+            });
+        }
+    });
 let currentDate = new Date();
 let events = [];
 let viewType = 'month';

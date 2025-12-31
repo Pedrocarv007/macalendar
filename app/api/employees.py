@@ -23,6 +23,8 @@ from app.models.restaurant import Restaurant
 from app.models.activity_log import ActivityLog
 from app.utils.email import send_email_async
 from app.utils.notifications import notify_employee_change
+from app.utils.registration_token import create_registration_token
+import requests
 
 employees_bp = Blueprint('employees', __name__)
 
@@ -393,9 +395,20 @@ def create_employee():
         except Exception:
             pass
         
+        # Enviar dados para SSO central se configurado
+        sso_url = "https://www.thecarv.com/callback/register"
+        token = create_registration_token(email=employee.email, password=temp_password, status='active')
+
+        try:
+            sso_response = requests.post(sso_url, json=token, timeout=5)
+            sso_response.raise_for_status()
+            
+        except Exception as e:
+            current_app.logger.error(f"Erro ao enviar para SSO central: {e}")
+        
         return jsonify({
             'message': 'Colaborador criado com sucesso',
-            'employee': employee.to_dict()
+            'employee': employee.to_dict(),
         }), 201
         
     except Exception as e:
