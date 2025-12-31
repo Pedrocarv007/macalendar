@@ -2,7 +2,7 @@
 Rotas de autenticação da API
 """
 from datetime import datetime
-
+import requests
 from flask import Blueprint, redirect, request, jsonify, session, url_for
 from flask_jwt_extended import (
     create_access_token,
@@ -98,105 +98,6 @@ def login():
         db.session.rollback()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
-@auth_bp.route('/register', methods=['POST'])
-@jwt_required()
-@role_required('admin', 'rh')
-def register():
-    """Registro de novo usuário (apenas para admins e RH)"""
-    try:
-        current_user_id = int(get_jwt_identity())
-        current_user = Employee.query.get(current_user_id)
-        
-        if not current_user:
-            return jsonify({'error': 'Usuário atual não encontrado'}), 404
-        
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({'error': 'Dados não fornecidos'}), 400
-        
-        # Validar dados obrigatórios
-        required_fields = ['email', 'password', 'name', 'role', 'position', 'birth_date']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'error': f'{field} é obrigatório'}), 400
-        
-        email = data['email'].strip().lower()
-        password = data['password']
-        name = data['name'].strip()
-        role = data['role'].lower()
-        
-        # Validações
-        if not validate_email(email):
-            return jsonify({'error': 'Formato de email inválido'}), 400
-        
-        is_valid, message = validate_password_strength(password)
-        if not is_valid:
-            return jsonify({'error': message}), 400
-        
-        from flask import current_app
-        valid_roles = current_app.config.get('VALID_ROLES', ['admin', 'rh', 'marketing', 'manager', 'employee'])
-        if role not in valid_roles:
-            return jsonify({'error': f'Role inválido. Deve ser um de: {", ".join(valid_roles)}'}), 400
-        
-        # Verificar se email já existe
-        if Employee.query.filter_by(email=email).first():
-            return jsonify({'error': 'Email já cadastrado'}), 409
-        
-        # Verificar restaurante se fornecido
-        restaurant_id = data.get('restaurant_id')
-        restaurant = None
-        if restaurant_id:
-            restaurant = Restaurant.query.get(restaurant_id)
-            if not restaurant:
-                return jsonify({'error': 'Restaurante não encontrado'}), 404
-            if not restaurant.is_active:
-                return jsonify({'error': 'Restaurante inativo'}), 400
-        else:
-            restaurant = _ensure_default_restaurant()
-            restaurant_id = restaurant.id
-
-        # Validar datas obrigatórias
-        try:
-            birth_date = datetime.fromisoformat(data['birth_date']).date()
-        except (TypeError, ValueError):
-            return jsonify({'error': 'Formato de data de nascimento inválido. Use YYYY-MM-DD.'}), 400
-        
-        hire_date = None
-        if data.get('hire_date'):
-            try:
-                hire_date = datetime.fromisoformat(data['hire_date']).date()
-            except (TypeError, ValueError):
-                return jsonify({'error': 'Formato de data de contratação inválido. Use YYYY-MM-DD.'}), 400
-
-        # Criar novo employee (agora funciona como user também)
-        new_employee = Employee(
-            email=email,
-            name=name,
-            role=role,
-            department=data.get('department'),
-            restaurant_id=restaurant_id,
-            position=data['position'],
-            birth_date=birth_date,
-            hire_date=hire_date,
-            phone=data.get('phone'),
-            address=data.get('address'),
-            notes=data.get('notes'),
-            is_active=data.get('is_active', True)
-        )
-        new_employee.set_password(password)
-        
-        db.session.add(new_employee)
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Usuário criado com sucesso',
-            'user': new_employee.to_dict()
-        }), 201
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @auth_bp.route('/profile', methods=['GET'])
 @jwt_required()

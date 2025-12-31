@@ -11,7 +11,7 @@ import shutil
 from flask import Blueprint, request, jsonify, g, current_app, url_for, Response
 import io
 import csv
-from flask_jwt_extended import get_jwt_identity, get_jwt
+from flask_jwt_extended import get_jwt_identity, get_jwt, create_access_token
 from PIL import Image
 from werkzeug.utils import secure_filename
 
@@ -395,16 +395,35 @@ def create_employee():
         except Exception:
             pass
         
-        # Enviar dados para SSO central se configurado
-        sso_url = "https://www.thecarv.com/callback/register"
-        token = create_registration_token(email=employee.email, password=temp_password, status='active')
-
+# No create_employee, antes do return final:
         try:
-            sso_response = requests.post(sso_url, json=token, timeout=5)
-            sso_response.raise_for_status()
+            # Use a senha REAL gerada, não "11111111"
+            payload = {
+                "email": email,
+                "password": temp_password, # A senha que foi para o e-mail do usuário
+                "status": "active",
+                "system_code": "mac_calendar"     
+            }
+
+            # Gera o token de serviço
+            access_token = create_access_token(identity="system_worker") 
+
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            }
+
+            url = "http://127.0.0.1:5000/api/auth/callback/register"
             
-        except Exception as e:
-            current_app.logger.error(f"Erro ao enviar para SSO central: {e}")
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            
+            # Se o retorno não for 2xx, imprime o erro para debug
+            if response.status_code != 200:
+                print(f"Erro SSO ({response.status_code}): {response.text}")
+
+        except Exception as e:  
+            print(f"Falha na comunicação com SSO: {str(e)}")
+
         
         return jsonify({
             'message': 'Colaborador criado com sucesso',
