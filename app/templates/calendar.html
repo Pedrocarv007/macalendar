@@ -245,6 +245,12 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" id="eventId" name="eventId">
 
+                    <div class="mb-3">
+                        <label for="photo" class="form-label">Foto do Evento</label>
+                        <input type="file" class="form-control" id="photo" name="photo" accept="image/*">
+                        <div class="form-text">Opcional. Envie uma imagem para o evento.</div>
+                    </div>
+
                         <div class="col-md-6">
                             <label for="selectedDate" class="form-label">Dia selecionado</label>
                             <div class="input-group">
@@ -403,6 +409,65 @@
 
 {% block scripts %}
     <script>
+// Salvar evento com upload de foto
+async function saveEvent() {
+    const form = document.getElementById('eventForm');
+    const formData = new FormData(form);
+
+    // Adiciona campos que podem não estar no form (ex: datas ocultas)
+    formData.set('start_date', document.getElementById('startDate').value);
+    formData.set('end_date', document.getElementById('endDate').value);
+    formData.set('event_type', document.getElementById('category').value);
+    formData.set('is_all_day', document.getElementById('allDay').checked);
+    formData.set('recurring', document.getElementById('recurring').checked);
+
+    // Se for festa de aniversário, adiciona número de pessoas na descrição
+    if (document.getElementById('category').value === 'birthday_party') {
+        const peopleCount = document.getElementById('peopleCount').value;
+        let desc = document.getElementById('description').value || '';
+        if (peopleCount) {
+            if (!desc.includes('Pessoas:')) desc += `\nPessoas: ${peopleCount}`;
+        }
+        formData.set('description', desc);
+    }
+
+    // Envia para a API
+    try {
+        const response = await fetch('https://www.thecarv.com/mac/api/calendar/events', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                // Não defina Content-Type, o browser faz isso automaticamente
+                'Authorization': window.localStorage.getItem('access_token') ? `Bearer ${window.localStorage.getItem('access_token')}` : ''
+            }
+        });
+        const data = await response.json();
+        if (response.ok) {
+            // Fechar modal, recarregar eventos, mostrar sucesso
+            const modal = bootstrap.Modal.getInstance(document.getElementById('eventModal'));
+            if (modal) modal.hide();
+            if (typeof appState !== 'undefined' && appState.notify) {
+                appState.notify('Evento criado com sucesso!', 'success');
+            } else {
+                alert('Evento criado com sucesso!');
+            }
+            // Recarregar eventos (ajuste conforme seu app)
+            if (typeof CalendarModule !== 'undefined' && CalendarModule.loadEvents) {
+                await CalendarModule.loadEvents();
+            } else {
+                window.location.reload();
+            }
+        } else {
+            throw new Error(data.error || 'Erro ao criar evento');
+        }
+    } catch (err) {
+        if (typeof appState !== 'undefined' && appState.notify) {
+            appState.notify(err.message, 'error');
+        } else {
+            alert(err.message);
+        }
+    }
+}
     // Ao abrir o modal de Desafio Mistério, defina a URL da imagem automaticamente
     document.addEventListener('DOMContentLoaded', function() {
         var mysteryModal = document.getElementById('mysteryModal');
@@ -978,8 +1043,16 @@ function showEventDetails(event) {
     const noLinkEl = document.getElementById('detailsNoLink');
     const imgWrap = document.getElementById('detailsImageWrapper');
     const imgEl = document.getElementById('detailsImage');
+    // Preferir photo_path, senão location
+    const photoPath = event.photo_path || event.extendedProps?.photo_path || '';
     const loc = event.extendedProps?.location || '';
-    if (loc) {
+    if (photoPath) {
+        imgEl.src = photoPath;
+        imgWrap.style.display = 'block';
+        linkEl.style.display = 'none';
+        linkEl.removeAttribute('href');
+        noLinkEl.style.display = 'none';
+    } else if (loc) {
         linkEl.href = loc;
         linkEl.style.display = 'inline-flex';
         noLinkEl.style.display = 'none';

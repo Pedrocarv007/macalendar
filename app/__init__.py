@@ -54,8 +54,12 @@ def create_app(config_name=None):
     
     # Carregar configurações
     selected_config = config_name or os.environ.get('FLASK_CONFIG') or 'default'
+    print("selected_config:", selected_config)
     config_class = CONFIG_MAP.get(selected_config, Config)
+    print("config_class:", config_class)
     app.config.from_object(config_class)
+    # Debug: mostrar valor da URI do banco
+    print("SQLALCHEMY_DATABASE_URI:", app.config.get("SQLALCHEMY_DATABASE_URI"))
     config_class.init_app(app)
     
     # Ajustes quando atrás de proxy (IIS/ARR): respeitar X-Forwarded-*

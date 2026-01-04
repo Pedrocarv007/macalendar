@@ -11,7 +11,7 @@ import shutil
 from flask import Blueprint, request, jsonify, g, current_app, url_for, Response
 import io
 import csv
-from flask_jwt_extended import get_jwt_identity, get_jwt
+from flask_jwt_extended import get_jwt_identity, get_jwt, create_access_token
 from PIL import Image
 from werkzeug.utils import secure_filename
 
@@ -157,7 +157,7 @@ def create_employee():
                 return jsonify({'error': 'Formato de data de contratação inválido. Use YYYY-MM-DD'}), 400
         
         # Determinar role do colaborador
-        valid_roles = current_app.config.get('VALID_ROLES', ['admin', 'rh', 'marketing', 'manager', 'employee'])
+        valid_roles = current_app.config.get('VALID_ROLES')
         requested_role = (data.get('role') or '').strip().lower() if data.get('role') else None
         role_to_set = 'employee'
 
@@ -206,10 +206,30 @@ def create_employee():
         db.session.add(employee)
         db.session.flush()  # Obter ID antes de processar a foto
 
-        # Gerar senha temporária forte e definir como senha inicial
-        alphabet = string.ascii_letters + string.digits + '!@#$%^&*()_+-=' 
-        temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
-        employee.set_password(temp_password)
+        try:
+            # Use a senha REAL gerada, não "11111111"
+              
+                payload = {
+                    "name": data['name'],
+                    "email": email,
+                    "status": "active",
+                    "system_name": "mac_calendar",
+                    "system_url": "http://localhost:5006/mac/auth/callback",    
+                }
+
+                url = "http://127.0.0.1:5005/api/auth/callback/register"
+                
+                response = requests.post(url, json=payload, timeout=10)
+
+                print(payload)
+                
+                # Se o retorno não for 2xx, imprime o erro para debug
+                if response.status_code != 200:
+                    print(f"Erro SSO ({response.status_code}): {response.text}")
+
+        except Exception as e:  
+            print(f"Falha na comunicação com SSO: {str(e)}")
+
         
         # Processar upload de foto se fornecido
         if 'photo' in request.files:
@@ -254,157 +274,14 @@ def create_employee():
         
         db.session.commit()
 
-        # Enviar email de boas-vindas com credenciais temporárias
-        try:
-            login_url = url_for('auth_web.login', _external=True)
-            html_content = f"""
-                <!DOCTYPE html>
-                <html lang="pt-BR">
-                    <head>
-                        <meta charset="UTF-8">
-                        <title>Teste SMTP | MAC Calendar</title>
-                        <style>  
-                            body {{
-                                margin: 0;
-                                padding: 0;
-                                background: #f5f7fb;
-                                color: #243447;
-                                font-family: 'Segoe UI', Arial, sans-serif;
-                            }}
-                            .container {{
-                                max-width: 640px;
-                                margin: 0 auto;
-                                padding: 32px 24px;
-                            }}
-                            .card {{
-                                background: #ffffff;
-                                border: 1px solid #e5e9f2;
-                                border-radius: 12px;
-                                box-shadow: 0 8px 20px rgba(18, 38, 63, 0.08);
-                                padding: 32px;
-                            }}
-                            .brand {{
-                                text-align: center;
-                                margin-bottom: 24px;
-                            }}
-                            .brand h1 {{
-                                margin: 8px 0 0 0;
-                                font-size: 24px;
-                                color: #0f6ddf;
-                            }}
-                            .badge {{
-                                display: inline-block;
-                                background: #e8f1ff;
-                                color: #0f6ddf;
-                                padding: 6px 12px;
-                                border-radius: 999px;
-                                font-weight: 600;
-                                font-size: 12px;
-                                letter-spacing: 0.5px;
-                            }}
-                            h2 {{
-                                color: #141c2c;
-                                margin: 0 0 8px 0;
-                                font-size: 20px;
-                            }}
-                            p {{
-                                margin: 0 0 12px 0;
-                                line-height: 1.6;
-                            }}
-                            .list {{
-                                margin: 16px 0;
-                                padding-left: 18px;
-                            }}
-                            .list li {{
-                                margin-bottom: 10px;
-                            }}
-                            .panel {{
-                                background: #f8fafc;
-                                border: 1px solid #e5e9f2;
-                                border-radius: 10px;
-                                padding: 14px 16px;
-                                margin: 16px 0;
-                                font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-                                font-size: 13px;
-                                color: #1f2937;
-                            }}
-                            .cta {{
-                                text-align: center;
-                                margin: 24px 0 12px 0;
-                            }}
-                            .cta a {{
-                                display: inline-block;
-                                background: #0f6ddf;
-                                color: #ffffff;
-                                padding: 12px 20px;
-                                border-radius: 8px;
-                                text-decoration: none;
-                                font-weight: 600;
-                            }}
-                            .footer {{
-                                text-align: center;
-                                color: #6b778c;
-                                font-size: 12px;
-                                margin-top: 16px;
-                                line-height: 1.4;
-                            }}
-                        </style>
-                    </head>
-                    <body>
-                        <div class="container">
-                            <div class="card">
-                                <div class="brand">
-                                    <span class="badge">MAC Calendar</span>
-                                    <h1>Bem vindo {employee.name}!</h1>
-                                </div>
-                                <h2>Credenciais Temporárias</h2>
-                                <p>Olá, {employee.name}! Aqui estão suas credenciais temporárias para acessar o MAC Calendar.</p>
-                                <div class="panel">
-                                    <strong>Checklist rápido:</strong><br>
-                                    • Entre em www.thecarv.com/mac<br>
-                                    • Utilize o email: {employee.email} e a senha: {temp_password} temporária fornecida.<br>
-                                    • Mude a senha no primeiro acesso para garantir a segurança da sua conta.
-                                </div>
-                                <h2>Próximos passos sugeridos</h2>
-                                <div class="cta">
-                                    <a href="{login_url}" target="_blank" rel="noopener">Acessar MAC Calendar</a>
-                                </div>
-                                <p>Qualquer dúvida, responda este e-mail e nossa equipe ajudará você a finalizar a configuração.</p>
-                                <div class="footer">
-                                    MAC Calendar · Thecarv Sistemas<br>
-                                    <p>Qualquer dúvida, contate o RH.</p>
-                                    &copy; {datetime.now().year} Thecarv Sistemas. Todos os direitos reservados.
-                                </div>
-                            </div>
-                        </div>
-                    </body>
-                </html>
-                """
-            send_email_async(
-                to=employee.email,
-                subject='Bem-vindo(a) ao MAC Calendar - Credenciais temporárias',
-                html=html_content,
-                mail_profile="noreply"
-            )
-        except Exception as e:
-            current_app.logger.exception(f'Falha ao enviar email de boas-vindas: {e}')
-
         # Notificar criação
         try:
             notify_employee_change('criado', employee, current_user)
         except Exception:
             pass
         
-        # Enviar dados para SSO central se configurado
-        sso_url = "https://www.thecarv.com/callback/register"
-        token = create_registration_token(email=employee.email, password=temp_password, status='active')
 
-        try:
-            sso_response = requests.post(sso_url, json=token, timeout=5)
-            sso_response.raise_for_status()
-            
-        except Exception as e:
-            current_app.logger.error(f"Erro ao enviar para SSO central: {e}")
+       
         
         return jsonify({
             'message': 'Colaborador criado com sucesso',
