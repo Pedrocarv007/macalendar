@@ -19,7 +19,7 @@ auth_web_bp = Blueprint('auth_web', __name__)
 def login():
     """Página de login web"""
 
-    return redirect("http://127.0.0.1:5005")
+    return redirect("http://192.168.0.2:5005")
     
    
 
@@ -45,7 +45,6 @@ def sso_callback():
         user_email = data['sub']
         user = Employee.query.filter_by(email=user_email).first()
         if user:
-            # Autenticar manualmente: salvar dados do usuário na sessão Flask
             session['user_id'] = user.id
             session['user_name'] = user.name
             session['user_role'] = user.role
@@ -55,6 +54,7 @@ def sso_callback():
                 notify_login(user)
             except Exception:
                 pass
+            print(f"Usuário {user.id} logado via SSO.")
             return redirect(url_for('web.dashboard'))  # ou para a página principal do sistema
         else:
             return "Usuário não encontrado", 404

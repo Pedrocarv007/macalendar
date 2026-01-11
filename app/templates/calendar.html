@@ -431,9 +431,9 @@ async function saveEvent() {
         formData.set('description', desc);
     }
 
-    // Envia para a API
+    // Envia para a API criar eventos
     try {
-        const response = await fetch('https://www.thecarv.com/mac/api/calendar/events', {
+        const response = await fetch('http://localhost:5006/mac/api/calendar/events', {
             method: 'POST',
             body: formData,
             headers: {

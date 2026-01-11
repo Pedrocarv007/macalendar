@@ -21,6 +21,7 @@ class Document(db.Model):
     filename = db.Column(db.String(255), nullable=True)
     file_path = db.Column(db.String(500), nullable=True)
     file_size = db.Column(db.Integer, nullable=True)  # Tamanho em bytes
+    file_extension = db.Column(db.String(10), nullable=True)
     description = db.Column(db.Text, nullable=True)
     tags = db.Column(db.String(500), nullable=True)
     is_public = db.Column(db.Boolean, default=False, nullable=False)

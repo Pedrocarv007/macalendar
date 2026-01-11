@@ -125,6 +125,9 @@ def register_error_handlers(app):
         
         if debug:
             message = str(error)
+            import traceback
+            print('--- Traceback (erro 500) ---')
+            traceback.print_exc()
         
         return jsonify({
             'error': 'INTERNAL_SERVER_ERROR',
@@ -155,6 +158,9 @@ def register_error_handlers(app):
         message = 'Erro interno do servidor'
         if debug:
             message = str(error)
+            import traceback
+            print('--- Traceback (Exception) ---')
+            traceback.print_exc()
         
         return jsonify({
             'error': 'INTERNAL_SERVER_ERROR',

@@ -13,7 +13,7 @@
                     <p class="text-muted mb-0">Gerencie arquivos e documentos importantes</p>
                 </div>
                 <div class="d-flex gap-2 document-actions-right">
-                    <button class="btn btn-outline-primary" onclick="bulkDownload()">
+                    <button class="btn btn-outline-primary" id="bulkDownloadBtn">
                         <i class="fas fa-download me-1"></i>Download em Lote
                     </button>
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#documentModal">
@@ -104,28 +104,25 @@
                                     <i class="fas fa-search"></i>
                                 </span>
                                 <input type="text" class="form-control" id="searchDocument" 
-                                       placeholder="Nome do arquivo ou descrição..." oninput="filterDocuments()">
+                                       placeholder="Nome do arquivo ou descrição...">
                             </div>
                         </div>
                         
                         <div class="col-md-2">
                             <label for="filterType" class="form-label">Tipo</label>
-                            <select class="form-select" id="filterType" onchange="filterDocuments()">
+                            <select class="form-select" id="filterType">
                                 <option value="">Todos</option>
                                 <option value="pdf">PDF</option>
                                 <option value="doc">Documento</option>
                                 <option value="image">Imagem</option>
-                                <option value="spreadsheet">Planilha</option>
                                 <option value="other">Outros</option>
                             </select>
                         </div>
                         
                         <div class="col-md-2">
                             <label for="filterCategory" class="form-label">Categoria</label>
-                            <select class="form-select" id="filterCategory" onchange="filterDocuments()">
+                            <select class="form-select" id="filterCategory">
                                 <option value="">Todas</option>
-                                <option value="Contratos">Contratos</option>
-                                <option value="Relatórios">Relatórios</option>
                                 <option value="Certificados">Certificados</option>
                                 <option value="Manuais">Manuais</option>
                                 <option value="Fotos">Fotos</option>
@@ -135,7 +132,7 @@
                         
                         <div class="col-md-2">
                             <label for="sortBy" class="form-label">Ordenar por</label>
-                            <select class="form-select" id="sortBy" onchange="sortDocuments()">
+                            <select class="form-select" id="sortBy">
                                 <option value="name">Nome</option>
                                 <option value="upload_date">Data de Upload</option>
                                 <option value="size">Tamanho</option>
@@ -144,7 +141,7 @@
                         </div>
                         
                         <div class="col-md-2">
-                            <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                            <button class="btn btn-outline-secondary w-100" id="clearFiltersBtn">
                                 <i class="fas fa-times me-1"></i>Limpar
                             </button>
                         </div>
@@ -164,13 +161,19 @@
                             <i class="fas fa-folder me-2"></i>Arquivos
                         </h5>
                         <div class="d-flex gap-2">
+                            <div id="gridActions" style="display: none;">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="DocumentsModule.toggleSelectAll()">
+                                    <i class="fas fa-check-double me-1"></i>Selecionar Todos
+                                </button>
+                            </div>
+                            <div id="paginationControls" class="d-flex justify-content-center align-items-center mt-1"></div>
                             <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#generateDocumentModal">
                                 <i class="fas fa-wand-magic-sparkles me-1"></i>Gerar Cartão
                             </button>
-                            <button class="btn btn-sm btn-outline-primary" onclick="toggleView('grid')" id="gridViewBtn">
+                            <button class="btn btn-sm btn-outline-primary" id="gridViewBtn">
                                 <i class="fas fa-th"></i>
                             </button>
-                            <button class="btn btn-sm btn-primary" onclick="toggleView('list')" id="listViewBtn">
+                            <button class="btn btn-sm btn-primary" id="listViewBtn">
                                 <i class="fas fa-list"></i>
                             </button>
                         </div>
@@ -192,7 +195,7 @@
                                 <thead>
                                     <tr>
                                         <th>
-                                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                                            <input type="checkbox" id="selectAll">
                                         </th>
                                         <th>Nome</th>
                                         <th>Tipo</th>
@@ -288,7 +291,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success" onclick="generateAndDownloadDocument()">
+                <button type="button" class="btn btn-success" id="generateAndDownloadBtn">
                     <i class="fas fa-download me-1"></i>Gerar e Baixar
                 </button>
             </div>
@@ -319,7 +322,7 @@
                     
                     <div class="mb-3">
                         <label for="documentName" class="form-label">Nome do Documento</label>
-                        <input type="text" class="form-control" id="documentName" name="name" 
+                        <input type="text" class="form-control" id="documentName" name="title" 
                                placeholder="Deixe em branco para usar o nome do arquivo">
                     </div>
                     
@@ -360,17 +363,18 @@
                             </label>
                         </div>
                     </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-danger" id="deleteDocumentBtn" style="display: none;">
+                            <i class="fas fa-trash me-1"></i>Excluir
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="saveDocumentBtn">
+                            <i class="fas fa-upload me-1"></i>Upload
+                        </button>
+                    </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-danger" id="deleteDocumentBtn" style="display: none;" onclick="deleteDocument()">
-                    <i class="fas fa-trash me-1"></i>Excluir
-                </button>
-                <button type="button" class="btn btn-primary" onclick="saveDocument()">
-                    <i class="fas fa-upload me-1"></i>Upload
-                </button>
-            </div>
+            
         </div>
     </div>
 </div>
@@ -399,806 +403,3 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
-<script>
-let documents = [];
-let filteredDocuments = [];
-let currentView = 'list';
-let selectedDocuments = new Set();
-
-document.addEventListener('DOMContentLoaded', function() {
-    loadDocuments();
-    loadCurrentEmployeeId();
-});
-
-async function loadCurrentEmployeeId() {
-    try {
-        // Usar o api client que já está configurado
-        const currentUser = await api.get('/auth/user');
-        
-        if (!currentUser || !currentUser.id) {
-            console.warn('Não foi possível obter dados do usuário');
-            return;
-        }
-        
-        // Preencher o campo hidden com o employee_id do user logado
-        document.getElementById('documentEmployee').value = currentUser.id;
-        
-        console.log('✅ Employee ID carregado:', currentUser.id);
-    } catch (error) {
-        console.error('❌ Erro ao carregar dados do colaborador:', error);
-        if (window.Utils && typeof Utils.showAlert === 'function') {
-            Utils.showAlert('Erro ao carregar usuário atual', 'error');
-        }
-    }
-}
-
-async function loadDocuments() {
-    const loading = document.getElementById('documentsLoading');
-    loading.style.display = 'block';
-    
-    try {
-        const apiBase = window.API_BASE_URL || '/api';
-        const response = await fetch(`${apiBase}/documents`, { credentials: 'include' });
-        if (!response.ok) {
-            const text = await response.text();
-            let parsed = null;
-            try { parsed = JSON.parse(text); } catch (e) {}
-            throw new Error((parsed && (parsed.error || parsed.message)) || 'Erro ao carregar');
-        }
-        const data = await response.json().catch(() => ({ documents: [] }));
-        documents = data.documents || [];
-        filteredDocuments = [...documents];
-        renderDocuments();
-        updateStats();
-    } catch (error) {
-        console.error('Erro ao carregar documentos:', error);
-        if (window.Utils && typeof Utils.showAlert === 'function') {
-            Utils.showAlert('Erro ao carregar documentos: ' + (error.message || 'Falha'), 'error');
-        }
-    } finally {
-        loading.style.display = 'none';
-    }
-}
-
-function renderDocuments() {
-    const listContainer = document.getElementById('documentsList');
-    const gridContainer = document.getElementById('documentsGrid');
-    const noResults = document.getElementById('noDocuments');
-    
-    if (filteredDocuments.length === 0) {
-        listContainer.style.display = 'none';
-        gridContainer.style.display = 'none';
-        noResults.style.display = 'block';
-        return;
-    }
-    
-    noResults.style.display = 'none';
-    
-    if (currentView === 'list') {
-        renderListView();
-        listContainer.style.display = 'block';
-        gridContainer.style.display = 'none';
-    } else {
-        renderGridView();
-        listContainer.style.display = 'none';
-        gridContainer.style.display = 'block';
-    }
-}
-
-function renderListView() {
-    const tbody = document.getElementById('documentsTableBody');
-    tbody.innerHTML = filteredDocuments.map(doc => `
-        <tr>
-            <td>
-                <input type="checkbox" class="document-checkbox" value="${doc.id}" 
-                       onchange="toggleDocumentSelection(${doc.id}, this.checked)">
-            </td>
-            <td>
-                <div class="d-flex align-items-center">
-                    <i class="fas ${getFileIcon(doc.filename)} me-2 text-${getFileColor(doc.filename)}"></i>
-                    <div>
-                        <strong>${doc.title}</strong>
-                        ${doc.description ? `<br><small class="text-muted">${doc.description.substring(0, 50)}${doc.description.length > 50 ? '...' : ''}</small>` : ''}
-                    </div>
-                </div>
-            </td>
-            <td>
-                <span class="badge bg-${getFileColor(doc.filename)}">${getFileTypeLabel(doc.filename)}</span>
-            </td>
-            <td>${doc.document_type}</td>
-            <td>${formatFileSize(doc.file_size)}</td>
-            <td>
-                <small>${formatDate(new Date(doc.created_at))}</small>
-            </td>
-            <td>
-                <div class="btn-group" role="group">
-                    <button class="btn btn-sm btn-outline-primary" onclick="previewDocument(${doc.id})" title="Visualizar">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-success" onclick="downloadDocument(${doc.id})" title="Download">
-                        <i class="fas fa-download"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-info" onclick="editDocument(${doc.id})" title="Editar">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="confirmDeleteDocument(${doc.id})" title="Excluir">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function renderGridView() {
-    const container = document.getElementById('documentsGridContainer');
-    container.innerHTML = filteredDocuments.map(doc => `
-        <div class="col-md-6 col-lg-4 col-xl-3">
-            <div class="card document-card">
-                <div class="card-body text-center">
-                    <div class="document-icon mb-3">
-                        <i class="fas ${getFileIcon(doc.filename)} text-${getFileColor(doc.filename)}" style="font-size: 3rem;"></i>
-                    </div>
-                    
-                    <h6 class="card-title" title="${doc.title}">${doc.title.substring(0, 20)}${doc.title.length > 20 ? '...' : ''}</h6>
-                    
-                    <div class="mb-2">
-                        <span class="badge bg-${getFileColor(doc.filename)}">${getFileTypeLabel(doc.filename)}</span>
-                        <span class="badge bg-secondary">${doc.document_type}</span>
-                    </div>
-                    
-                    <div class="text-muted small mb-3">
-                        <div>${formatFileSize(doc.file_size)}</div>
-                        <div>${formatDate(new Date(doc.created_at))}</div>
-                    </div>
-                    
-                    ${doc.description ? `<p class="text-muted small">${doc.description.substring(0, 80)}${doc.description.length > 80 ? '...' : ''}</p>` : ''}
-                </div>
-                <div class="card-footer">
-                    <div class="btn-group w-100" role="group">
-                        <button class="btn btn-sm btn-outline-primary" onclick="previewDocument(${doc.id})" title="Visualizar">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-success" onclick="downloadDocument(${doc.id})" title="Download">
-                            <i class="fas fa-download"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-info" onclick="editDocument(${doc.id})" title="Editar">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-function toggleView(view) {
-    currentView = view;
-    
-    document.getElementById('listViewBtn').className = view === 'list' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
-    document.getElementById('gridViewBtn').className = view === 'grid' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
-    
-    renderDocuments();
-}
-
-function filterDocuments() {
-    const search = document.getElementById('searchDocument').value.toLowerCase();
-    const type = document.getElementById('filterType').value;
-    const category = document.getElementById('filterCategory').value;
-    
-    filteredDocuments = documents.filter(doc => {
-        const matchesSearch = !search || 
-            doc.title.toLowerCase().includes(search) ||
-            (doc.description && doc.description.toLowerCase().includes(search));
-        
-        const matchesType = !type || getFileTypeCategory(doc.document_type) === type;
-        const matchesCategory = !category || doc.document_type === category;
-        
-        return matchesSearch && matchesType && matchesCategory;
-    });
-    
-    renderDocuments();
-}
-
-function sortDocuments() {
-    const sortBy = document.getElementById('sortBy').value;
-    
-    filteredDocuments.sort((a, b) => {
-        if (sortBy === 'title') {
-            return a.title.localeCompare(b.title);
-        } else if (sortBy === 'created_at') {
-            return new Date(b.created_at) - new Date(a.created_at);
-        } else if (sortBy === 'file_size') {
-            return b.file_size - a.file_size;
-        } else if (sortBy === 'document_type') {
-            return a.document_type.localeCompare(b.document_type);
-        }
-        return 0;
-    });
-    
-    renderDocuments();
-}
-
-function clearFilters() {
-    document.getElementById('searchDocument').value = '';
-    document.getElementById('filterType').value = '';
-    document.getElementById('filterCategory').value = '';
-    document.getElementById('sortBy').value = 'name';
-    
-    filteredDocuments = [...documents];
-    renderDocuments();
-}
-
-function toggleSelectAll() {
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.document-checkbox');
-    
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = selectAll.checked;
-        toggleDocumentSelection(parseInt(checkbox.value), checkbox.checked);
-    });
-}
-
-function toggleDocumentSelection(docId, selected) {
-    if (selected) {
-        selectedDocuments.add(docId);
-    } else {
-        selectedDocuments.delete(docId);
-    }
-    
-    // Update select all checkbox
-    const checkboxes = document.querySelectorAll('.document-checkbox');
-    const selectAll = document.getElementById('selectAll');
-    selectAll.checked = checkboxes.length > 0 && selectedDocuments.size === checkboxes.length;
-}
-
-async function saveDocument() {
-    const form = document.getElementById('documentForm');
-    const formData = new FormData(form);
-    
-    // Validar se arquivo foi selecionado (para novo documento)
-    const documentId = document.getElementById('documentId').value;
-    const file = document.getElementById('documentFile').files[0];
-    const employeeId = document.getElementById('documentEmployee').value;
-    
-    if (!documentId && !file) {
-        Utils.showAlert('Por favor, selecione um arquivo', 'error');
-        return;
-    }
-    
-    // Validar se employee_id foi preenchido
-    if (!employeeId) {
-        Utils.showAlert('Erro: Colaborador não foi carregado. Tente novamente.', 'error');
-        return;
-    }
-    
-    // Adicionar restaurant_id
-    formData.set('restaurant_id', {{ current_user.restaurant_id if current_user and current_user.restaurant_id else 'null' }});
-    formData.set('is_public', document.getElementById('documentPublic').checked);
-    
-    try {
-        console.log('📤 Enviando documento...', { documentId, employeeId });
-        
-        let result;
-        if (documentId) {
-            // Atualizar documento existente
-            result = await api.put(`/documents/${documentId}`, formData);
-        } else {
-            // Criar novo documento
-            result = await api.post('/documents', formData);
-        }
-        
-        console.log('✅ Documento salvo:', result);
-        
-        Utils.showToast(documentId ? 'Documento atualizado!' : 'Documento enviado!', 'success');
-        
-        // Close modal and refresh
-        bootstrap.Modal.getInstance(document.getElementById('documentModal')).hide();
-        form.reset();
-        document.getElementById('deleteDocumentBtn').style.display = 'none';
-        document.getElementById('documentModalTitle').textContent = 'Novo Documento';
-        
-        loadDocuments();
-        
-    } catch (error) {
-        console.error('❌ Erro ao salvar documento:', error);
-        Utils.showAlert('Erro ao salvar documento: ' + error.message, 'error');
-    }
-}
-
-function previewDocument(id) {
-    const doc = documents.find(d => d.id === id);
-    if (!doc) return;
-    
-    document.getElementById('previewModalTitle').textContent = doc.name;
-    document.getElementById('downloadPreviewBtn').onclick = () => downloadDocument(id);
-    
-    const content = document.getElementById('previewContent');
-    
-    if (doc.type.startsWith('image/')) {
-        content.innerHTML = `<img src="/api/documents/${id}/preview" class="img-fluid" alt="${doc.name}">`;
-    } else if (doc.type === 'application/pdf') {
-        content.innerHTML = `<embed src="/api/documents/${id}/preview" type="application/pdf" width="100%" height="500px">`;
-    } else {
-        content.innerHTML = `
-            <div class="text-center py-5">
-                <i class="fas ${getFileIcon(doc.type)} text-${getFileColor(doc.type)}" style="font-size: 5rem;"></i>
-                <h5 class="mt-3">${doc.name}</h5>
-                <p class="text-muted">Visualização não disponível para este tipo de arquivo</p>
-                <button class="btn btn-primary" onclick="downloadDocument(${id})">
-                    <i class="fas fa-download me-1"></i>Download
-                </button>
-            </div>
-        `;
-    }
-    
-    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
-    modal.show();
-}
-
-function downloadDocument(id) {
-    const prefix = window.APP_PREFIX || '';
-    window.open(`${prefix}/api/documents/${id}/download`, '_blank');
-}
-
-function editDocument(id) {
-    const doc = documents.find(d => d.id === id);
-    if (!doc) return;
-    
-    document.getElementById('documentModalTitle').textContent = 'Editar Documento';
-    document.getElementById('documentId').value = doc.id;
-    document.getElementById('documentName').value = doc.name;
-    document.getElementById('documentCategory').value = doc.category;
-    document.getElementById('documentDescription').value = doc.description || '';
-    document.getElementById('documentTags').value = doc.tags || '';
-    document.getElementById('documentPublic').checked = doc.is_public;
-    
-    // Hide file input for editing
-    document.getElementById('documentFile').style.display = 'none';
-    document.getElementById('documentFile').required = false;
-    
-    document.getElementById('deleteDocumentBtn').style.display = 'inline-block';
-    
-    const modal = new bootstrap.Modal(document.getElementById('documentModal'));
-    modal.show();
-}
-
-async function deleteDocument() {
-    const documentId = document.getElementById('documentId').value;
-    await deleteDocumentById(documentId);
-    bootstrap.Modal.getInstance(document.getElementById('documentModal')).hide();
-}
-
-function confirmDeleteDocument(id) {
-    const doc = documents.find(d => d.id === id);
-    if (!doc) return;
-    
-    if (confirm(`Tem certeza que deseja excluir o documento ${doc.name}?`)) {
-        deleteDocumentById(id);
-    }
-}
-
-async function deleteDocumentById(id) {
-    try {
-        await api.delete(`/documents/${id}`);
-        Utils.showToast('Documento excluído!', 'success');
-        loadDocuments();
-    } catch (error) {
-        Utils.showAlert('Erro ao excluir documento: ' + error.message, 'error');
-    }
-}
-
-function bulkDownload() {
-    if (selectedDocuments.size === 0) {
-        Utils.showAlert('Selecione pelo menos um documento', 'warning');
-        return;
-    }
-    
-    const ids = Array.from(selectedDocuments);
-    const prefix = window.APP_PREFIX || '';
-    const url = `${prefix}/api/documents/bulk-download?ids=${ids.join(',')}`;
-    window.open(url, '_blank');
-}
-
-function updateStats() {
-    document.getElementById('totalDocuments').textContent = documents.length;
-    
-    const pdfCount = documents.filter(d => d.filename && d.filename.toLowerCase().endsWith('.pdf')).length;
-    document.getElementById('pdfCount').textContent = pdfCount;
-    
-    const imageCount = documents.filter(d => d.filename && /\.(jpg|jpeg|png|gif|webp)$/i.test(d.filename)).length;
-    document.getElementById('imageCount').textContent = imageCount;
-    
-    const totalSize = documents.reduce((total, d) => total + (d.file_size || 0), 0);
-    document.getElementById('totalSize').textContent = formatFileSize(totalSize);
-}
-
-// Utility functions - adapted to work with filename
-function getFileIcon(filename) {
-    if (!filename) return 'fa-file';
-    const ext = filename.toLowerCase().split('.').pop();
-    
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return 'fa-file-image';
-    if (ext === 'pdf') return 'fa-file-pdf';
-    if (['doc', 'docx', 'txt'].includes(ext)) return 'fa-file-word';
-    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'fa-file-excel';
-    if (['ppt', 'pptx'].includes(ext)) return 'fa-file-powerpoint';
-    if (['zip', 'rar', '7z'].includes(ext)) return 'fa-file-archive';
-    return 'fa-file';
-}
-
-function getFileColor(filename) {
-    if (!filename) return 'secondary';
-    const ext = filename.toLowerCase().split('.').pop();
-    
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return 'warning';
-    if (ext === 'pdf') return 'danger';
-    if (['doc', 'docx', 'txt'].includes(ext)) return 'primary';
-    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'success';
-    if (['ppt', 'pptx'].includes(ext)) return 'info';
-    return 'secondary';
-}
-
-function getFileTypeLabel(filename) {
-    if (!filename) return 'Arquivo';
-    const ext = filename.toLowerCase().split('.').pop();
-    
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return 'Imagem';
-    if (ext === 'pdf') return 'PDF';
-    if (['doc', 'docx', 'txt'].includes(ext)) return 'Documento';
-    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'Planilha';
-    if (['ppt', 'pptx'].includes(ext)) return 'Apresentação';
-    if (['zip', 'rar', '7z'].includes(ext)) return 'Compactado';
-    return 'Arquivo';
-}
-
-function getFileTypeCategory(filename) {
-    if (!filename) return 'other';
-    const ext = filename.toLowerCase().split('.').pop();
-    
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return 'image';
-    if (ext === 'pdf') return 'pdf';
-    if (['doc', 'docx', 'txt'].includes(ext)) return 'doc';
-    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'spreadsheet';
-    return 'other';
-}
-
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-function formatDate(date) {
-    return date.toLocaleDateString('pt-BR');
-}
-
-// Reset modal when closed
-document.getElementById('documentModal').addEventListener('shown.bs.modal', function() {
-    // Carregar employee_id quando modal abrir
-    loadCurrentEmployeeId();
-});
-
-document.getElementById('documentModal').addEventListener('hidden.bs.modal', function() {
-    const form = document.getElementById('documentForm');
-    form.reset();
-    document.getElementById('deleteDocumentBtn').style.display = 'none';
-    document.getElementById('documentModalTitle').textContent = 'Novo Documento';
-    document.getElementById('documentFile').style.display = 'block';
-    document.getElementById('documentFile').required = true;
-});
-
-// ===== FUNÇÕES PARA GERAÇÃO DE DOCUMENTOS =====
-
-let allEmployees = [];
-let selectedEmployee = null;
-
-// Carregar lista de funcionários quando modal abrir
-document.getElementById('generateDocumentModal').addEventListener('shown.bs.modal', function() {
-    loadEmployeesForGeneration();
-});
-
-// Fechar modal quando fecha
-document.getElementById('generateDocumentModal').addEventListener('hidden.bs.modal', function() {
-    document.getElementById('generateDocumentForm').reset();
-    document.getElementById('employeeDropdown').style.display = 'none';
-    document.getElementById('employeeInfo').style.display = 'none';
-    document.getElementById('genEmployeeId').value = '';
-    selectedEmployee = null;
-});
-
-// Carregar lista de funcionários
-async function loadEmployeesForGeneration() {
-    try {
-        // Usar a mesma base da API e enviar cookies da sessão
-        const response = await fetch(`${window.API_BASE_URL || '/api'}/employees`, {
-            credentials: 'include'
-        });
-        if (!response.ok) throw new Error('Erro ao carregar');
-        const data = await response.json();
-        const employees = data.employees || [];
-        const workers = (data.workers || []).map(w => ({ ...w, is_worker: true }));
-        allEmployees = [...employees.map(e => ({ ...e, is_worker: false })), ...workers];
-        console.log('Colaboradores carregados para geração:', allEmployees.length);
-    } catch (error) {
-        console.error('Erro ao carregar funcionários:', error);
-        Utils.showAlert('Erro ao carregar funcionários', 'error');
-    }
-}
-
-// Buscar funcionários enquanto digita
-document.getElementById('genEmployeeSearch').addEventListener('input', function(e) {
-    const searchTerm = e.target.value.toLowerCase().trim();
-    const dropdown = document.getElementById('employeeDropdown');
-    
-    if (searchTerm.length < 1) {
-        dropdown.style.display = 'none';
-        return;
-    }
-    
-    const filtered = allEmployees.filter(emp => 
-        emp.name.toLowerCase().includes(searchTerm) ||
-        (emp.email && emp.email.toLowerCase().includes(searchTerm))
-    );
-    
-    dropdown.innerHTML = '';
-    
-    if (filtered.length === 0) {
-        dropdown.innerHTML = '<div class="list-group-item disabled">Nenhum funcionário encontrado</div>';
-    } else {
-        filtered.forEach(emp => {
-            const item = document.createElement('button');
-            item.type = 'button';
-            item.className = 'list-group-item list-group-item-action';
-            const roleLabel = emp.is_worker ? 'Trabalhador' : (emp.role || 'N/A');
-            const emailText = emp.email ? emp.email : 'Sem email cadastrado';
-            const typeBadge = emp.is_worker ? '<span class="badge bg-warning text-dark ms-2">Worker</span>' : '';
-            item.innerHTML = `
-                <div class="d-flex w-100 justify-content-between align-items-center">
-                    <div class="d-flex align-items-center">
-                        <strong>${emp.name}</strong>${typeBadge}
-                    </div>
-                    <small class="text-muted">${roleLabel}</small>
-                </div>
-                <small class="text-muted">${emailText}</small>
-            `;
-            item.onclick = (e) => {
-                e.preventDefault();
-                selectEmployee(emp);
-            };
-            dropdown.appendChild(item);
-        });
-    }
-    
-    dropdown.style.display = 'block';
-});
-
-// Limpar busca
-document.getElementById('clearSearchBtn').addEventListener('click', function() {
-    document.getElementById('genEmployeeSearch').value = '';
-    document.getElementById('employeeDropdown').style.display = 'none';
-    document.getElementById('genEmployeeId').value = '';
-    document.getElementById('genEmployeeIsWorker').value = 'false';
-    selectedEmployee = null;
-    document.getElementById('employeeInfo').style.display = 'none';
-    document.getElementById('selectedEmployeeName').style.display = 'none';
-});
-
-// Selecionar funcionário
-function selectEmployee(employee) {
-    selectedEmployee = employee;
-    document.getElementById('genEmployeeId').value = employee.id;
-    document.getElementById('genEmployeeIsWorker').value = employee.is_worker ? 'true' : 'false';
-    document.getElementById('genEmployeeSearch').value = employee.name;
-    document.getElementById('employeeDropdown').style.display = 'none';
-    
-    // Mostrar informações do funcionário
-    const typeLabel = employee.is_worker ? ' (worker)' : '';
-    document.getElementById('infoEmployeeName').textContent = `${employee.name}${typeLabel}`;
-    document.getElementById('infoEmployeePhoto').textContent = 
-        employee.photo_filename ? '✓ Tem foto' : '⚠ Sem foto (usará placeholder)';
-    
-    const docType = document.getElementById('genDocumentType').value;
-    if (docType === 'aniversario' && employee.birth_date) {
-        const date = new Date(employee.birth_date);
-        document.getElementById('infoEmployeeBirthDate').textContent = 
-            date.toLocaleDateString('pt-BR');
-        document.getElementById('infoBirthDate').style.display = 'block';
-    } else {
-        document.getElementById('infoBirthDate').style.display = 'none';
-    }
-    
-    document.getElementById('employeeInfo').style.display = 'block';
-    document.getElementById('selectedEmployeeName').style.display = 'block';
-    document.getElementById('selectedEmployeeName').textContent = `✓ ${employee.name}${typeLabel} selecionado`;
-}
-
-// Atualizar tipo de documento
-document.getElementById('genDocumentType').addEventListener('change', function() {
-    if (selectedEmployee) {
-        const docType = this.value;
-        if (docType === 'aniversario' && selectedEmployee.birth_date) {
-            const date = new Date(selectedEmployee.birth_date);
-            document.getElementById('infoEmployeeBirthDate').textContent = 
-                date.toLocaleDateString('pt-BR');
-            document.getElementById('infoBirthDate').style.display = 'block';
-        } else {
-            document.getElementById('infoBirthDate').style.display = 'none';
-        }
-    }
-    // Mostrar campos extras para Funcionário do Mês
-    if (this.value === 'funcionario_mes') {
-        document.getElementById('employeeOfMonthFields').style.display = 'block';
-    } else {
-        document.getElementById('employeeOfMonthFields').style.display = 'none';
-    }
-});
-
-// Gerar e baixar documento
-async function generateAndDownloadDocument() {
-    const docType = document.getElementById('genDocumentType').value;
-    const employeeId = document.getElementById('genEmployeeId').value;
-    const isWorker = document.getElementById('genEmployeeIsWorker').value === 'true';
-    const monthYear = document.getElementById('genMonthYear') ? document.getElementById('genMonthYear').value : '';
-    const reason = document.getElementById('genReason') ? document.getElementById('genReason').value : '';
-
-    if (!docType) {
-        Utils.showAlert('Selecione um tipo de cartão', 'warning');
-        return;
-    }
-
-    if (!employeeId) {
-        Utils.showAlert('Selecione um funcionário', 'warning');
-        return;
-    }
-
-    if (docType === 'funcionario_mes' && !monthYear) {
-        Utils.showAlert('Informe o mês/ano para o Funcionário do Mês', 'warning');
-        return;
-    }
-
-    // Mostrar loading
-    const btn = event.target;
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';
-
-    try {
-        // Obter restaurant_id do funcionário selecionado
-        const restaurantId = selectedEmployee.restaurant_id;
-
-        // Chamar API para gerar documento (via cliente API com CSRF)
-        const payload = {
-            document_type: docType,
-            employee_id: parseInt(employeeId),
-            restaurant_id: restaurantId,
-            is_worker: isWorker
-        };
-        if (docType === 'funcionario_mes') {
-            payload.month_year = monthYear;
-            if (reason) payload.reason = reason;
-        }
-        const result = await api.post('/documents/generate-auto', payload);
-        if (!result || !result.document || !result.document.filename) {
-            throw new Error('Resposta inválida da API');
-        }
-        const filename = result.document.filename;
-        
-        // Atualizar status do botão
-        btn.innerHTML = '<i class="fas fa-download me-1"></i>Baixando...';
-        
-        // Gerar nome do arquivo com data e hora
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-        const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS
-        const cleanName = selectedEmployee.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-        const downloadName = `cartao_${docType}_${cleanName}_${dateStr}_${timeStr}.png`;
-        
-        // Aguardar um pouco para garantir que o arquivo foi salvo
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Baixar arquivo
-        const downloadLink = document.createElement('a');
-        const prefix = window.APP_PREFIX || '';
-        downloadLink.href = `${prefix}/uploads/generated/${filename}`;
-        downloadLink.download = downloadName;
-        downloadLink.style.display = 'none';
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-        
-        // Aguardar download iniciar
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Fechar modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('generateDocumentModal'));
-        if (modal) {
-            modal.hide();
-        }
-        
-        // Recarregar documentos
-        loadDocuments();
-        
-        // Mostrar sucesso
-        Utils.showToast(`✓ Cartão gerado e baixado: ${downloadName}`, 'success');
-        
-    } catch (error) {
-        console.error('Erro ao gerar documento:', error);
-        Utils.showAlert('Erro ao gerar documento: ' + error.message, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-    }
-}
-
-// ===== IA - GERAÇÃO DE POSTS =====
-
-const aiPostModalEl = document.getElementById('aiPostModal');
-if (aiPostModalEl) {
-    aiPostModalEl.addEventListener('shown.bs.modal', resetAiPostModal);
-    aiPostModalEl.addEventListener('hidden.bs.modal', resetAiPostModal);
-}
-
-function resetAiPostModal() {
-    const form = document.getElementById('aiPostForm');
-    const errorBox = document.getElementById('aiPostError');
-    form.reset();
-    document.getElementById('aiPostOutput').value = '';
-    document.getElementById('aiCopyBtn').disabled = true;
-    errorBox.classList.add('d-none');
-    errorBox.textContent = '';
-}
-
-async function generateAiPost() {
-    const topic = document.getElementById('aiTopic').value.trim();
-    const tone = document.getElementById('aiTone').value;
-    const length = document.getElementById('aiLength').value;
-    const language = document.getElementById('aiLanguage').value;
-    const btn = document.getElementById('aiGenerateBtn');
-    const output = document.getElementById('aiPostOutput');
-    const copyBtn = document.getElementById('aiCopyBtn');
-    const errorBox = document.getElementById('aiPostError');
-
-    if (!topic) {
-        Utils.showAlert('Digite um tema para o post', 'warning');
-        return;
-    }
-
-    errorBox.classList.add('d-none');
-    errorBox.textContent = '';
-    output.value = '';
-    copyBtn.disabled = true;
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';
-
-    try {
-        const data = await api.post('/ai/posts', { topic, tone, length, language });
-        if (!data || !data.text) {
-            throw new Error('Resposta vazia da IA');
-        }
-        output.value = data.text;
-        copyBtn.disabled = false;
-        Utils.showToast('Post gerado com IA', 'success');
-    } catch (error) {
-        errorBox.textContent = error.message;
-        errorBox.classList.remove('d-none');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-wand-magic-sparkles me-1"></i>Gerar texto';
-    }
-}
-
-function copyAiPost() {
-    const output = document.getElementById('aiPostOutput');
-    if (!output.value) return;
-
-    navigator.clipboard.writeText(output.value)
-        .then(() => Utils.showToast('Copiado para a área de transferência', 'success'))
-        .catch(() => Utils.showAlert('Não foi possível copiar o texto', 'error'));
-}
-</script>
-{% endblock %}
