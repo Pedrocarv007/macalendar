@@ -1,17 +1,20 @@
 /**
  * MAC Calendar - Documents Module
- * VERSÃO RESTAURADA: Stats, Filtros e templateRow originais garantidos + Correção de Paginação.
+ * VERSÃO RESTAURADA E COMPLETA: 
+ * - Filtro Local (Instantâneo)
+ * - Download em Lote (Thecarv + Sem janela)
+ * - Geração de Cartão (Com campos extras Mês/Motivo)
+ * - Auto-Reset da Modal ao sair
  */
 
 const DocumentsModule = {
     data: [],
-    filteredData: [],
+    allEmployees: [], 
     currentUser: null,
     currentView: 'list', 
-    allEmployees: [],
-    selectedEmployee: null,
+    currentPage: 1,
     searchTimer: null,
-    currentPage: 1, // Página atual controlada pelo módulo
+    selectedEmployee: null,
 
     async init() {
         try {
@@ -25,165 +28,195 @@ const DocumentsModule = {
     },
 
     setupHandlers() {
-        // 1. BUSCA (Debounce)
+        const self = this;
+
+        // --- HANDLERS DA MODAL DE GERAÇÃO (Limpeza e Carregamento) ---
+        const genModal = document.getElementById('generateDocumentModal');
+        if (genModal) {
+            genModal.addEventListener('show.bs.modal', () => {
+                self.loadEmployeesForGeneration();
+            });
+
+            genModal.addEventListener('hidden.bs.modal', () => {
+                const form = document.getElementById('generateDocumentForm');
+                if (form) form.reset();
+                document.getElementById('genEmployeeId').value = '';
+                document.getElementById('employeeDropdown').style.display = 'none';
+                document.getElementById('employeeInfo').style.display = 'none';
+                document.getElementById('selectedEmployeeName').style.display = 'none';
+                self.selectedEmployee = null;
+            });
+        }
+
+        // 1. BUSCA DE DOCUMENTOS
         const searchInput = document.getElementById('searchDocument');
         if (searchInput) {
             searchInput.oninput = () => {
-                DocumentsModule.currentPage = 1; 
-                clearTimeout(DocumentsModule.searchTimer);
-                DocumentsModule.searchTimer = setTimeout(() => DocumentsModule.filterAndDisplay(), 300);
+                self.currentPage = 1; 
+                clearTimeout(self.searchTimer);
+                self.searchTimer = setTimeout(() => self.filterAndDisplay(), 300);
             };
         }
 
-        // 2. FILTROS (Restaurados um a um para não haver erro de ID)
-        const fType = document.getElementById('filterType');
-        if (fType) {
-            fType.onchange = () => {
-                DocumentsModule.currentPage = 1;
-                DocumentsModule.filterAndDisplay();
+        // 2. FILTROS
+        ['filterType', 'filterCategory', 'sortBy'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.onchange = () => {
+                if (id !== 'sortBy') self.currentPage = 1;
+                self.filterAndDisplay();
+            };
+        });
+
+        // 3. CONTROLES DE VISUALIZAÇÃO E AÇÕES
+        document.getElementById('gridViewBtn').onclick = () => self.toggleView('grid');
+        document.getElementById('listViewBtn').onclick = () => self.toggleView('list');
+        document.getElementById('selectAll').onchange = () => self.toggleSelectAll();
+        document.getElementById('bulkDownloadBtn').onclick = () => self.downloadSelected();
+        document.getElementById('generateAndDownloadBtn').onclick = () => self.generateAndDownloadDocument();
+
+        // 4. PESQUISA DE FUNCIONÁRIOS (Filtro Local)
+        const empSearch = document.getElementById('genEmployeeSearch');
+        if (empSearch) {
+            empSearch.oninput = (e) => self.handleEmployeeSearch(e.target.value.toLowerCase().trim());
+        }
+
+        const genType = document.getElementById('genDocumentType');
+        if (genType) {
+            genType.onchange = (e) => {
+                const fields = document.getElementById('employeeOfMonthFields');
+                if (fields) fields.style.display = e.target.value === 'funcionario_mes' ? 'block' : 'none';
             };
         }
 
-        const fCat = document.getElementById('filterCategory');
-        if (fCat) {
-            fCat.onchange = () => {
-                DocumentsModule.currentPage = 1;
-                DocumentsModule.filterAndDisplay();
-            };
-        }
-
-        const fSort = document.getElementById('sortBy');
-        if (fSort) {
-            fSort.onchange = () => {
-                DocumentsModule.filterAndDisplay();
-            };
-        }
-
-        // 3. CONTROLES DE VISUALIZAÇÃO
-        const gridBtn = document.getElementById('gridViewBtn');
-        if (gridBtn) gridBtn.onclick = () => DocumentsModule.toggleView('grid');
-
-        const listBtn = document.getElementById('listViewBtn');
-        if (listBtn) listBtn.onclick = () => DocumentsModule.toggleView('list');
-
-        const clearBtn = document.getElementById('clearFiltersBtn');
-        if (clearBtn) {
-            clearBtn.onclick = () => {
-                document.getElementById('searchDocument').value = '';
-                document.getElementById('filterType').value = '';
-                document.getElementById('filterCategory').value = '';
-                document.getElementById('sortBy').value = 'name';
-                DocumentsModule.currentPage = 1;
-                DocumentsModule.filterAndDisplay();
-            };
-        }
-
-        // 4. FORMULÁRIO (Protegido com referência direta ao objeto)
-        const docForm = document.getElementById('documentForm');
-        if (docForm) {
-            docForm.onsubmit = function(e) {
-                e.preventDefault();
-                DocumentsModule.saveDocument();
-            };
-        }
-
-        // 5. DELEGAÇÃO DE EVENTOS (Tabela e Grid)
+        // 5. DELEGAÇÃO DE EVENTOS
         const handleActions = (e) => {
             const target = e.target;
             const editBtn = target.closest('.doc-edit-btn');
             const checkbox = target.closest('.doc-check');
-            if (editBtn) DocumentsModule.editDocument(editBtn.getAttribute('data-id'));
-            if (checkbox) DocumentsModule.updateBulkActionButton();
+            if (editBtn) self.editDocument(editBtn.getAttribute('data-id'));
+            if (checkbox) self.updateBulkActionButton();
         };
 
-        const tableBody = document.getElementById('documentsTableBody');
-        const gridContainer = document.getElementById('documentsGridContainer');
-        if (tableBody) tableBody.onclick = handleActions;
-        if (gridContainer) gridContainer.onclick = handleActions;
+        document.getElementById('documentsTableBody').onclick = handleActions;
+        document.getElementById('documentsGridContainer').onclick = handleActions;
 
-        // 6. SELEÇÃO E GERAÇÃO
-        const selectAll = document.getElementById('selectAll');
-        if (selectAll) selectAll.onchange = () => DocumentsModule.toggleSelectAll();
-
-        const bulkBtn = document.getElementById('bulkDownloadBtn');
-        if (bulkBtn) bulkBtn.onclick = () => DocumentsModule.downloadSelected();
-
-        const genBtn = document.getElementById('generateAndDownloadBtn');
-        if (genBtn) genBtn.onclick = () => DocumentsModule.generateAndDownloadDocument();
+        const docForm = document.getElementById('documentForm');
+        if (docForm) docForm.onsubmit = (e) => { e.preventDefault(); self.saveDocument(); };
     },
 
-    toggleView(view) {
-        this.currentView = view;
+    // --- LÓGICA DE FUNCIONÁRIOS (RESTAURADA) ---
 
-        // Controla a visibilidade do botão "Selecionar Todos" do Grid
-        const gridActions = document.getElementById('gridActions');
-        if (gridActions) {
-            // Só mostra se for 'grid'. Se for 'list', esconde porque a tabela já tem o seu checkbox no topo.
-            gridActions.style.display = view === 'grid' ? 'block' : 'none';
+    async loadEmployeesForGeneration() {
+        try {
+            const response = await api.get('/employees');
+            const employees = (response.employees || []).map(e => ({ ...e, is_worker: false }));
+            const workers = (response.workers || []).map(w => ({ ...w, is_worker: true }));
+            this.allEmployees = [...employees, ...workers];
+        } catch (error) { console.error('Erro colaboradores:', error); }
+    },
+
+    handleEmployeeSearch(term) {
+        const dropdown = document.getElementById('employeeDropdown');
+        if (term.length < 1) { dropdown.style.display = 'none'; return; }
+
+        const filtered = this.allEmployees.filter(emp => 
+            emp.name.toLowerCase().includes(term) || (emp.email && emp.email.toLowerCase().includes(term))
+        );
+
+        if (filtered.length > 0) {
+            dropdown.innerHTML = filtered.map(emp => `
+                <button type="button" class="list-group-item list-group-item-action" 
+                    onclick='DocumentsModule.selectEmployee(${JSON.stringify(emp).replace(/'/g, "&apos;")})'>
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <strong>${emp.name}${emp.is_worker ? ' <span class="badge bg-warning text-dark">Worker</span>' : ''}</strong>
+                        <small class="text-muted">${emp.role || 'N/A'}</small>
+                    </div>
+                </button>`).join('');
+            dropdown.style.display = 'block';
+        } else {
+            dropdown.innerHTML = '<div class="list-group-item disabled text-center">Nenhum resultado</div>';
+            dropdown.style.display = 'block';
         }
-
-        this.render();
     },
+
+    selectEmployee(emp) {
+        this.selectedEmployee = emp;
+        document.getElementById('genEmployeeId').value = emp.id;
+        document.getElementById('genEmployeeIsWorker').value = emp.is_worker;
+        document.getElementById('genEmployeeSearch').value = emp.name;
+        document.getElementById('employeeDropdown').style.display = 'none';
+        document.getElementById('infoEmployeeName').textContent = emp.name + (emp.is_worker ? ' (Worker)' : '');
+        document.getElementById('employeeInfo').style.display = 'block';
+        Thecarv.notify(`Selecionado: ${emp.name}`, 'info');
+    },
+
+    // --- GERAÇÃO E DOWNLOAD (RESTAURADA E COMPLETA) ---
+
+    async generateAndDownloadDocument() {
+        const docType = document.getElementById('genDocumentType').value;
+        const employeeId = document.getElementById('genEmployeeId').value;
+        const monthYear = document.getElementById('genMonthYear')?.value;
+        const reason = document.getElementById('genReason')?.value;
+
+        if (!docType || !employeeId) return Thecarv.notify('Selecione o tipo e o funcionário', 'warning');
+
+        Thecarv.loading('A gerar cartão...');
+        try {
+            const payload = {
+                document_type: docType,
+                employee_id: parseInt(employeeId),
+                restaurant_id: this.selectedEmployee.restaurant_id,
+                is_worker: document.getElementById('genEmployeeIsWorker').value === 'true',
+                month_year: monthYear || '',
+                reason: reason || ''
+            };
+
+            const result = await api.post('/documents/generate-auto', payload);
+            
+            if (result?.document?.filename) {
+                const url = `${window.APP_PREFIX || ''}/uploads/generated/${result.document.filename}`;
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `cartao_${docType}_${this.selectedEmployee.name.replace(/\s+/g, '_')}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                bootstrap.Modal.getInstance(document.getElementById('generateDocumentModal')).hide();
+                await this.loadDocuments();
+                Thecarv.notify('Cartão gerado!', 'success');
+            }
+        } catch (error) { Thecarv.notify('Erro na geração', 'error'); }
+        finally { Thecarv.close(); }
+    },
+
+    // --- DOCUMENTOS E PAGINAÇÃO ---
 
     async loadDocuments(queryString = '') {
         const loading = document.getElementById('documentsLoading');
         if (loading) loading.style.display = 'block';
-
         const params = new URLSearchParams(queryString);
-        // Garante que a página atual é enviada
         if (!params.has('page')) params.append('page', this.currentPage);
-
         try {
             const response = await api.get(`/documents?${params.toString()}`);
             this.data = response.documents || [];
-            
             this.render();
-            // CHAMA AS FUNÇÕES DE STATS E PAGINAÇÃO
             this.updateStats(response.stats);
             this.updatePagination(response.stats);
-        } catch (error) {
-            Thecarv.notify('Erro ao carregar', 'error');
-        } finally {
-            if (loading) loading.style.display = 'none';
-        }
+        } catch (error) { Thecarv.notify('Erro ao carregar', 'error'); }
+        finally { if (loading) loading.style.display = 'none'; }
     },
 
-    // --- LÓGICA DE STATS (RESTAURADA E EXPLÍCITA) ---
-    updateStats(stats) {
-        if (!stats) return;
-
-        const totalSize = this.data.reduce((acc, doc) => acc + (doc.file_size || 0), 0);
-        
-        const elTotal = document.getElementById('totalDocuments');
-        const elPdf = document.getElementById('pdfCount');
-        const elImg = document.getElementById('imageCount');
-        const elSize = document.getElementById('totalSize');
-
-        if (elTotal) elTotal.textContent = stats.total || 0;
-        if (elPdf) elPdf.textContent = stats.pdf || 0;
-        if (elImg) elImg.textContent = stats.image || 0;
-        if (elSize) elSize.textContent = Utils.formatFileSize(totalSize);
-    },
-
-    // --- PAGINAÇÃO ---
     updatePagination(stats) {
         const container = document.getElementById('paginationControls');
-        if (!container || !stats || !stats.pages) return;
-
+        if (!container || !stats || stats.pages <= 1) { if (container) container.innerHTML = ''; return; }
         container.innerHTML = `
-            <div class="d-flex align-items-center justify-content-center mt-4">
-                <button class="btn btn-sm btn-outline-secondary me-2" ${stats.current_page <= 1 ? 'disabled' : ''} onclick="DocumentsModule.changePage(${stats.current_page - 1})">Anterior</button>
-                <span class="mx-3 fw-bold">Página ${stats.current_page} de ${stats.pages}</span>
-                <button class="btn btn-sm btn-outline-secondary ms-2" ${stats.current_page >= stats.pages ? 'disabled' : ''} onclick="DocumentsModule.changePage(${stats.current_page + 1})">Próximo</button>
-            </div>`;
+            <button class="btn btn-sm btn-outline-secondary me-2" ${stats.current_page <= 1 ? 'disabled' : ''} onclick="DocumentsModule.changePage(${stats.current_page - 1})">Anterior</button>
+            <span class="mx-2 fw-bold text-muted">${stats.current_page} / ${stats.pages}</span>
+            <button class="btn btn-sm btn-outline-secondary ms-2" ${stats.current_page >= stats.pages ? 'disabled' : ''} onclick="DocumentsModule.changePage(${stats.current_page + 1})">Próximo</button>`;
     },
 
-    // ADICIONADO: Função para trocar de página
-    changePage(p) {
-        this.currentPage = p;
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        this.filterAndDisplay();
-    },
+    changePage(p) { this.currentPage = p; window.scrollTo({ top: 0, behavior: 'smooth' }); this.filterAndDisplay(); },
 
     filterAndDisplay() {
         const params = new URLSearchParams({
@@ -191,7 +224,7 @@ const DocumentsModule = {
             type: document.getElementById('filterType')?.value || '',
             document_type: document.getElementById('filterCategory')?.value || '',
             sortBy: document.getElementById('sortBy')?.value || 'upload_date',
-            page: this.currentPage // Importante: incluir a página atual aqui
+            page: this.currentPage
         });
         this.loadDocuments(params.toString());
     },
@@ -199,7 +232,6 @@ const DocumentsModule = {
     render() {
         const container = document.getElementById(this.currentView === 'list' ? 'documentsTableBody' : 'documentsGridContainer');
         const noResults = document.getElementById('noDocuments');
-
         document.getElementById('documentsList').style.display = this.currentView === 'list' ? '' : 'none';
         document.getElementById('documentsGrid').style.display = this.currentView === 'grid' ? '' : 'none';
 
@@ -208,79 +240,106 @@ const DocumentsModule = {
             if (container) container.innerHTML = '';
             return;
         }
-
         if (noResults) noResults.style.display = 'none';
-        container.innerHTML = this.data.map(doc =>
-            this.currentView === 'list' ? this.templateRow(doc) : this.templateCard(doc)
-        ).join('');
+        container.innerHTML = this.data.map(doc => this.currentView === 'list' ? this.templateRow(doc) : this.templateCard(doc)).join('');
         this.updateBulkActionButton();
     },
 
     templateRow(doc) {
-        return `
-            <tr>
-                <td><input type="checkbox" class="doc-check form-check-input" value="${doc.id}"></td>
-                <td>
-                    <div class="d-flex align-items-center">
-                        <i class="fas ${Utils.getFileIcon(doc.filename)} me-2 text-${Utils.getFileColor(doc.filename)}"></i>
-                        <div>
-                            <strong>${doc.title}</strong>
-                            <br><small class="text-muted">${Utils.truncate(doc.description, 40)}</small>
-                        </div>
-                    </div>
-                </td>
-                <td><span class="badge bg-${Utils.getFileColor(doc.filename)}">${Utils.getFileTypeLabel(doc.filename)}</span></td>
-                <td><span class="badge bg-${Utils.getFileColor(doc.filename)}">${doc.document_type}</span></td>
-                <td>${Utils.formatFileSize(doc.file_size)}</td>
-                <td>${Utils.formatDate(new Date(doc.created_at))}</td>
-                <td>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-primary" onclick="DocumentsModule.download(${doc.id})"><i class="fas fa-download"></i></button>
-                        <button class="btn btn-sm btn-outline-warning doc-edit-btn" data-id="${doc.id}"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="DocumentsModule.deleteDocument(${doc.id})"><i class="fas fa-trash"></i></button>
-                    </div>
-                </td>
-            </tr>`;
+        return `<tr>
+            <td><input type="checkbox" class="doc-check form-check-input" value="${doc.id}"></td>
+            <td><div class="d-flex align-items-center"><i class="fas ${Utils.getFileIcon(doc.filename)} me-2 text-${Utils.getFileColor(doc.filename)}"></i>
+            <div><strong>${doc.title}</strong><br><small class="text-muted">${Utils.truncate(doc.description, 40)}</small></div></div></td>
+            <td><span class="badge bg-${Utils.getFileColor(doc.filename)}">${Utils.getFileTypeLabel(doc.filename)}</span></td>
+            <td><span class="badge bg-${Utils.getFileColor(doc.filename)}">${doc.document_type}</span></td>
+            <td>${Utils.formatFileSize(doc.file_size)}</td>
+            <td>${Utils.formatDate(new Date(doc.created_at))}</td>
+            <td><div class="btn-group">
+                <button class="btn btn-sm btn-outline-primary" onclick="DocumentsModule.download(${doc.id})"><i class="fas fa-download"></i></button>
+                <button class="btn btn-sm btn-outline-warning doc-edit-btn" data-id="${doc.id}"><i class="fas fa-edit"></i></button>
+            </div></td>
+        </tr>`;
     },
 
     templateCard(doc) {
-        const icon = Utils.getFileIcon(doc.filename);
         const color = Utils.getFileColor(doc.filename);
-        return `
-            <div class="col-md-4 col-lg-3 mb-4">
-                <div class="card h-100 shadow-sm border-top border-${color} border-4">
-                    <div class="position-absolute top-0 end-0 p-2">
-                         <input type="checkbox" class="doc-check form-check-input" value="${doc.id}">
-                    </div>
-                    <div class="card-body text-center">
-                        <i class="fas ${icon} fa-3x text-${color} mb-3"></i>
-                        <h6 class="card-title text-truncate" title="${doc.title}">${doc.title}</h6>
-                        <span class="badge bg-${color} mb-3">${doc.document_type}</span>
-                        <div class="btn-group w-100">
-                            <button class="btn btn-sm btn-outline-primary" onclick="DocumentsModule.download(${doc.id})"><i class="fas fa-download"></i></button>
-                            <button class="btn btn-sm btn-outline-warning doc-edit-btn" data-id="${doc.id}"><i class="fas fa-edit"></i></button>
-                        </div>
+        return `<div class="col-md-4 col-lg-3 mb-4">
+            <div class="card h-100 shadow-sm border-top border-${color} border-4">
+                <div class="position-absolute top-0 end-0 p-2"><input type="checkbox" class="doc-check form-check-input" value="${doc.id}"></div>
+                <div class="card-body text-center">
+                    <i class="fas ${Utils.getFileIcon(doc.filename)} fa-3x text-${color} mb-3"></i>
+                    <h6 class="card-title text-truncate">${doc.title}</h6>
+                    <span class="badge bg-${color} mb-3">${doc.document_type}</span>
+                    <div class="btn-group w-100">
+                        <button class="btn btn-sm btn-outline-primary" onclick="DocumentsModule.download(${doc.id})"><i class="fas fa-download"></i></button>
+                        <button class="btn btn-sm btn-outline-warning doc-edit-btn" data-id="${doc.id}"><i class="fas fa-edit"></i></button>
                     </div>
                 </div>
-            </div>`;
+            </div>
+        </div>`;
+    },
+
+    updateStats(stats) {
+        if (!stats) return;
+        ['totalDocuments', 'pdfCount', 'imageCount'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = stats[id.replace('Count', '').replace('Documents', '')] || 0;
+        });
+    },
+
+    toggleView(view) {
+        this.currentView = view;
+        const btnGrid = document.getElementById('gridViewBtn');
+        const btnList = document.getElementById('listViewBtn');
+        const gridActions = document.getElementById('gridActions');
+        btnGrid?.classList.toggle('btn-primary', view === 'grid');
+        btnGrid?.classList.toggle('btn-outline-primary', view !== 'grid');
+        btnList?.classList.toggle('btn-primary', view === 'list');
+        btnList?.classList.toggle('btn-outline-primary', view !== 'list');
+        if (gridActions) gridActions.style.display = view === 'grid' ? 'block' : 'none';
+        this.render();
+    },
+
+    download(id) {
+        const link = document.createElement('a');
+        link.href = `${window.API_BASE_URL}/documents/${id}/download`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    },
+
+    toggleSelectAll() {
+        const mainCb = document.getElementById('selectAll');
+        document.querySelectorAll('.doc-check').forEach(cb => cb.checked = mainCb?.checked || false);
+        this.updateBulkActionButton();
+    },
+
+    updateBulkActionButton() {
+        const selected = document.querySelectorAll('.doc-check:checked').length;
+        const btn = document.getElementById('bulkDownloadBtn');
+        if (btn) {
+            btn.disabled = selected === 0;
+            btn.innerHTML = `<i class="fas fa-download me-1"></i>Download (${selected})`;
+        }
+    },
+
+    async downloadSelected() {
+        const ids = Array.from(document.querySelectorAll('.doc-check:checked')).map(cb => cb.value);
+        if (ids.length === 0) return;
+        window.location.href = `${window.API_BASE_URL}/documents/bulk-download?ids=${ids.join(',')}`;
     },
 
     async saveDocument() {
-        const form = document.getElementById('documentForm');
-        const formData = new FormData(form);
+        const formData = new FormData(document.getElementById('documentForm'));
         const docId = document.getElementById('documentId').value;
-
         Thecarv.loading('A guardar...');
         try {
             if (docId) await api.put(`/documents/${docId}`, formData);
             else await api.post('/documents', formData);
             Thecarv.notify('Salvo!', 'success');
-            const modal = bootstrap.Modal.getInstance(document.getElementById('documentModal'));
-            if (modal) modal.hide();
+            bootstrap.Modal.getInstance(document.getElementById('documentModal')).hide();
             await this.loadDocuments();
-        } catch (error) {
-            Thecarv.notify('Erro ao salvar', 'error');
-        } 
+        } catch (e) { Thecarv.notify('Erro ao salvar', 'error'); }
     },
 
     async editDocument(id) {
@@ -289,46 +348,8 @@ const DocumentsModule = {
         document.getElementById('documentId').value = doc.id;
         document.getElementById('documentName').value = doc.title || '';
         document.getElementById('documentCategory').value = doc.document_type || '';
-        document.getElementById('documentDescription').value = doc.description || '';
-        document.getElementById('documentTags').value = doc.tags || '';
-        document.getElementById('documentPublic').checked = !!doc.is_public;
         document.getElementById('documentModalTitle').textContent = 'Editar Documento';
-        document.getElementById('documentFile').required = false;
         new bootstrap.Modal(document.getElementById('documentModal')).show();
-    },
-
-    download(id) { window.open(`${window.API_BASE_URL}/documents/${id}/download`, '_blank'); },
-    
-    toggleSelectAll() {
-        const selectAll = document.getElementById('selectAll');
-        document.querySelectorAll('.doc-check').forEach(cb => cb.checked = selectAll.checked);
-        this.updateBulkActionButton();
-    },
-
-    updateBulkActionButton() {
-        const selected = document.querySelectorAll('.doc-check:checked');
-        const bulkBtn = document.getElementById('bulkDownloadBtn');
-        if (bulkBtn) {
-            bulkBtn.disabled = selected.length === 0;
-            bulkBtn.innerHTML = `<i class="fas fa-download me-1"></i>Download (${selected.length})`;
-        }
-    },
-
-    // Adicionado apenas para garantir que não falta no teu objeto
-    async deleteDocument(id) {
-        const res = await Thecarv.confirm('Apagar Documento?', 'Esta ação não pode ser desfeita.');
-        if (res.isConfirmed) {
-            Thecarv.loading('A eliminar...');
-            try {
-                await api.delete(`/documents/${id}`);
-                Thecarv.notify('Removido!', 'success');
-                await this.loadDocuments();
-            } catch (error) {
-                Thecarv.notify('Erro ao eliminar', 'error');
-            } finally {
-                Thecarv.close();
-            }
-        }
     }
 };
 
