@@ -1,9 +1,10 @@
 """
 Rotas da API do Calendário
 """
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 from flask_jwt_extended import get_jwt_identity, get_jwt
 from datetime import datetime, date, timedelta
+from werkzeug.utils import secure_filename
 import os
 import calendar as pycalendar
 from app.api.ai import get_client
@@ -90,36 +91,36 @@ def create_event():
     """Criar novo evento"""
     try:
         current_user_id = g.get('current_user_id')
-        # claims via g
         user_role = g.get('current_user_role')
         user_restaurant_id = g.get('current_user_restaurant_id')
-        
-        data = request.get_json()
-        
+
+        # Suporte a form-data (upload de arquivo)
+        if request.content_type and request.content_type.startswith('multipart/form-data'):
+            data = request.form.to_dict()
+            file = request.files.get('photo')
+        else:
+            data = request.get_json()
+            file = None
+
         if not data:
             return jsonify({'error': 'Dados não fornecidos'}), 400
-        
-        # Validar dados obrigatórios
+
         required_fields = ['title', 'start_date', 'end_date', 'event_type']
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'error': f'{field} é obrigatório'}), 400
-        
-        # Verificar permissões
+
         restaurant_id = data.get('restaurant_id') or user_restaurant_id
         if user_role not in ['admin', 'rh', 'marketing', 'manager']:
             if not user_restaurant_id or restaurant_id != user_restaurant_id:
                 return jsonify({'error': 'Permissão negada'}), 403
-        
-        # Converter datas
+
         try:
             start_date = datetime.fromisoformat(data['start_date'].replace('Z', ''))
             end_date = datetime.fromisoformat(data['end_date'].replace('Z', ''))
         except ValueError:
             return jsonify({'error': 'Formato de data inválido'}), 400
-        
-        if data['event_type'] == 'birthday_party':
-           print("Evento de festa de aniversário criado.")                                          
+                         
         # Extrair número de pessoas da descrição
         people_count = 0
         if data.get('description'):
@@ -161,7 +162,34 @@ def create_event():
 
 
 
-        # Criar evento
+        # Upload da foto
+        photo_path = None
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            ext = os.path.splitext(filename)[1].lower()
+            if ext not in ['.jpg', '.jpeg', '.png', '.gif']:
+                return jsonify({'error': 'Formato de imagem não suportado'}), 400
+            unique_name = f"event_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}{ext}"
+            upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'events')
+            try:
+                os.makedirs(upload_folder, exist_ok=True)
+                file_path = os.path.join(upload_folder, unique_name)
+                file.save(file_path)
+            except Exception as upload_err:
+                import traceback
+                traceback.print_exc()
+                return jsonify({'error': f'Erro ao salvar imagem: {upload_err}'}), 500
+
+        def parse_bool(val):
+            if isinstance(val, bool):
+                return val
+            if isinstance(val, str):
+                return val.lower() in ('true', '1', 'yes', 'on')
+            return bool(val)
+
+        is_all_day = parse_bool(data.get('is_all_day', False))
+        is_recurring = parse_bool(data.get('recurring', False))
+
         event = CalendarEvent(
             title=data['title'],
             description=data.get('description'),
@@ -171,22 +199,27 @@ def create_event():
             restaurant_id=restaurant_id,
             created_by=current_user_id,
             employee_id=data.get('employee_id'),
-            is_all_day=data.get('is_all_day', False),
+            is_all_day=is_all_day,
             color=data.get('color', '#3788d8'),
-            location=data.get('location')
+            location=data.get('location'),
+            photo_path=photo_path,
+            is_recurring=is_recurring
         )
-        
+
         db.session.add(event)
         db.session.commit()
-        
+
         return jsonify({
             'message': 'Evento criado com sucesso',
             'event': event.to_dict()
         }), 201
         
     except Exception as e:
+        import traceback
         db.session.rollback()
+        traceback.print_exc()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
 
 
 

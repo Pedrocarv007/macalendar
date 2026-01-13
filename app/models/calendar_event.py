@@ -21,6 +21,7 @@ class CalendarEvent(db.Model):
     is_all_day = db.Column(db.Boolean, default=False, nullable=False)
     color = db.Column(db.String(7), default='#3788d8', nullable=False)  # Cor do evento em hex
     location = db.Column(db.String(200), nullable=True)
+    photo_path = db.Column(db.String(300), nullable=True)  # Caminho da foto do evento
     is_recurring = db.Column(db.Boolean, default=False, nullable=False)
     recurrence_rule = db.Column(db.String(500), nullable=True)  # Regra de recorrência (RRULE)
     event_metadata = db.Column(db.Text, nullable=True)  # JSON para dados extras (mystery answer, etc.)
@@ -90,6 +91,7 @@ class CalendarEvent(db.Model):
             'color': self.color,
             'backgroundColor': self.color,
             'borderColor': self.color,
+            'photo_path': self.photo_path,
             'extendedProps': {
                 'event_type': self.event_type,
                 'restaurant_id': self.restaurant_id,
