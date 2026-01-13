@@ -209,6 +209,8 @@
     
     <!-- Core JS Modules (carregados em ordem) -->
     <!-- 1. API Client -->
+    <script src="https://www.thecarv.com/plugins/alert/thecarv.js"></script>
+    
     <script src="{{ url_for('static', filename='js/api-client.js') }}"></script>
     
     <!-- 2. App State -->
@@ -219,6 +221,8 @@
     
     <!-- 4. DOM Utilities -->
     <script src="{{ url_for('static', filename='js/dom.js') }}"></script>
+
+
     
     <!-- 5. Page Modules (conforme necessário) -->
     {% if 'dashboard' in request.path %}

@@ -38,7 +38,6 @@ def create_demo_users():
                 'role': 'admin',
                 'department': 'Administração',
                 'position': 'Administrador do Sistema',
-                'password': 'Admin123!'
             },
         ]
 
@@ -66,7 +65,6 @@ def create_demo_users():
                 restaurant_id=restaurant.id,
                 is_active=True
             )
-            employee.set_password(user_data['password'])
             
             db.session.add(employee)
             created_count += 1

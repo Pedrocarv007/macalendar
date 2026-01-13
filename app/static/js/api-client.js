@@ -149,5 +149,10 @@ class APIError extends Error {
 }
 
 // Instância global
+Thecarv.init({
+    brandName: 'MAC Calendar',
+    primaryColor: '#dc3545',
+    confirmText: 'Confirmar'
+});
 const api = new APIClient();
 window.api = api;

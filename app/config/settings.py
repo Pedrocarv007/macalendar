@@ -15,9 +15,9 @@ class Config:
     
     # Configurações básicas do Flask
     SECRET_KEY = os.getenv('SECRET_KEY') 
-    DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-    APPLICATION_ROOT = os.getenv('APPLICATION_ROOT', '/mac')
-    APP_BASE_URL = os.getenv('APP_BASE_URL', 'https://www.thecarv.com/mac')
+    DEBUG = os.getenv('FLASK_DEBUG')
+    APPLICATION_ROOT = os.getenv('APPLICATION_ROOT')
+    APP_BASE_URL = os.getenv('APP_BASE_URL')
     
     # Configurações do banco de dados
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL') 
@@ -39,11 +39,17 @@ class Config:
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
     
     # Configurações de roles de usuário (podem ser sobrescritas por env)
-    _roles_env = os.getenv('VALID_ROLES')
-    if _roles_env:
-        VALID_ROLES = [r.strip().lower() for r in _roles_env.split(',') if r.strip()]
-    else:
-        VALID_ROLES = ['admin', 'rh', 'marketing', 'manager', 'employee', 'shift_manager', 'sub_manager', 'rp', 'coucher']
+    roles_env = os.getenv('VALID_ROLES')
+    staff_roles_env = os.getenv('STAFF_ROLES')
+    super_roles_env = os.getenv('SUPER_ROLES')
+    if roles_env:
+        VALID_ROLES = [r.strip().lower() for r in roles_env.split(',') if r.strip()]
+    if staff_roles_env:
+        STAFF_ROLES = [r.strip().lower() for r in staff_roles_env.split(',') if r.strip()]
+    if super_roles_env:
+        SUPER_ROLES = [r.strip().lower() for r in super_roles_env.split(',') if r.strip()]
+    
+
 
     _default_role_env = os.getenv('DEFAULT_ROLE', 'employee').strip().lower()
     DEFAULT_ROLE = _default_role_env if _default_role_env in VALID_ROLES else (VALID_ROLES[0] if VALID_ROLES else 'employee')
@@ -54,11 +60,12 @@ class Config:
     SESSION_USE_SIGNER = True
     SESSION_KEY_PREFIX = 'mac-calendar:'
     PERMANENT_SESSION_LIFETIME = timedelta(days=31)  # Duração quando "lembrar-me" está ativo
-    SESSION_COOKIE_SECURE = True  # True apenas em produção com HTTPS
+    SESSION_COOKIE_SECURE = False  # True apenas em produção com HTTPS
     SESSION_COOKIE_HTTPONLY = True  # Previne acesso via JavaScript
     SESSION_COOKIE_SAMESITE = 'Lax'  # Proteção contra CSRF
     SESSION_COOKIE_PATH = os.getenv('APPLICATION_ROOT')  # Path do cookie deve corresponder ao APPLICATION_ROOT
     SESSION_COOKIE_NAME = 'mac_session'  # Nome específico para evitar conflitos
+    
     
     # Configurações de email
     MAIL_SERVER = os.getenv('MAIL_SERVER') 

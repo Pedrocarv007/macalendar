@@ -1,143 +1,129 @@
 /**
  * MAC Calendar - Utilities
- * Funções utilitárias gerais
+ * Funções utilitárias gerais e de documentos
  */
 
 class Utils {
+    // --- FUNÇÕES DE DOCUMENTOS (NOVAS) ---
+
     /**
-     * Formatar data
+     * Retorna o ícone FontAwesome baseado no nome do arquivo
      */
-    static formatDate(date, format = 'pt-BR') {
-        if (typeof date === 'string') {
-            date = new Date(date);
+    static getFileIcon(filename) {
+        if (!filename) return 'fa-file';
+        const ext = filename.toLowerCase().split('.').pop();
+        
+        const map = {
+            'fa-file-image': ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'],
+            'fa-file-pdf': ['pdf'],
+            'fa-file-word': ['doc', 'docx', 'txt'],
+            'fa-file-excel': ['xls', 'xlsx', 'csv'],
+            'fa-file-powerpoint': ['ppt', 'pptx'],
+            'fa-file-archive': ['zip', 'rar', '7z']
+        };
+
+        for (const [icon, extensions] of Object.entries(map)) {
+            if (extensions.includes(ext)) return icon;
         }
+        return 'fa-file';
+    }
+
+    static getFileTypeLabel(filename) {
+    if (!filename) return 'Arquivo';
+    const ext = filename.toLowerCase().split('.').pop();
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return 'Imagem';
+    if (ext === 'pdf') return 'PDF';
+    if (['doc', 'docx', 'txt'].includes(ext)) return 'Documento';
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'Planilha';
+    if (['ppt', 'pptx'].includes(ext)) return 'Apresentação';
+    if (['zip', 'rar', '7z'].includes(ext)) return 'Compactado';
+    return 'Arquivo';
+}
+
+    /**
+     * Retorna a cor contextual do Bootstrap baseada na extensão
+     */
+    static getFileColor(filename) {
+        if (!filename) return 'secondary';
+        const ext = filename.toLowerCase().split('.').pop();
+        
+        if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return 'warning';
+        if (ext === 'pdf') return 'danger';
+        if (['doc', 'docx'].includes(ext)) return 'primary';
+        if (['xls', 'xlsx', 'csv'].includes(ext)) return 'success';
+        if (['ppt', 'pptx'].includes(ext)) return 'info';
+        return 'secondary';
+    }
+
+    /**
+     * Formata o tamanho do arquivo de bytes para humano
+     */
+    static formatFileSize(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // --- FUNÇÕES QUE VOCÊ JÁ TINHA (MANTIDAS) ---
+
+    static formatDate(date, format = 'pt-BR') {
+        if (!date) return '---';
+        if (typeof date === 'string') date = new Date(date);
         
         if (format === 'pt-BR') {
             return date.toLocaleDateString('pt-BR', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
+                year: 'numeric', month: '2-digit', day: '2-digit'
             });
-        } else if (format === 'ISO') {
-            return date.toISOString().split('T')[0];
         }
-        
-        return date.toString();
+        return date.toISOString().split('T')[0];
     }
 
-    /**
-     * Formatar hora
-     */
     static formatTime(date, format = 'HH:mm') {
-        if (typeof date === 'string') {
-            date = new Date(date);
-        }
-
+        if (!date) return '--:--';
+        if (typeof date === 'string') date = new Date(date);
         const hours = String(date.getHours()).padStart(2, '0');
         const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
-
-        if (format === 'HH:mm') {
-            return `${hours}:${minutes}`;
-        } else if (format === 'HH:mm:ss') {
-            return `${hours}:${minutes}:${seconds}`;
-        }
-
-        return `${hours}:${minutes}`;
+        return format === 'HH:mm:ss' ? `${hours}:${minutes}:${String(date.getSeconds()).padStart(2, '0')}` : `${hours}:${minutes}`;
     }
 
-    /**
-     * Formatar data e hora
-     */
     static formatDateTime(date) {
-        return `${this.formatDate(date, 'pt-BR')} ${this.formatTime(date, 'HH:mm')}`;
+        return `${this.formatDate(date)} ${this.formatTime(date)}`;
     }
 
-    /**
-     * Validar email
-     */
-    static isValidEmail(email) {
-        const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return pattern.test(email);
-    }
-
-    /**
-     * Validar telefone
-     */
-    static isValidPhone(phone) {
-        const clean = phone.replace(/\D/g, '');
-        return clean.length >= 10 && clean.length <= 11;
-    }
-
-    /**
-     * Capitalizar string
-     */
-    static capitalize(str) {
-        if (!str) return '';
-        return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-    }
-
-    /**
-     * Truncar string
-     */
     static truncate(str, length = 100) {
         if (!str) return '';
-        if (str.length <= length) return str;
-        return str.substring(0, length) + '...';
+        return str.length <= length ? str : str.substring(0, length) + '...';
     }
 
-    /**
-     * Copiar para clipboard
-     */
     static async copyToClipboard(text) {
         try {
             await navigator.clipboard.writeText(text);
+            this.showToast('Copiado para a área de transferência', 'success');
             return true;
-        } catch (error) {
-            return false;
-        }
+        } catch (error) { return false; }
     }
 
-    /**
-     * Exibir alerta (Bootstrap)
-     */
     static showAlert(message, type = 'info', duration = 5000) {
         const alertContainer = document.getElementById('alert-container') || document.body;
         const alertId = 'alert-' + Date.now();
-
-        const icons = {
-            success: 'check-circle',
-            error: 'exclamation-triangle',
-            warning: 'exclamation-triangle',
-            info: 'info-circle'
-        };
+        const icons = { success: 'check-circle', error: 'exclamation-triangle', warning: 'exclamation-triangle', info: 'info-circle' };
 
         const alertDiv = document.createElement('div');
         alertDiv.id = alertId;
         alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
-        alertDiv.innerHTML = `
-            <i class="fas fa-${icons[type] || 'info-circle'} me-2"></i>
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
+        alertDiv.innerHTML = `<i class="fas fa-${icons[type] || 'info-circle'} me-2"></i>${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
 
-        alertContainer.appendChild(alertDiv);
-
-        if (duration > 0) {
-            setTimeout(() => {
-                const alert = document.getElementById(alertId);
-                if (alert) {
-                    bootstrap.Alert.getOrCreateInstance(alert).close();
-                }
-            }, duration);
-        }
-
+        alertContainer.prepend(alertDiv);
+        if (duration > 0) setTimeout(() => {
+            const alert = document.getElementById(alertId);
+            if (alert) bootstrap.Alert.getOrCreateInstance(alert).close();
+        }, duration);
         return alertId;
     }
 
-    /**
-     * Exibir toast (Bootstrap)
-     */
     static showToast(message, type = 'info', duration = 3000) {
         let toastContainer = document.getElementById('toast-container');
         if (!toastContainer) {
@@ -148,84 +134,25 @@ class Utils {
             document.body.appendChild(toastContainer);
         }
 
-        const toastId = 'toast-' + Date.now();
         const toastElement = document.createElement('div');
-        toastElement.id = toastId;
         toastElement.className = `toast align-items-center text-bg-${type === 'error' ? 'danger' : type} border-0`;
         toastElement.setAttribute('role', 'alert');
         toastElement.innerHTML = `
             <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
-                </div>
+                <div class="toast-body">${message}</div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        `;
+            </div>`;
 
         toastContainer.appendChild(toastElement);
-
         const toast = new bootstrap.Toast(toastElement, { delay: duration });
         toast.show();
-
-        toastElement.addEventListener('hidden.bs.toast', () => {
-            toastElement.remove();
-        });
-
-        return toastId;
+        toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
     }
 
-    /**
-     * Gerar UUID
-     */
-    static generateUUID() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
 
-    /**
-     * Deep clone de objeto
-     */
-    static deepClone(obj) {
-        if (obj === null || typeof obj !== 'object') return obj;
-        if (obj instanceof Date) return new Date(obj.getTime());
-        if (obj instanceof Array) return obj.map(item => this.deepClone(item));
-        if (obj instanceof Object) {
-            const cloned = {};
-            for (const key in obj) {
-                if (obj.hasOwnProperty(key)) {
-                    cloned[key] = this.deepClone(obj[key]);
-                }
-            }
-            return cloned;
-        }
-    }
+    
 
-    /**
-     * Merging objetos
-     */
-    static mergeObjects(target, source) {
-        for (const key in source) {
-            if (source.hasOwnProperty(key)) {
-                if (typeof source[key] === 'object' && source[key] !== null) {
-                    target[key] = this.mergeObjects(target[key] || {}, source[key]);
-                } else {
-                    target[key] = source[key];
-                }
-            }
-        }
-        return target;
-    }
 
-    /**
-     * Esperar (sleep)
-     */
-    static sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
 }
 
-// Fazer Utils disponível globalmente
 window.Utils = Utils;
