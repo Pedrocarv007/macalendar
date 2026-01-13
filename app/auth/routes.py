@@ -19,7 +19,7 @@ auth_web_bp = Blueprint('auth_web', __name__)
 def login():
     """Página de login web"""
 
-    return redirect("http://192.168.0.2:5005")
+    return redirect("https://www.thecarv.com")
     
    
 
