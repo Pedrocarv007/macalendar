@@ -161,11 +161,12 @@
                             <i class="fas fa-folder me-2"></i>Arquivos
                         </h5>
                         <div class="d-flex gap-2">
-                            <div id="gridActions" style="display: none;">
-                                <button class="btn btn-sm btn-outline-secondary" onclick="DocumentsModule.toggleSelectAll()">
-                                    <i class="fas fa-check-double me-1"></i>Selecionar Todos
-                                </button>
-                            </div>
+                                                        <div id="gridActions" class="d-flex align-items-center">
+                                                            <button class="btn btn-sm btn-outline-secondary" onclick="DocumentsModule.toggleSelectAll()">
+                                                                <i class="fas fa-check-double me-1"></i>Selecionar Todos
+                                                            </button>
+                                                        </div>
+                            <!-- gridActions removido: apenas o checkbox na tabela será usado para selecionar todos -->
                             <div id="paginationControls" class="d-flex justify-content-center align-items-center mt-1"></div>
                             <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#generateDocumentModal">
                                 <i class="fas fa-wand-magic-sparkles me-1"></i>Gerar Cartão
@@ -194,9 +195,7 @@
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>
-                                            <input type="checkbox" id="selectAll">
-                                        </th>
+                                        <th>Selecionar</th>
                                         <th>Nome</th>
                                         <th>Tipo</th>
                                         <th>Categoria</th>
