@@ -70,7 +70,9 @@ const DocumentsModule = {
         // 3. CONTROLES DE VISUALIZAÇÃO E AÇÕES
         document.getElementById('gridViewBtn').onclick = () => self.toggleView('grid');
         document.getElementById('listViewBtn').onclick = () => self.toggleView('list');
-        document.getElementById('selectAll').onchange = () => self.toggleSelectAll();
+        // Botão Selecionar Todos (visual, funciona em ambas as views)
+        const gridActionsBtn = document.querySelector('#gridActions button');
+        if (gridActionsBtn) gridActionsBtn.onclick = () => self.toggleSelectAll();
         document.getElementById('bulkDownloadBtn').onclick = () => self.downloadSelected();
         document.getElementById('generateAndDownloadBtn').onclick = () => self.generateAndDownloadDocument();
 
@@ -285,6 +287,12 @@ const DocumentsModule = {
             const el = document.getElementById(id);
             if (el) el.textContent = stats[id.replace('Count', '').replace('Documents', '')] || 0;
         });
+        // Atualiza o tamanho total
+        const elSize = document.getElementById('totalSize');
+        if (elSize) {
+            const totalSize = (this.data || []).reduce((acc, doc) => acc + (doc.file_size || 0), 0);
+            elSize.textContent = Utils.formatFileSize(totalSize);
+        }
     },
 
     toggleView(view) {
@@ -309,9 +317,23 @@ const DocumentsModule = {
     },
 
     toggleSelectAll() {
-        const mainCb = document.getElementById('selectAll');
-        document.querySelectorAll('.doc-check').forEach(cb => cb.checked = mainCb?.checked || false);
+        // Alterna seleção de todos os checkboxes
+        const allChecks = document.querySelectorAll('.doc-check');
+        const allChecked = Array.from(allChecks).every(cb => cb.checked);
+        allChecks.forEach(cb => cb.checked = !allChecked);
         this.updateBulkActionButton();
+
+        // Atualiza cor do botão Selecionar Todos
+        const gridActionsBtn = document.querySelector('#gridActions button');
+        if (gridActionsBtn) {
+            if (!allChecked) {
+                gridActionsBtn.classList.remove('btn-outline-secondary');
+                gridActionsBtn.classList.add('btn-primary');
+            } else {
+                gridActionsBtn.classList.remove('btn-primary');
+                gridActionsBtn.classList.add('btn-outline-secondary');
+            }
+        }
     },
 
     updateBulkActionButton() {
