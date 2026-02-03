@@ -5,7 +5,8 @@ from datetime import date
 
 # Adicionar diretório raiz ao path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+import dotenv
+loadenv = dotenv.load_dotenv()
 from app import create_app
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
@@ -17,10 +18,10 @@ def create_demo_users():
     
     with app.app_context():
         # Criar restaurante demo se não existir
-        restaurant = Restaurant.query.filter_by(name='Restaurante Demo').first()
+        restaurant = Restaurant.query.filter_by(name='Oeiras A5').first()
         if not restaurant:
             restaurant = Restaurant(
-                name='Restaurante Demo',
+                name='Oeiras A5',
                 address='Rua do Demo, 123',
                 phone='910000000',
                 email='demo-restaurant@mac.com',
@@ -71,7 +72,6 @@ def create_demo_users():
             
             print(f"✅ {user_data['name']} criado")
             print(f"   📧 Email: {user_data['email']}")
-            print(f"   🔑 Senha: {user_data['password']}")
             print(f"   👤 Role: {user_data['role']}\n")
 
         if created_count > 0:

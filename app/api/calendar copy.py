@@ -11,7 +11,7 @@ from app.api.ai import get_client
 from app.extensions.database import db
 from app.models.calendar_event import CalendarEvent
 from app.models.employee import Employee
-from app.middleware.security import api_login_required
+from app.middleware.security import api_login_required, role_required
 import random
 import string
 from sqlalchemy import or_

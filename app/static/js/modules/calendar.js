@@ -1,290 +1,296 @@
 /**
- * MAC Calendar - Calendar Module
- * Módulo para gerenciar eventos do calendário
+ * ============================================================
+ * 1. CONFIGURAÇÃO E ESTADO GLOBAL
+ * ============================================================
  */
+const CalendarConfig = {
+    baseUrl: 'http://192.168.0.2:5006/mac/api',
+    defaultImg: 'https://www.thecarv.com/desafio.jpg'
+};
 
-const CalendarModule = {
-    events: [],
-    currentMonth: new Date(),
+const CalendarState = {
     currentDate: new Date(),
-    
-    /**
-     * Inicializar o módulo
-     */
-    init() {
-        this.setupHandlers();
-        this.loadEvents();
-    },
-    
-    /**
-     * Setup event handlers
-     */
-    setupHandlers() {
-        // Handlers dos botões podem ser configurados aqui
-    },
-    
-    /**
-     * Carregar eventos
-     */
-    async loadEvents() {
-        try {
-            // Incluir eventos globais (restaurant_id null) junto com os do restaurante
-            const res = await api.get('/calendar/events?include_global=true');
-            this.events = res.events || [];
-            if (typeof events !== 'undefined') {
-                events = this.events;
-            }
-            if (typeof renderCalendar === 'function') {
-                renderCalendar();
-                if (typeof renderTodayEvents === 'function') {
-                    renderTodayEvents();
-                }
-                if (typeof renderUpcomingEvents === 'function') {
-                    renderUpcomingEvents();
-                }
-                if (typeof updateCurrentMonth === 'function') {
-                    updateCurrentMonth();
-                }
-                if (typeof renderCategoryCounts === 'function') {
-                    renderCategoryCounts();
-                }
-            }
-        } catch (error) {
-            if (typeof appState !== 'undefined' && appState.notify) {
-                appState.notify('Erro ao carregar eventos', 'error');
-            }
-        }
-    },
-    
-    /**
-     * Renderizar calendário
-     */
-    renderCalendar() {
-        // Será implementado conforme necessário
-    },
-    
-    /**
-     * Deletar evento
-     */
-    async deleteEvent(id) {
-        const self = this;  // Preservar contexto de 'this'
-        Swal.fire({
-            title: 'Deletar evento?',
-            text: 'Esta ação não pode ser desfeita!',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#dc3545',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Sim, deletar!',
-            cancelButtonText: 'Cancelar'
-        }).then(async (result) => {
-            if (result.isConfirmed) {
-                try {
-                    const response = await api.delete(`/calendar/events/${id}`);
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Deletado!',
-                        text: 'Evento deletado com sucesso',
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
-                    await self.loadEvents();
-                } catch (error) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro',
-                        text: error.message || 'Erro ao deletar evento'
-                    });
-                }
-            }
-        });
-    },
-    
-    /**
-     * Criar evento
-     */
-    async createEvent(eventData) {
-        try {
-            await api.post('/calendar/events', eventData);
-            appState.notify('Evento criado com sucesso', 'success');
-            this.loadEvents();
-        } catch (error) {
-            appState.notify('Erro ao criar evento', 'error');
-        }
-    },
-
-    async generateMysteryChallenges(params) {
-        try {
-            const res = await api.post('/calendar/generate/mystery-tuesdays', params);
-            await this.loadEvents();
-            return res;
-        } catch (error) {
-            throw error;
-        }
-    },
-
-    async generateMysteryAnswers(params) {
-        try {
-            const res = await api.post('/calendar/generate/mystery-answers', params);
-            if (typeof appState !== 'undefined' && appState.notify) {
-                appState.notify(`Geradas ${res.count || 0} respostas de sábado`, 'success');
-            }
-            await this.loadEvents();
-        } catch (error) {
-            if (typeof appState !== 'undefined' && appState.notify) {
-                appState.notify(error.message || 'Erro ao gerar respostas', 'error');
-            }
-            throw error;
-        }
-    },
-
-    async markPosted(id) {
-        try {
-            await api.put(`/calendar/events/${id}/mark-posted`, {});
-            if (typeof appState !== 'undefined' && appState.notify) {
-                appState.notify('Evento marcado como postado', 'success');
-            }
-            await this.loadEvents();
-        } catch (error) {
-            if (typeof appState !== 'undefined' && appState.notify) {
-                appState.notify('Erro ao marcar postado', 'error');
-            }
-            throw error;
-        }
-    }
+    events: [],
+    viewType: 'month',
+    selectedDateOnly: null,
+    openFromCalendar: false,
+    openFromEdit: false
 };
 
 /**
- * Salvar evento (novo ou editado)
+ * ============================================================
+ * 2. SERVIÇOS (API)
+ * ============================================================
  */
-async function saveEvent() {
-    const form = document.getElementById('eventForm');
-    if (!form) {
-        alert('Erro: formulário não encontrado');
-        return;
-    }
-    
-    if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-    }
-    
-    try {
-        const eventId = document.getElementById('eventId')?.value;
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData);
-        
-        // Mapear category para event_type (conforme esperado pela API)
-        if (data.category) {
-            data.event_type = data.category;
-            delete data.category;
-        }
-        
-        // Converter dates
-        if (data.startDate) {
-            data.start_date = new Date(data.startDate).toISOString();
-        }
-        if (data.endDate) {
-            data.end_date = new Date(data.endDate).toISOString();
-        }
-        
-        // Se for festa de aniversário, incluir número de pessoas na descrição
-        const peopleCount = data.peopleCount ? parseInt(data.peopleCount, 10) : null;
-        if (data.event_type === 'birthday_party' && peopleCount && peopleCount > 0) {
-            const prefix = `Pessoas: ${peopleCount}`;
-            if (data.description) {
-                // Evitar duplicar a informação
-                if (!/Pessoas\s*:\s*\d+/i.test(data.description)) {
-                    data.description = `${prefix}\n${data.description}`;
-                }
-            } else {
-                data.description = prefix;
-            }
+const CalendarService = {
+    async request(url, method = 'GET', body = null) {
+        const token = window.localStorage.getItem('access_token');
+        const options = {
+            method,
+            headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+        };
+        if (body && !(body instanceof FormData)) {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(body);
+        } else if (body) {
+            options.body = body;
         }
 
-        // Remover campos desnecessários
-        delete data.eventId;
-        delete data.startDate;
-        delete data.endDate;
-        delete data.peopleCount;
-        
-        // Mapear checkboxes booleanos
-        data.is_all_day = data.allDay === 'on';
-        data.is_recurring = data.recurring === 'on';
-        delete data.allDay;
-        delete data.recurring;
+        const response = await fetch(`${CalendarConfig.baseUrl}${url}`, options);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Erro na requisição');
+        return data;
+    },
 
-        // Garantir restaurant_id: usar o do usuário da sessão se não houver no formulário
-        if (!data.restaurant_id) {
-            const userRest = (typeof appState !== 'undefined' && appState.user) ? appState.user.restaurant_id : null;
-            if (userRest) {
-                data.restaurant_id = userRest;
-            }
+    getEvents(month, year) { return this.request(`/calendar/events?month=${month + 1}&year=${year}`); },
+    saveEvent(formData) { return this.request('/calendar/events', 'POST', formData); }
+};
+
+/**
+ * ============================================================
+ * 3. UTILITÁRIOS
+ * ============================================================
+ */
+const Utils_date = {
+    normalizeHour: (time) => {
+        const h = time?.split(':')[0] || '00';
+        return `${String(Math.max(0, Math.min(23, parseInt(h)))).padStart(2, '0')}:00`;
+    },
+    formatDate: (d) => new Date(d).toLocaleDateString('pt-BR'),
+    isSameDay: (d1, d2) => d1.getDate() === d2.getDate() && d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear()
+};
+
+/**
+ * ============================================================
+ * 4. CONTROLE DE INTERFACE (UI)
+ * ============================================================
+ */
+const CalendarUI = {
+    state: CalendarState,
+
+    async init() {
+        this.bindEvents();
+        await this.loadEvents();
+        updateCurrentMonth();
+    },
+
+    async loadEvents() {
+        const container = document.getElementById('calendarGrid');
+        if (container) container.innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div><p>Carregando eventos...</p></div>';
+        
+        try {
+            const data = await CalendarService.getEvents(this.state.currentDate.getMonth(), this.state.currentDate.getFullYear());
+            this.state.events = data.events || data.items || data || [];
+            renderCalendar();
+            renderCategoryCounts();
+        } catch (err) {
+            if (container) container.innerHTML = '<p class="text-danger text-center">Erro ao carregar dados.</p>';
         }
+    },
+
+    bindEvents() {
+        document.querySelectorAll('input[name="viewType"]').forEach(r => {
+            r.addEventListener('change', (e) => {
+                this.state.viewType = e.target.id.replace('View', '');
+                renderCalendar();
+            });
+        });
+
+        document.getElementById('eventModal')?.addEventListener('show.bs.modal', (e) => this.handleEventModalShow(e));
         
-        let response;
-        let message;
-        if (eventId && eventId !== '') {
-            // Atualizar
-            response = await api.put(`/calendar/events/${eventId}`, data);
-            message = 'Evento atualizado com sucesso';
-        } else {
-            // Criar novo
-            response = await api.post('/calendar/events', data);
-            message = 'Evento criado com sucesso';
+        ['startTime', 'endTime'].forEach(id => {
+            document.getElementById(id)?.addEventListener('blur', (e) => {
+                e.target.value = Utils_date.normalizeHour(e.target.value);
+                updateHiddenDateTimes();
+            });
+        });
+
+        document.getElementById('category')?.addEventListener('change', toggleBirthdayFields);
+    },
+
+    handleEventModalShow(event) {
+        if (this.state.openFromCalendar || this.state.openFromEdit) {
+            updateHiddenDateTimes();
+            return;
         }
-        
-        // Mostrar notificação
-        if (typeof appState !== 'undefined' && appState.notify) {
-            appState.notify(message, 'success');
-        } else if (typeof App !== 'undefined' && App.notify) {
-            App.notify(message, 'success');
-        } else {
-            alert(message);
-        }
-        
-        // Fechar modal
-        const modal = document.getElementById('eventModal');
-        if (modal) {
-            const bsModal = bootstrap.Modal.getInstance(modal);
-            if (bsModal) {
-                bsModal.hide();
-            }
-        }
-        
-        // Resetar form
-        form.reset();
-        
-        // Recarregar eventos
-        if (typeof CalendarModule !== 'undefined') {
-            CalendarModule.loadEvents();
-        }
-        
-    } catch (error) {
-        const errorMsg = error.message || 'Erro ao salvar evento';
-        
-        if (typeof appState !== 'undefined' && appState.notify) {
-            appState.notify(errorMsg, 'error');
-        } else if (typeof App !== 'undefined' && App.notify) {
-            App.notify(errorMsg, 'danger');
-        } else {
-            alert('Erro: ' + errorMsg);
-        }
+        document.getElementById('eventForm').reset();
+        document.getElementById('eventId').value = '';
+        setSelectedDateForModal(new Date());
+        setTimeFields('09:00', '10:00');
+        updateHiddenDateTimes();
+        toggleBirthdayFields();
+    },
+
+    syncDateTime() { updateHiddenDateTimes(); }
+};
+
+/**
+ * ============================================================
+ * 5. RENDERIZAÇÃO DAS VISÕES
+ * ============================================================
+ */
+function renderCalendar() {
+    const container = document.getElementById('calendarGrid');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (CalendarState.viewType !== 'day') {
+        ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].forEach(day => {
+            const h = document.createElement('div');
+            h.className = 'day-header';
+            h.textContent = day;
+            container.appendChild(h);
+        });
     }
+
+    if (CalendarState.viewType === 'month') renderMonthView(container);
+    else if (CalendarState.viewType === 'week') renderWeekView(container);
+    else renderDayView(container);
+}
+
+function renderMonthView(container) {
+    const year = CalendarState.currentDate.getFullYear();
+    const month = CalendarState.currentDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+    for (let i = 0; i < 42; i++) {
+        const d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        container.appendChild(createDayCell(d, month));
+    }
+}
+
+function renderWeekView(container) {
+    const startOfWeek = new Date(CalendarState.currentDate);
+    startOfWeek.setDate(CalendarState.currentDate.getDate() - CalendarState.currentDate.getDay());
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(startOfWeek);
+        d.setDate(startOfWeek.getDate() + i);
+        container.appendChild(createDayCell(d, CalendarState.currentDate.getMonth()));
+    }
+}
+
+function renderDayView(container) {
+    const cell = createDayCell(CalendarState.currentDate, CalendarState.currentDate.getMonth());
+    cell.classList.add('day-view-focus');
+    container.appendChild(cell);
+}
+
+function createDayCell(date, currentMonth) {
+    const cell = document.createElement('div');
+    cell.className = `calendar-day ${date.getMonth() !== currentMonth ? 'other-month' : ''} ${Utils_date.isSameDay(date, new Date()) ? 'today' : ''}`;
+    cell.innerHTML = `<div class="day-number">${date.getDate()}</div><div class="day-events"></div>`;
+    cell.onclick = () => selectDate(date);
+
+    const dayEvents = CalendarState.events.filter(e => Utils_date.isSameDay(new Date(e.start), date));
+    const evContainer = cell.querySelector('.day-events');
+
+    dayEvents.forEach(e => {
+        const div = document.createElement('div');
+        div.className = `event event-${e.extendedProps?.event_type || 'default'}`;
+        div.textContent = e.title;
+        div.onclick = (ex) => { ex.stopPropagation(); editEvent(e); };
+        evContainer.appendChild(div);
+    });
+    return cell;
 }
 
 /**
- * Deletar evento (versão global)
+ * ============================================================
+ * 6. AÇÕES E MODAIS
+ * ============================================================
  */
-function deleteEvent() {
-    const eventId = document.getElementById('eventId')?.value;
-    if (!eventId) {
-        return;
-    }
-    
-    if (!confirm('Tem certeza que deseja deletar este evento?')) {
-        return;
-    }
-    
-    CalendarModule.deleteEvent(eventId);
+function selectDate(date) {
+    CalendarState.openFromCalendar = true;
+    CalendarState.openFromEdit = false;
+    setSelectedDateForModal(date);
+    setTimeFields('09:00', '10:00');
+    updateHiddenDateTimes();
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('eventModal'));
+    document.getElementById('eventModalTitle').textContent = 'Novo Evento - ' + Utils_date.formatDate(date);
+    modal.show();
 }
+
+function editEvent(event) {
+    CalendarState.openFromEdit = true;
+    CalendarState.openFromCalendar = false;
+    document.getElementById('eventModalTitle').textContent = 'Editar Evento';
+    document.getElementById('eventId').value = event.id;
+    document.getElementById('title').value = event.title;
+    document.getElementById('description').value = event.description || '';
+    
+    const start = new Date(event.start);
+    const end = event.end ? new Date(event.end) : start;
+    setSelectedDateForModal(start);
+    setTimeFields(String(start.getHours()).padStart(2, '0') + ':00', String(end.getHours()).padStart(2, '0') + ':00');
+    document.getElementById('category').value = event.extendedProps?.event_type || 'event';
+    
+    updateHiddenDateTimes();
+    toggleBirthdayFields();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('eventModal')).show();
+}
+
+function toggleBirthdayFields() {
+    const category = document.getElementById('category')?.value;
+    const box = document.getElementById('birthdayFields');
+    if (box) box.style.display = (category === 'birthday_party') ? '' : 'none';
+}
+
+async function saveEvent() {
+    const formData = new FormData(document.getElementById('eventForm'));
+    formData.set('start_date', document.getElementById('startDate').value);
+    formData.set('end_date', document.getElementById('endDate').value);
+    try {
+        await CalendarService.saveEvent(formData);
+        bootstrap.Modal.getInstance(document.getElementById('eventModal'))?.hide();
+        await CalendarUI.loadEvents();
+    } catch (err) { alert(err.message); }
+}
+
+/**
+ * ============================================================
+ * 7. APOIO E NAVEGAÇÃO
+ * ============================================================
+ */
+function updateHiddenDateTimes() {
+    const dateStr = CalendarState.selectedDateOnly;
+    const start = Utils_date.normalizeHour(document.getElementById('startTime')?.value);
+    const end = Utils_date.normalizeHour(document.getElementById('endTime')?.value);
+    document.getElementById('startDate').value = `${dateStr}T${start}`;
+    document.getElementById('endDate').value = `${dateStr}T${end}`;
+}
+
+function setSelectedDateForModal(date) {
+    const d = new Date(date);
+    CalendarState.selectedDateOnly = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (document.getElementById('selectedDate')) document.getElementById('selectedDate').value = CalendarState.selectedDateOnly;
+}
+
+function setTimeFields(s, e) {
+    if (document.getElementById('startTime')) document.getElementById('startTime').value = s;
+    if (document.getElementById('endTime')) document.getElementById('endTime').value = e;
+}
+
+function updateCurrentMonth() {
+    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const el = document.getElementById('currentMonth');
+    if (el) el.innerHTML = `<i class="fas fa-calendar me-2"></i> ${monthNames[CalendarState.currentDate.getMonth()]} ${CalendarState.currentDate.getFullYear()}`;
+}
+
+function renderCategoryCounts() {
+    const counts = { meeting: 0, training: 0, event: 0, urgent: 0, desafio_misterio: 0, desafio_misterio_resposta: 0 };
+    CalendarState.events.forEach(ev => {
+        const type = ev.extendedProps?.event_type || 'event';
+        if (counts[type] !== undefined) counts[type]++;
+    });
+    Object.keys(counts).forEach(key => {
+        const el = document.getElementById(`cat-${key.replace('_', '-')}`);
+        if (el) el.textContent = counts[key];
+    });
+}
+
+async function nextMonth() { CalendarState.currentDate.setMonth(CalendarState.currentDate.getMonth() + 1); await CalendarUI.loadEvents(); updateCurrentMonth(); }
+async function prevMonth() { CalendarState.currentDate.setMonth(CalendarState.currentDate.getMonth() - 1); await CalendarUI.loadEvents(); updateCurrentMonth(); }
+
+document.addEventListener('DOMContentLoaded', () => CalendarUI.init());

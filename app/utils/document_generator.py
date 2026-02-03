@@ -105,22 +105,36 @@ class DocumentGenerator:
         # Fallback para fonte padrão PIL
         return ImageFont.load_default()
     
-    def _get_template_image(self, template_name):
-        """Obter imagem de template"""
+    def _get_template_image(self, template_name, restaurant_id):
+        """Obter imagem de template baseada na sigla do restaurante"""
+        from app.models.restaurant import Restaurant
+        
         templates = {
             'bem_vindo': 'bem_vindo.png',
             'aniversario': 'aniversario.png',
-            'welcome': 'bem_vindo.png',
-            'birthday': 'aniversario.png',
             'funcionario_mes': 'funcionario_mes.png',
-            'funcionariomes': 'funcionario_mes.png',
-            'employee_of_the_month': 'funcionario_mes.png'
         }
-        filename = templates.get(template_name.lower(), 'bem_vindo.png')
-        template_path = self.base_dir / filename
+        
+        # 1. Define o nome do arquivo base
+        base_filename = templates.get(template_name.lower(), 'bem_vindo.png')
+
+        res = Restaurant.query.get(restaurant_id)
+        
+       
+        nome = res.name.lower() if res and hasattr(res, 'name') else None
+        
+        # 3. Tenta montar o caminho dinâmico: self.base_dir / 'ag' / 'bem_vindo.png'
+        if nome:
+            template_path = self.base_dir / 'templates_generate' / nome / base_filename
+        else:
+           
+            template_path = self.base_dir / base_filename
+
+        # 5. Renderização ou Imagem em Branco
         if not os.path.exists(template_path):
-            # Se não existir template, criar imagem em branco
+            
             return Image.new('RGBA', (1920, 1280), color=(240, 240, 240, 255))
+            
         return Image.open(template_path).convert('RGBA')
     
     def _apply_rounded_corners(self, image, radius=50):
@@ -154,11 +168,11 @@ class DocumentGenerator:
         
         return placeholder
     
-    def generate_welcome_card(self, employee_name, employee_photo_path=None, restaurant_name=None):
+    def generate_welcome_card(self, employee_name, employee_photo_path=None, restaurant_id=None):
         """Gerar cartão de boas-vindas - APENAS com foto, nome e data"""
         try:
             # Carregar template
-            fundo = self._get_template_image('bem_vindo')
+            fundo = self._get_template_image('bem_vindo', restaurant_id)
             largura, altura = fundo.size
             
             centro_x = largura // 2
@@ -211,11 +225,11 @@ class DocumentGenerator:
         except Exception:
             raise
     
-    def generate_birthday_card(self, employee_name, birth_date, employee_photo_path=None):
+    def generate_birthday_card(self, employee_name, birth_date, employee_photo_path=None, restaurant_id=None):
         """Gerar cartão de aniversário - APENAS com foto, nome e data"""
         try:
             # Carregar template
-            fundo = self._get_template_image('aniversario')
+            fundo = self._get_template_image('aniversario', restaurant_id)
             largura, altura = fundo.size
             
             centro_x = largura // 2
@@ -279,7 +293,7 @@ class DocumentGenerator:
             raise
     
     def generate_custom_card(self, title, employee_name, template='bem_vindo', 
-                           additional_text=None, employee_photo_path=None):
+                           additional_text=None, employee_photo_path=None, restaurant_id=None):
         """Gerar cartão customizado - APENAS com foto, nome e data"""
         try:
             fundo = self._get_template_image(template)

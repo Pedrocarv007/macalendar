@@ -32,10 +32,10 @@ Execute **PowerShell como Administrador** e rode:
 cd I:\server_apps\macalendar
 
 # Instale o serviço usando NSSM
-nssm install MACCalendar "I:\server_apps\macalendar\.venv\Scripts\python.exe" "-m waitress --listen=127.0.0.1:6005 --threads=8 run:app"
+nssm install pdf2doc "I:\server_apps\pdftoword\.venv\Scripts\python.exe" "python -m uvicorn app:app --host 0.0.0.0 --port 5010"
 
 # Configure o diretório de trabalho
-nssm set MACCalendar AppDirectory "I:\server_apps\macalendar"
+nssm set pdf2doc AppDirectory "I:\server_apps\pdftoword"
 
 # Configure variáveis de ambiente
 nssm set MACCalendar AppEnvironmentExtra FLASK_CONFIG=production RUNNING_ON_IIS=1

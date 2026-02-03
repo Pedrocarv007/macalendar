@@ -21,6 +21,7 @@ const DocumentsModule = {
             this.currentUser = await api.get('/auth/user');
             this.setupHandlers();
             await this.loadDocuments();
+            await this.loadRestaurantsForAdmin();
             console.log("🚀 DocumentsModule iniciado com sucesso.");
         } catch (error) {
             console.warn('Erro na inicialização:', error);
@@ -201,10 +202,10 @@ const DocumentsModule = {
         if (!params.has('page')) params.append('page', this.currentPage);
         try {
             const response = await api.get(`/documents?${params.toString()}`);
-            this.data = response.documents || [];
+            this.data = response.items || [];
             this.render();
-            this.updateStats(response.stats);
-            this.updatePagination(response.stats);
+            this.updateStats(response);
+            this.updatePagination(response);
         } catch (error) { Thecarv.notify('Erro ao carregar', 'error'); }
         finally { if (loading) loading.style.display = 'none'; }
     },
@@ -220,18 +221,70 @@ const DocumentsModule = {
 
     changePage(p) { this.currentPage = p; window.scrollTo({ top: 0, behavior: 'smooth' }); this.filterAndDisplay(); },
 
-    filterAndDisplay() {
-        const params = new URLSearchParams({
-            search: document.getElementById('searchDocument')?.value || '',
-            type: document.getElementById('filterType')?.value || '',
-            document_type: document.getElementById('filterCategory')?.value || '',
-            sortBy: document.getElementById('sortBy')?.value || 'upload_date',
-            page: this.currentPage
+   filterAndDisplay() {
+    // 1. Pegamos os elementos
+    const searchInput = document.getElementById('searchDocument');
+    const categorySelect = document.getElementById('filterCategory');
+    const restaurantSelect = document.getElementById('filterRestaurant'); // Pode ser null se não for admin
+    const sortSelect = document.getElementById('sortBy');
+
+    // 2. Criamos os parâmetros
+    const params = new URLSearchParams();
+    
+    if (searchInput?.value) params.append('search', searchInput.value);
+    
+    // Só envia o filtro se não for "todos"
+    if (categorySelect?.value && categorySelect.value !== 'todos') {
+        params.append('document_type', categorySelect.value);
+    }
+
+    if (restaurantSelect?.value && restaurantSelect.value !== 'todos') {
+        params.append('restaurant_id', restaurantSelect.value);
+    }
+
+    params.append('sortBy', sortSelect?.value || 'upload_date');
+    params.append('page', this.currentPage || 1);
+
+    // 3. Chama o carregamento com a string formatada: ?search=...&document_type=...
+    this.loadDocuments(params.toString());
+    this.updateStats()
+},
+
+        async clearFilters() {
+        // 1. Limpa os valores dos campos
+        if (document.getElementById('filterRestaurant')) document.getElementById('filterRestaurant').value = 'todos';
+        if (document.getElementById('filterCategory')) document.getElementById('filterCategory').value = 'todos';
+        if (document.getElementById('searchDocument')) document.getElementById('searchDocument').value = '';
+        
+        // 2. Reseta a página para a primeira
+        this.currentPage = 1; 
+        
+        // 3. Atualiza a exibição
+        await this.filterAndDisplay();
+    },
+    // Chame esta função no init() para carregar os restaurantes se for Admin
+    async loadRestaurantsForAdmin() {
+        const select = document.getElementById('filterRestaurant');
+        if (!select) return; // Se não existe o campo, não é admin
+
+        try {
+            const response = await api.get('/restaurants'); // Rota que você deve ter no Python
+            // response deve ser uma lista de {id, name}
+           const lista = response.restaurants || [];
+
+        lista.forEach(res => {
+            const opt = document.createElement('option');
+            opt.value = res.id;
+            opt.textContent = res.name;
+            select.appendChild(opt);
         });
-        this.loadDocuments(params.toString());
+            
+        } catch (error) {
+            Thecarv.notify("Erro ao carregar lista de restaurantes", 'error');
+        }
     },
 
-    render() {
+        render() {
         const container = document.getElementById(this.currentView === 'list' ? 'documentsTableBody' : 'documentsGridContainer');
         const noResults = document.getElementById('noDocuments');
         document.getElementById('documentsList').style.display = this.currentView === 'list' ? '' : 'none';
@@ -281,19 +334,27 @@ const DocumentsModule = {
         </div>`;
     },
 
-    updateStats(stats) {
-        if (!stats) return;
-        ['totalDocuments', 'pdfCount', 'imageCount'].forEach(id => {
+    updateStats(response) {
+        if (!response) return;
+        
+        // Mapeamento manual para evitar erros de substituição de string
+        const mapeamento = {
+            'totalDocuments': response.total || 0,
+            'pdfCount': response.pdf || 0,
+            'imageCount': response.fotos || response.image || 0 // Tenta 'fotos' ou 'image'
+        };
+
+        Object.keys(mapeamento).forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.textContent = stats[id.replace('Count', '').replace('Documents', '')] || 0;
+            if (el) el.textContent = mapeamento[id];
         });
-        // Atualiza o tamanho total
-        const elSize = document.getElementById('totalSize');
-        if (elSize) {
-            const totalSize = (this.data || []).reduce((acc, doc) => acc + (doc.file_size || 0), 0);
-            elSize.textContent = Utils.formatFileSize(totalSize);
-        }
-    },
+            // Atualiza o tamanho total
+            const elSize = document.getElementById('totalSize');
+            if (elSize) {
+                const totalSize = (this.data || []).reduce((acc, doc) => acc + (doc.file_size || 0), 0);
+                elSize.textContent = Utils.formatFileSize(totalSize);
+            }
+        },
 
     toggleView(view) {
         this.currentView = view;

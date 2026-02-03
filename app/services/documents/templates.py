@@ -24,7 +24,7 @@ def get_strategies(target, restaurant, photo_path, data, generator):
             'params': {
                 'employee_name': target.name,
                 'employee_photo_path': photo_path,
-                'restaurant_name': restaurant.name
+                'restaurant_id': restaurant.id
             }
         },
         'aniversario': {
@@ -33,7 +33,8 @@ def get_strategies(target, restaurant, photo_path, data, generator):
             'params': {
                 'employee_name': target.name,
                 'birth_date': get_birthday_for_current_year(getattr(target, 'birth_date', None)),
-                'employee_photo_path': photo_path
+                'employee_photo_path': photo_path,
+                'restaurant_id': restaurant.id
             }
         },
         'funcionario_mes': {
@@ -43,7 +44,8 @@ def get_strategies(target, restaurant, photo_path, data, generator):
                 'employee_name': target.name,
                 'month_year': data.get('month_year') or data.get('mes_ano'),
                 'reason': data.get('reason') or data.get('motivo'),
-                'employee_photo_path': photo_path
+                'employee_photo_path': photo_path,
+                'restaurant_id': restaurant.id
             }
         }
     }
