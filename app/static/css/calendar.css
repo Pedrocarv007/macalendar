@@ -15,17 +15,67 @@
     overflow-x: auto;
 }
 
+
+/* Harmonize selects to look like inputs */
+.form-select.input-like {
+    background-image: none !important; /* remove caret bg to look like input */
+    padding-right: .75rem !important;
+    border-color: var(--bs-border-color, #ced4da);
+}
+.input-group .form-select.input-like { height: 100%; }
+
+/* Make disabled selectedDate look like a normal input */
+#selectedDate[disabled] {
+    opacity: 1;
+    background-color: var(--bs-body-bg);
+    color: inherit;
+}
+
+/* Time inputs: align numbers and balance width */
+.time-only {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+.input-group-text i { width: 1.1rem; text-align: center; }
+
+/* Flash messages/alerts sempre acima dos modais */
+.alert, .flask-flash, .flash-message, .swal2-container, .swal2-popup {
+    z-index: 9999 !important;
+}
+/* Para garantir que container de mensagens não fique atrás */
+#flash-messages, .flash-container {
+    z-index: 9999 !important;
+    position: relative;
+}
+
+/* Esconde o campo de URL da imagem do Desafio Mistério sempre */
+#mysteryImageGroup { display: none !important; }
+
 /* ========== Calendar Grid ========== */
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 1px;
     background: rgba(255, 199, 44, 0.2);
+    border: 1px solid rgba(255, 199, 44, 0.2);
     border-radius: 8px;
     overflow: hidden;
     /* Fit all 7 columns within the viewport on mobile */
     width: 100%;
 }
+
+#calendarGrid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+}
+
+/* Quando for visualização de dia, ocupa a largura total */
+.day-view-focus {
+    grid-column: span 7;
+    min-height: 400px; /* Dá destaque ao dia */
+}
+
 
 .day-header {
     background: var(--mc-red);
@@ -210,6 +260,46 @@
     .calendar-actions-right .btn i {
         font-size: 0.9rem;
     }
+}
+
+/* Responsividade para dispositivos móveis */
+@media (max-width: 768px) {
+  .calendar-grid {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    min-width: 320px;
+  }
+  .calendar-day {
+    width: 100% !important;
+    min-width: 120px;
+    margin-bottom: 8px;
+    font-size: 1rem;
+  }
+  .day-header {
+    width: 100% !important;
+    min-width: 120px;
+    font-size: 1rem;
+    text-align: center;
+  }
+  .calendar-actions, .calendar-actions-right {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .card {
+    margin-bottom: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .calendar-day, .day-header {
+    min-width: 90px;
+    font-size: 0.9rem;
+  }
+  .calendar-actions {
+    flex-direction: column;
+    gap: 4px;
+  }
 }
 
 @media (max-width: 576px) {

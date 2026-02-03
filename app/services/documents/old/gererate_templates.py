@@ -104,3 +104,5 @@ def generate_templates(current_user_id, user_role, user_restaurant_id, data):
     db.session.commit()
     
     return jsonify({'message': 'Sucesso!', 'document': document.to_dict()}), 201
+
+
