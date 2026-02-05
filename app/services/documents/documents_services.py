@@ -42,18 +42,19 @@ class DocumentService(BaseService):
         # 2. Categoria (Certificados, Manuais, etc)
         category = filters.get('document_type')
         if category and category != 'todos':
-            query = query.filter(or_(Document.document_type.ilike(category), Document.document_type.ilike(category)))
+            query = query.filter(Document.document_type.ilike(category))
 
         # 3. Lógica de Hierarquia para Administradores
-        if self.role not in Config.SUPER_ROLES:
-            # Usuário Comum: Sempre travado no restaurante dele
-            query = query.filter(Document.restaurant_id == self.restaurant_id)
-        else:
-            # Admin: Verifica se ele escolheu um restaurante específico no select
+        current_restaurant_filter = self.restaurant_id
+        if self.role in Config.SUPER_ROLES:
             req_restaurant_id = filters.get('restaurant_id')
             if req_restaurant_id and req_restaurant_id != 'todos':
-                query = query.filter(Document.restaurant_id == int(req_restaurant_id))
-
+                current_restaurant_filter = int(req_restaurant_id)
+                query = query.filter(Document.restaurant_id == current_restaurant_filter)
+            else:
+                current_restaurant_filter = None # Sem filtro de restaurante (Ver tudo)
+        else:
+             query = query.filter(Document.restaurant_id == self.restaurant_id)
 
 
         sort_by = filters.get('sortBy', 'upload_date')
@@ -75,7 +76,10 @@ class DocumentService(BaseService):
         image_count = query.filter(Document.document_type == 'Foto').count() 
         
         # Soma do tamanho de todos os arquivos filtrados
-        total_bytes = db.session.query(func.sum(Document.file_size)).filter(Document.restaurant_id == self.restaurant_id).scalar() or 0
+        if current_restaurant_filter:
+             total_bytes = db.session.query(func.sum(Document.file_size)).filter(Document.restaurant_id == current_restaurant_filter).scalar() or 0
+        else:
+             total_bytes = db.session.query(func.sum(Document.file_size)).scalar() or 0
 
         
         return {
@@ -169,27 +173,41 @@ class DocumentService(BaseService):
         generator = DocumentGenerator()
         
         # Lógica de caminho de foto integrada
-        folder = 'workers' if hasattr(target, 'worker_id') else 'employees'
-        photo_path = str(self.base_upload_path / folder / target.photo_filename) if target.photo_filename else None
+        is_worker_instance = isinstance(target, Worker)
+        folder = 'workers' if is_worker_instance else 'employees'
+        
+        # Correção: Worker muitas vezes não tem photo_filename preenchido ou usa lógica diferente
+        photo_filename = getattr(target, 'photo_filename', None)
+        photo_path = str(self.base_upload_path / folder / photo_filename) if photo_filename else None
 
         strategies = get_strategies(target, restaurant, photo_path, extra_data, generator)
         config = strategies.get(document_type.lower())
         
         if not config: raise ValueError('Tipo de documento inválido')
+        
+        # Agora retorna (caminho_relativo, nome_arquivo)
+        relative_path, filename = config['method'](**config['params'])
+        
+        # Se relative_path vier com barras invertidas (Windows), normalizar para web
+        relative_path = relative_path.replace('\\', '/')
 
-        file_path, filename = config['method'](**config['params'])
+        # Resolver caminho absoluto para cálculo de tamanho (Assumindo estrutura root/uploads)
+        # current_app.root_path aponta para /app, então .parent vai para raiz do projeto
+        full_path = Path(current_app.root_path).parent / relative_path
+        
+        file_size = os.path.getsize(full_path) if full_path.exists() else 0
 
         doc = Document(
             title=f'Cartão - {target.name}',
             document_type="Foto",
             template_name=document_type,
             filename=filename,
-            file_path=file_path,
-            file_size=os.path.getsize(file_path),
+            file_path=relative_path, # Salvando caminho relativo web-friendly
+            file_size=file_size,
             file_extension="png",
             restaurant_id=restaurant.id,
-            employee_id=None if folder == 'workers' else target.id,
-            worker_id=target.id if folder == 'workers' else None,
+            employee_id=None if is_worker_instance else target.id,
+            worker_id=target.id if is_worker_instance else None,
             created_by=self.user_id,
             status='generated'
         )
@@ -205,8 +223,39 @@ class DocumentService(BaseService):
         if not self._can_manage(doc):
             raise PermissionError("Acesso negado")
 
-        self.log_activity('download', f"Descarregou: {doc.title}", doc.id, 'document')   
-        return send_file(doc.file_path, as_attachment=True, download_name=doc.filename)
+        self.log_activity('download', f"Descarregou: {doc.title}", doc.id, 'document')
+        
+        # Resolver caminho absoluto se estiver salvo como relativo
+        file_path = doc.file_path
+        if not os.path.isabs(file_path):
+             # Tenta resolver primeiro em root/uploads (novo padrão)
+             potential_path = Path(current_app.root_path).parent / file_path
+             if potential_path.exists():
+                 file_path = str(potential_path)
+             else:
+                 # Fallback para app/static (legado)
+                 file_path = os.path.join(current_app.root_path, 'static', file_path)
+             
+        return send_file(file_path, as_attachment=True, download_name=doc.filename)
+
+    def view_file(self, document_id):
+        """Visualizar arquivo no navegador (inline)"""
+        doc = Document.query.get_or_404(document_id)
+        if not self._can_manage(doc):
+            raise PermissionError("Acesso negado")
+
+        # Resolver caminho absoluto se estiver salvo como relativo
+        file_path = doc.file_path
+        if not os.path.isabs(file_path):
+             # Tenta resolver primeiro em root/uploads (novo padrão)
+             potential_path = Path(current_app.root_path).parent / file_path
+             if potential_path.exists():
+                 file_path = str(potential_path)
+             else:
+                 # Fallback para app/static (legado)
+                 file_path = os.path.join(current_app.root_path, 'static', file_path)
+             
+        return send_file(file_path, as_attachment=False)
 
     def download_zip(self, document_ids):
         docs = Document.query.filter(Document.id.in_(document_ids)).all()

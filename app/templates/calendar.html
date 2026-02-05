@@ -328,7 +328,7 @@
             <div class="modal-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div class="badge bg-primary" id="detailsCategory">Categoria</div>
-                    <button type="button" class="btn btn-sm btn-outline-success" id="detailsMarkPosted" style="display: none;" onclick="markPostedFromDetails()">
+                    <button type="button" class="btn btn-sm btn-outline-success" id="detailsMarkPosted"  onclick="markPostedFromDetails()">
                         <i class="fas fa-check me-1"></i>Marcar como postado
                     </button>
                 </div>
@@ -337,11 +337,7 @@
                     <div class="border rounded p-3 bg-light" id="detailsDescription" style="min-height: 80px;"></div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Imagem/Link</label>
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <a href="#" id="detailsLink" target="_blank" rel="noopener" style="display: none;">Abrir link</a>
-                        <span class="text-muted" id="detailsNoLink" style="display: none;">Nenhum link informado</span>
-                    </div>
+                    <label class="form-label fw-semibold">Imagem</label>
                     <div id="detailsImageWrapper" style="display: none;">
                         <img id="detailsImage" src="" alt="Prévia" class="img-fluid rounded border">
                     </div>
@@ -359,4 +355,8 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/modules/calendar.js') }}"></script>
 {% endblock %}

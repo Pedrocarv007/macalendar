@@ -92,8 +92,10 @@ class CalendarEvent(db.Model):
             'backgroundColor': self.color,
             'borderColor': self.color,
             'photo_path': self.photo_path,
+            'location': self.location,  # Expondo na raiz também para facilitar acesso
             'extendedProps': {
                 'event_type': self.event_type,
+                'is_posted': self.metadata_json.get('is_posted', False),
                 'restaurant_id': self.restaurant_id,
                 'restaurant_name': self.restaurant.name if self.restaurant else None,
                 'created_by': self.created_by,

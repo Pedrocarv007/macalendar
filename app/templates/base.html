@@ -160,8 +160,8 @@
                             </li> -->
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <a class="dropdown-item" href="#">
-                                    <i class="fas fa-question-circle me-2"></i>Ajuda
+                                <a class="dropdown-item" href="{{ url_for('web.manual') }}">
+                                    <i class="fas fa-book-open me-2"></i>Manual do Usuário
                                 </a>
                             </li>
                             <li>
@@ -239,10 +239,6 @@
     
     {% if 'documents' in request.path %}
     <script src="{{ url_for('static', filename='js/modules/documents.js') }}"></script>
-    {% endif %}
-    
-    {% if 'calendar' in request.path %}
-    <script src="{{ url_for('static', filename='js/modules/calendar.js') }}"></script>
     {% endif %}
     
     {% if 'profile' in request.path %}

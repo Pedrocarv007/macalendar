@@ -2,6 +2,7 @@
 Módulo para gerar documentos automaticamente usando PIL/Canva
 Gera cartões de boas-vindas e aniversário
 """
+from fileinput import filename
 from PIL import Image, ImageDraw, ImageFont
 import os
 from datetime import datetime
@@ -15,7 +16,15 @@ class DocumentGenerator:
         return ''.join(c if ord(c) < 128 else '?' for c in text)
 
 
-    """Gerador de documentos com templates"""
+    
+    def _generate_filename(self, prefix):
+        """Gerar nome de arquivo único com timestamp e uuid"""
+        import uuid
+        import time
+        timestamp = int(time.time() * 1000) # Milissegundos
+        unique_id = uuid.uuid4().hex[:8]
+        return f"{prefix}_{timestamp}_{unique_id}.png"
+
     def generate_employee_of_the_month_card(self, employee_name, month_year, reason=None, employee_photo_path=None):
         """Gerar cartão de Funcionário do Mês com nome, mês/ano, motivo e foto"""
         try:
@@ -70,10 +79,12 @@ class DocumentGenerator:
                 except Exception:
                     pass
 
-            filename = f"cartao_funcionario_mes_{int(datetime.now().timestamp())}.png"
+            filename = self._generate_filename("cartao_funcionario_mes")
             filepath = self.uploads_dir / filename
             fundo.save(str(filepath), 'PNG')
-            return str(filepath), filename
+            
+            # Retorna caminho relativo para o banco de dados
+            return f"uploads/generated/{filename}", filename
         except Exception:
             raise
 
@@ -81,7 +92,8 @@ class DocumentGenerator:
     def __init__(self):
         # Diretórios
         self.base_dir = Path(__file__).parent.parent.parent
-        self.uploads_dir = self.base_dir / 'uploads' / 'generated'
+        # Mudança: salvar em app/static/uploads/generated para servir via /static/...
+        self.uploads_dir = self.base_dir / 'app' / 'static' / 'uploads' / 'generated'
         
         # Criar diretório se não existir
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
@@ -216,11 +228,12 @@ class DocumentGenerator:
                 pass
             
             # Salvar
-            filename = f"cartao_bemvindo_{int(datetime.now().timestamp())}.png"
+            filename = self._generate_filename("cartao_bemvindo")
             filepath = self.uploads_dir / filename
             fundo.save(str(filepath), 'PNG')
             
-            return str(filepath), filename
+            # Retorna caminho relativo para o banco de dados
+            return f"uploads/generated/{filename}", filename
             
         except Exception:
             raise
@@ -283,11 +296,12 @@ class DocumentGenerator:
                 pass
             
             # Salvar
-            filename = f"cartao_aniversario_{int(datetime.now().timestamp())}.png"
+            filename = self._generate_filename("cartao_aniversario")
             filepath = self.uploads_dir / filename
             fundo.save(str(filepath), 'PNG')
             
-            return str(filepath), filename
+            # Retorna caminho relativo para o banco de dados
+            return f"uploads/generated/{filename}", filename
             
         except Exception:
             raise
@@ -342,7 +356,7 @@ class DocumentGenerator:
             
             # Salvar
             filename = f"cartao_custom_{int(datetime.now().timestamp())}.png"
-            filepath = self.uploads_dir / filename
+            filepath = "I:\\server_apps\\macalendar\\app\\static\\uploads\\documents\\" + filename
             fundo.save(str(filepath), 'PNG')
             
             return str(filepath), filename

@@ -1,4 +1,5 @@
-from flask import Blueprint, request, jsonify, g
+import os
+from flask import Blueprint, request, jsonify, g, send_from_directory
 from app.middleware.security import api_login_required
 from app.services.documents.documents_services import DocumentService 
 
@@ -86,3 +87,18 @@ def generate_document_auto():
     data = request.get_json() or {}
     doc = service.generate_from_template_auto(data) 
     return jsonify({"document": doc.to_dict()}), 201
+
+@documents_bp.route('/view/<int:document_id>', methods=['GET'])
+@api_login_required
+def view_document(document_id):
+    try:
+        service = get_service()
+        # Requires implementing a view_file method in service or just retrieving the file path/obj
+        # However, to keep it simple and safe, let's use the service to get the file path.
+        # But BaseService doesn't have it.
+        # Let's rely on the service to return the file path or send it.
+        return service.view_file(document_id)
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
+    except FileNotFoundError as e:
+        return jsonify({'error': str(e)}), 404

@@ -268,22 +268,25 @@ const DocumentsModule = {
         if (!select) return; // Se não existe o campo, não é admin
 
         try {
-            const response = await api.get('/restaurants'); // Rota que você deve ter no Python
-            // response deve ser uma lista de {id, name}
-           const lista = response.restaurants || [];
+            const response = await api.get('/restaurants'); 
+            const lista = response.restaurants || [];
 
-        lista.forEach(res => {
-            const opt = document.createElement('option');
-            opt.value = res.id;
-            opt.textContent = res.name;
-            select.appendChild(opt);
-        });
+            // --- CORREÇÃO AQUI: Limpa o select mas mantém a primeira opção "Todos" ---
+            select.innerHTML = '<option value="todos">Todos os Restaurantes</option>';
+
+            lista.forEach(res => {
+                const opt = document.createElement('option');
+                opt.value = res.id;
+                opt.textContent = res.name;
+                select.appendChild(opt);
+            });
             
+            console.log("✅ Filtro de restaurantes carregado sem duplicatas.");
         } catch (error) {
-            Thecarv.notify("Erro ao carregar lista de restaurantes", 'error');
+            console.error("Erro ao carregar lista de restaurantes:", error);
+            // Evita usar Thecarv.notify aqui para não poluir a tela no init
         }
     },
-
         render() {
         const container = document.getElementById(this.currentView === 'list' ? 'documentsTableBody' : 'documentsGridContainer');
         const noResults = document.getElementById('noDocuments');
@@ -310,6 +313,7 @@ const DocumentsModule = {
             <td>${Utils.formatFileSize(doc.file_size)}</td>
             <td>${Utils.formatDate(new Date(doc.created_at))}</td>
             <td><div class="btn-group">
+                <button class="btn btn-sm btn-outline-info" onclick="DocumentsModule.view(${doc.id})"><i class="fas fa-eye"></i></button>
                 <button class="btn btn-sm btn-outline-primary" onclick="DocumentsModule.download(${doc.id})"><i class="fas fa-download"></i></button>
                 <button class="btn btn-sm btn-outline-warning doc-edit-btn" data-id="${doc.id}"><i class="fas fa-edit"></i></button>
             </div></td>
@@ -326,6 +330,7 @@ const DocumentsModule = {
                     <h6 class="card-title text-truncate">${doc.title}</h6>
                     <span class="badge bg-${color} mb-3">${doc.document_type}</span>
                     <div class="btn-group w-100">
+                        <button class="btn btn-sm btn-outline-info" onclick="DocumentsModule.view(${doc.id})"><i class="fas fa-eye"></i></button>
                         <button class="btn btn-sm btn-outline-primary" onclick="DocumentsModule.download(${doc.id})"><i class="fas fa-download"></i></button>
                         <button class="btn btn-sm btn-outline-warning doc-edit-btn" data-id="${doc.id}"><i class="fas fa-edit"></i></button>
                     </div>
@@ -367,6 +372,47 @@ const DocumentsModule = {
         btnList?.classList.toggle('btn-outline-primary', view !== 'list');
         if (gridActions) gridActions.style.display = view === 'grid' ? 'block' : 'none';
         this.render();
+    },
+
+    view(id) {
+        const doc = this.data.find(d => String(d.id) === String(id));
+        if (!doc) return;
+
+        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        const title = document.getElementById('previewTitle');
+        const frame = document.getElementById('previewFrame');
+        const img = document.getElementById('previewImage');
+        const error = document.getElementById('previewError');
+        const spinner = document.getElementById('previewSpinner');
+        const downloadBtn = document.getElementById('previewDownloadBtn');
+
+        // Reset
+        title.textContent = doc.title;
+        frame.classList.add('d-none');
+        img.classList.add('d-none');
+        error.classList.add('d-none');
+        spinner.classList.remove('d-none');
+        downloadBtn.onclick = () => this.download(id);
+
+        const url = `${window.API_BASE_URL}/documents/view/${id}`;
+        
+        // Determinar tipo
+        const ext = doc.filename.split('.').pop().toLowerCase();
+        
+        modal.show();
+
+        setTimeout(() => {
+            spinner.classList.add('d-none');
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+                img.src = url;
+                img.classList.remove('d-none');
+            } else if (['pdf'].includes(ext)) {
+                frame.src = url;
+                frame.classList.remove('d-none');
+            } else {
+                error.classList.remove('d-none');
+            }
+        }, 500);
     },
 
     download(id) {

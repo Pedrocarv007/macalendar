@@ -49,6 +49,7 @@ class ScriptNameMiddleware:
         return self.app(environ, start_response)
 
 def create_app(config_name=None):
+       
     """Factory para criar aplicação Flask"""
     
     # Criar instância Flask
@@ -61,7 +62,7 @@ def create_app(config_name=None):
                 scheduler.init_app(app)
                 
                 # 2. Define a tarefa (Ajuste o horário para 1 ou 2 minutos à frente de agora para testar)
-                @scheduler.task('cron', id='do_monthly_birthdays', day='3', hour='16', minute='20')
+                @scheduler.task('cron', id='do_monthly_birthdays', day='3', hour='19', minute='59')
                 def scheduled_birthdays():
                     with app.app_context():
                         print("⏰ [APScheduler] Iniciando tarefa automática de aniversários...")
