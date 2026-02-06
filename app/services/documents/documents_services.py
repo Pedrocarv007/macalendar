@@ -4,6 +4,7 @@ import zipfile
 from pathlib import Path
 from datetime import datetime
 from flask import current_app, send_file
+from werkzeug.utils import secure_filename
 from sqlalchemy import func, or_
 from app.extensions.database import db
 from app.models.document import Document
@@ -270,5 +271,77 @@ class DocumentService(BaseService):
         return send_file(zip_buffer, mimetype='application/zip', as_attachment=True, 
                          download_name=f"lote_{datetime.now().strftime('%Y%m%d')}.zip")
     
-    def upload(self, data, form):
-        pass
+    def upload(self, file, form_data):
+        """Upload de um novo documento"""
+        if not file:
+             raise ValueError("Nenhum ficheiro fornecido")
+             
+        filename = secure_filename(file.filename)
+        if not filename:
+             raise ValueError("Nome de ficheiro inválido")
+
+        # 1. Definir caminho de salvamento
+        # Usa 'documents' dentro da pasta de uploads configurada
+        save_dir = self.base_upload_path / 'documents'
+        save_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 2. Gerar nome único para evitar sobrescrita
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_filename = f"{timestamp}_{filename}"
+        full_path = save_dir / unique_filename
+        
+        # 3. Salvar arquivo
+        file.save(str(full_path))
+        
+        # 4. Calcular tamanho
+        file_size = os.path.getsize(full_path)
+        
+        # 5. Calcular caminho relativo para o banco 
+        # (Deve ser relativo ao root path ou uma convention consistente)
+        # O sistema usa relative paths em muitos lugares. 
+        # Se base_upload_path for '.../uploads', path relativo será 'documents/filename' ??
+        # Na visualização (view_file), ele tenta resolver via upload folder.
+        # Vamos salvar "documents/filename" se base_upload_path ja aponta para uploads.
+        
+        # Mas espere: self.base_upload_path = Path(current_app.config.get('UPLOAD_FOLDER'))
+        # Se UPLOAD_FOLDER é absoluto...
+        # Vamos salvar o caminho relativo à pasta 'uploads' se possível, ou 'uploads/documents/...' para ser seguro.
+        
+        # Olhando o `generate_from_template`, ele salva `file_path=relative_path`.
+        # E relative_path é algo como 'uploads/generated/...'? 
+        # (Não, relative_path lá é retornado pelo strategies)
+        
+        # Vamos assumir que guardar 'uploads/documents/xxx' é o padrão seguro visto nos exemplos do script de check
+        # ID: 278, Path: uploads/generated/cartao_aniversario...
+        
+        relative_path = f"uploads/documents/{unique_filename}"
+        
+        # 6. Criar Registro
+        doc = Document(
+            title=form_data.get('title', filename),
+            description=form_data.get('description'),
+            document_type=form_data.get('document_type', 'Outros'),
+            template_name='upload', 
+            filename=unique_filename,
+            file_path=relative_path,
+            file_size=file_size,
+            file_extension=filename.split('.')[-1].lower(),
+            restaurant_id=self.restaurant_id, 
+            created_by=self.user_id,
+            status='uploaded',
+            is_public=form_data.get('is_public') == 'true'
+        )
+        
+        # Admin pode forçar outro restaurante
+        if self.role in Config.SUPER_ROLES and form_data.get('restaurant_id'):
+             try:
+                 doc.restaurant_id = int(form_data.get('restaurant_id'))
+             except:
+                 pass
+
+        db.session.add(doc)
+        db.session.commit()
+        
+        self.log_activity('document_upload', f"Carregou documento: {doc.title}", doc.id, 'document')
+        
+        return doc

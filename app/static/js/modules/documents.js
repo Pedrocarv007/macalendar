@@ -396,8 +396,9 @@ const DocumentsModule = {
 
         const url = `${window.API_BASE_URL}/documents/view/${id}`;
         
-        // Determinar tipo
-        const ext = doc.filename.split('.').pop().toLowerCase();
+        // Determinar tipo com segurança
+        const filename = doc.filename || '';
+        const ext = filename.indexOf('.') > 0 ? filename.split('.').pop().toLowerCase() : '';
         
         modal.show();
 

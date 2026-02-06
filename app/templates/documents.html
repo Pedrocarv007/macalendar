@@ -370,23 +370,40 @@
 </div>
 
 <!-- Preview Modal -->
-<div class="modal fade" id="previewModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="previewModalTitle">Visualizar Documento</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content glass-card border-0">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title" id="previewTitle">Visualizar Documento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body text-center">
-                <div id="previewContent">
-                    <!-- Preview content will be loaded here -->
+            <div class="modal-body p-0 position-relative" style="min-height: 400px; background: #f8f9fa;">
+                <!-- Loading Spinner -->
+                <div id="previewSpinner" class="position-absolute top-50 start-50 translate-middle text-center z-3">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+                    <div class="mt-2 text-muted fw-bold">Carregando visualização...</div>
+                </div>
+
+                <!-- Error Message -->
+                <div id="previewError" class="position-absolute top-50 start-50 translate-middle text-center w-75 d-none">
+                    <div class="alert alert-warning shadow-sm border-0">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-2 d-block"></i>
+                        <h5 class="alert-heading">Visualização não disponível</h5>
+                        <p class="mb-0">Não foi possível gerar uma pré-visualização para este arquivo. Por favor, faça o download para visualizar.</p>
+                    </div>
+                </div>
+
+                <!-- Content Container -->
+                <div class="w-100 h-100 d-flex align-items-center justify-content-center bg-dark bg-opacity-10">
+                    <iframe id="previewFrame" class="w-100 h-100 border-0 d-none" style="min-height: 80vh;"></iframe>
+                    <img id="previewImage" class="img-fluid d-none shadow-sm" style="max-height: 80vh;" alt="Preview">
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                <button type="button" class="btn btn-primary" id="downloadPreviewBtn">
-                    <i class="fas fa-download me-1"></i>Download
-                </button>
+            <div class="modal-footer border-top-0 bg-light">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Fechar</button>
+                <a href="#" id="previewDownloadBtn" class="btn btn-primary px-4" download>
+                    <i class="fas fa-download me-2"></i>Download Original
+                </a>
             </div>
         </div>
     </div>
