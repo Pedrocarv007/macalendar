@@ -37,8 +37,7 @@ class Config:
     UPLOAD_FOLDER = BASE_DIR / 'uploads'
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
-    
-    # Configurações de roles de usuário (podem ser sobrescritas por env)
+
     roles_env = os.getenv('VALID_ROLES')
     staff_roles_env = os.getenv('STAFF_ROLES')
     super_roles_env = os.getenv('SUPER_ROLES')

@@ -67,7 +67,7 @@ def get_employees():
         restaurant_id = request.args.get('restaurant_id', type=int)
         
         # Query base
-        query = Employee.query
+        query = Employee.query.filter(Employee.id != 999)
         worker_query = Worker.query
         
         # Filtrar por permissões

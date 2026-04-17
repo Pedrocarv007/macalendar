@@ -30,29 +30,22 @@ def process_auto_generation(strategy_key, target, restaurant, photo_path, data, 
         # -------------------------------------------------
 
         # 3. Define o nome e caminho do arquivo
-        filename = f"{strategy_key}_{target.name.lower().replace(' ', '_')}_{datetime.now().year}.png"
-        upload_dir = os.path.join('app', 'static', 'uploads', 'documents')
-        
-        if not os.path.exists(upload_dir):
-            os.makedirs(upload_dir)
-        
-        upload_path = os.path.join(upload_dir, filename)
+     
 
         # --- LÓGICA DE SALVAMENTO ---
-        if hasattr(result, 'save'):
-            result.save(upload_path)
-            print(f"✅ Imagem Pillow salva em: {upload_path}")
         elif isinstance(result, str):
             print(f"ℹ️ O gerador já devolveu um caminho: {result}")
         else:
             raise ValueError(f"O gerador retornou um tipo inesperado: {type(result)}")
         # 4. Cria o registro no Banco de Dados
+        # Salva o caminho relativo para acesso web
+        
         new_doc = Document(
             title=f"{strat['category']} - {target.name}",
             template_name="Auto Generated",
-            file_path=filename, # Guardamos apenas o nome do arquivo
+            file_path=result, # Caminho relativo para preview
             document_type=strat['category'],
-            restaurant_id=restaurant.id,
+            restaurant_id=target.restaurant_id,
             employee_id=SYSTEM_USER_ID,
             created_at=datetime.utcnow(),
             created_by=SYSTEM_USER_ID,
@@ -64,11 +57,12 @@ def process_auto_generation(strategy_key, target, restaurant, photo_path, data, 
             start_date=data_real, 
             end_date=data_real,
             event_type='event',
+            location = result,
             description="""
                                         Parabéns pelo seu aniversário! Desejo muita saúde, sucesso e realizações, 
                                         tanto na vida pessoal quanto na profissional.
                                         Que você tenha um dia excelente e um ano de grandes conquistas. Felicidades!""", 
-            restaurant_id=restaurant.id,
+            restaurant_id=target.restaurant_id,
             created_by=SYSTEM_USER_ID
         )
 

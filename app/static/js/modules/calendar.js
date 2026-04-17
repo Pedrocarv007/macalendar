@@ -4,7 +4,7 @@
  * ============================================================
  */
 const CalendarConfig = {
-    baseUrl: 'http://192.168.0.2:5006/mac/api',
+    baseUrl: window.API_BASE_URL || '/api',
     defaultImg: 'https://www.thecarv.com/desafio.jpg'
 };
 
@@ -14,7 +14,8 @@ const CalendarState = {
     viewType: 'month',
     selectedDateOnly: null,
     openFromCalendar: false,
-    openFromEdit: false
+    openFromEdit: false,
+    activeEvent: null
 };
 
 /**
@@ -37,13 +38,18 @@ const CalendarService = {
         }
 
         const response = await fetch(`${CalendarConfig.baseUrl}${url}`, options);
+        // Handle empty response for 204 No Content (common in Delete)
+        if (response.status === 204) return null;
+
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Erro na requisição');
         return data;
     },
 
     getEvents(month, year) { return this.request(`/calendar/events?month=${month + 1}&year=${year}`); },
-    saveEvent(formData) { return this.request('/calendar/events', 'POST', formData); }
+    saveEvent(formData) { return this.request('/calendar/events', 'POST', formData); },
+    deleteEvent(id) { return this.request(`/calendar/events/${id}`, 'DELETE'); },
+    markPosted(id) { return this.request(`/calendar/events/${id}/mark-posted`, 'PUT'); }
 };
 
 /**
@@ -190,17 +196,74 @@ function createDayCell(date, currentMonth) {
         const div = document.createElement('div');
         div.className = `event event-${e.extendedProps?.event_type || 'default'}`;
         div.textContent = e.title;
-        div.onclick = (ex) => { ex.stopPropagation(); editEvent(e); };
+        // Logic for click: previewing the event
+        div.onclick = (ex) => { 
+            ex.stopPropagation(); 
+            previewEvent(e); 
+        };
         evContainer.appendChild(div);
     });
+
     return cell;
 }
+    // Preview de evento: mostra imagem (se houver) e descrição
+    function previewEvent(event) {
+        // Save active event for modal actions
+        CalendarState.activeEvent = event;
 
-/**
- * ============================================================
- * 6. AÇÕES E MODAIS
- * ============================================================
- */
+        // Preenche título e data
+        document.getElementById('detailsTitle').textContent = event.title || '';
+        document.getElementById('detailsWhen').textContent = event.start ? Utils_date.formatDate(event.start) : '';
+        document.getElementById('detailsCategory').textContent = event.extendedProps?.event_type || '';
+        // Descrição
+        document.getElementById('detailsDescription').textContent = event.description || event.extendedProps?.description || '';
+        
+        // Imagem/link
+        const imgWrapper = document.getElementById('detailsImageWrapper');
+        const img = document.getElementById('detailsImage');
+        
+        // Verifica location na raiz ou em extendedProps
+        // Backend envia em extendedProps.location, mas FullCalendar pode não mapear para raiz automaticamente
+        let fileUrl = event.location || event.extendedProps?.location || '';
+        
+        if (fileUrl && (fileUrl.endsWith('.png') || fileUrl.endsWith('.jpg') || fileUrl.endsWith('.jpeg') || fileUrl.endsWith('.webp'))) {
+            let src = fileUrl;
+            if (!src.startsWith('http')) {
+                // Remove barra inicial se houver
+                if (src.startsWith('/')) src = src.substring(1);
+                // Adiciona static se não tiver
+                if (!src.startsWith('mac/static/')) src = 'mac/static/' + src;
+                // Adiciona barra inicial para caminho absoluto
+                src = '/' + src;
+            }
+            img.src = src;
+            imgWrapper.style.display = '';
+        } else {
+            imgWrapper.style.display = 'none';
+        }
+        // Verifica status de postado dos metadados ou cor
+        const isPosted = event.extendedProps?.is_posted === true || event.backgroundColor === '#2ecc71';
+        
+        const btnPosted = document.getElementById('detailsMarkPosted');
+        if (btnPosted) {
+            if (isPosted) {
+                btnPosted.innerHTML = '<i class="fas fa-check-double me-1"></i>Postado';
+                btnPosted.classList.replace('btn-outline-success', 'btn-success');
+                btnPosted.disabled = true;
+            } else {
+                btnPosted.innerHTML = '<i class="fas fa-check me-1"></i>Marcar como postado';
+                btnPosted.classList.replace('btn-success', 'btn-outline-success');
+                btnPosted.classList.remove('btn-success'); // garantir remoção
+                btnPosted.classList.add('btn-outline-success');
+                btnPosted.disabled = false;
+            }
+        }
+
+        // Link
+        // Abre modal
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('eventDetailsModal')).show();
+    }
+
 function selectDate(date) {
     CalendarState.openFromCalendar = true;
     CalendarState.openFromEdit = false;
@@ -243,6 +306,71 @@ async function saveEvent() {
     formData.set('end_date', document.getElementById('endDate').value);
     try {
         await CalendarService.saveEvent(formData);
+        bootstrap.Modal.getInstance(document.getElementById('eventModal'))?.hide();
+        await CalendarUI.loadEvents();
+    } catch (err) { alert(err.message); }
+}
+
+async function deleteEvent() {
+    const id = document.getElementById('eventId').value;
+    if (!id) return;
+    if (!confirm('Tem certeza que deseja excluir este evento?')) return;
+    
+    try {
+        await CalendarService.deleteEvent(id);
+        bootstrap.Modal.getInstance(document.getElementById('eventModal'))?.hide();
+        await CalendarUI.loadEvents();
+    } catch (err) { alert(err.message); }
+}
+
+async function deleteEventFromDetails() {
+    const event = CalendarState.activeEvent;
+    if (!event || !event.id) return;
+    if (!confirm('Tem certeza que deseja excluir este evento?')) return;
+
+    try {
+        await CalendarService.deleteEvent(event.id);
+        bootstrap.Modal.getInstance(document.getElementById('eventDetailsModal'))?.hide();
+        await CalendarUI.loadEvents();
+    } catch (err) { alert(err.message); }
+}
+
+function editEventFromDetails() {
+    const event = CalendarState.activeEvent;
+    if (!event) return;
+    
+    bootstrap.Modal.getInstance(document.getElementById('eventDetailsModal'))?.hide();
+    editEvent(event);
+}
+
+async function markPostedFromDetails() {
+    const event = CalendarState.activeEvent;
+    if (!event || !event.id) return;
+
+    try {
+        await CalendarService.markPosted(event.id);
+        
+        // Atualizar UI localmente ou recarregar
+        const btn = document.getElementById('detailsMarkPosted');
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-check-double me-1"></i>Postado';
+            btn.classList.replace('btn-outline-success', 'btn-success');
+            btn.disabled = true;
+        }
+        
+        // Recarrega eventos para atualizar cor no calendário
+        await CalendarUI.loadEvents();
+        
+    } catch (err) { alert(err.message); }
+}
+
+async function markPostedFromModal() {
+    // Busca ID do campo hidden do modal de edição
+    const eventId = document.getElementById('eventId').value;
+    if (!eventId) return;
+
+    try {
+        await CalendarService.markPosted(eventId);
         bootstrap.Modal.getInstance(document.getElementById('eventModal'))?.hide();
         await CalendarUI.loadEvents();
     } catch (err) { alert(err.message); }
@@ -292,5 +420,17 @@ function renderCategoryCounts() {
 
 async function nextMonth() { CalendarState.currentDate.setMonth(CalendarState.currentDate.getMonth() + 1); await CalendarUI.loadEvents(); updateCurrentMonth(); }
 async function prevMonth() { CalendarState.currentDate.setMonth(CalendarState.currentDate.getMonth() - 1); await CalendarUI.loadEvents(); updateCurrentMonth(); }
+async function today() { CalendarState.currentDate = new Date(); await CalendarUI.loadEvents(); updateCurrentMonth(); }
+
+// Expose functions to global scope
+window.nextMonth = nextMonth;
+window.prevMonth = prevMonth;
+window.today = today;
+window.saveEvent = saveEvent;
+window.editEventFromDetails = editEventFromDetails;
+window.deleteEventFromDetails = deleteEventFromDetails;
+window.markPostedFromDetails = markPostedFromDetails;
+window.markPostedFromModal = markPostedFromModal;
+window.deleteEvent = deleteEvent;
 
 document.addEventListener('DOMContentLoaded', () => CalendarUI.init());

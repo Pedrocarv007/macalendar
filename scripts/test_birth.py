@@ -14,6 +14,7 @@ from app.models.employee import Employee
 from app.models.restaurant import Restaurant
 from app.utils.auto_templates import process_auto_generation
 from app.utils.document_generator import DocumentGenerator
+from app.models.workers import Worker
 
 def run_monthly_automated_birthdays():
     generator = DocumentGenerator() 
@@ -26,10 +27,16 @@ def run_monthly_automated_birthdays():
     hoje = datetime.now()
     mes_atual = hoje.month
     
-    aniversariantes = Employee.query.filter(
+    emp_birthdays = Employee.query.filter(
         extract('month', Employee.birth_date) == mes_atual
     ).all()
-    
+
+    work_birthdays = Worker.query.filter(
+        extract('month', Worker.birth_date) == mes_atual
+    ).all()
+
+    aniversariantes = emp_birthdays + work_birthdays
+
     for emp in aniversariantes:
        
         try:

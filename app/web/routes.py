@@ -30,6 +30,12 @@ def dashboard():
     """Dashboard principal"""
     return render_template('dashboard.html')
 
+@web_bp.route('/manual')
+@login_required
+def manual():
+    """Manual do Usuário"""
+    return render_template('manual.html')
+
 @web_bp.route('/dashboard/stats')
 @login_required
 def dashboard_stats():

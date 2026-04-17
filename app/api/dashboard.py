@@ -3,6 +3,7 @@ API routes para Dashboard
 """
 from flask import Blueprint, jsonify, session, g, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy.orm import joinedload
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
 from app.models.document import Document
@@ -97,7 +98,7 @@ def get_recent_events():
             else:
                 return jsonify([]), 200
 
-        events = query.order_by(CalendarEvent.start_date).limit(6).all()
+        events = query.options(joinedload(CalendarEvent.restaurant)).order_by(CalendarEvent.start_date).limit(6).all()
         return jsonify([event.to_dict() for event in events]), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
