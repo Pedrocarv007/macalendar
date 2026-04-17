@@ -14,3 +14,35 @@
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 }
+
+/* ========== Responsive ========== */
+@media (max-width: 768px) {
+    /* Wrap and compact top actions */
+    .restaurant-actions {
+        flex-wrap: wrap;
+        gap: var(--space-sm);
+    }
+    .restaurant-actions-right .btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.95rem;
+    }
+    /* Softer hover on cards for small screens */
+    .restaurant-card:hover {
+        transform: none;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+    /* Table compaction */
+    .table thead th,
+    .table tbody td {
+        padding: var(--space-sm);
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 576px) {
+    /* Extra compact buttons on phones */
+    .restaurant-actions-right .btn {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.9rem;
+    }
+}

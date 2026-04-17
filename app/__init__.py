@@ -2,63 +2,179 @@
 Inicialização da aplicação Flask para MAC Calendar
 Sistema de gestão para restaurantes com calendário e gestão de colaboradores
 """
-from flask import Flask, session
+import os
+from datetime import datetime
+
+from flask import Flask, session, send_from_directory
+from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_wtf.csrf import generate_csrf
 from flask_cors import CORS
 
+from app.api.auth import auth_bp
+from app.api.calendar import calendar_bp
+from app.api.dashboard import dashboard_bp
+from app.api.documents import documents_bp
+from app.api.employees import employees_bp
+from app.api.notifications import notifications_bp
+from app.api.profile import profile_bp
+from app.api.restaurants import restaurants_bp
+from app.api.ai import ai_bp
+from app.auth.routes import auth_web_bp
+from app.config.settings import Config, config as CONFIG_MAP
+from app.extensions.database import init_db
+from app.middleware.security import init_security
+from app.middleware.security_headers import add_security_headers, configure_https
+from app.web.routes import web_bp
+from app.errors import register_error_handlers
+from types import SimpleNamespace
+from flask_apscheduler import APScheduler
+
+class ScriptNameMiddleware:
+    """Middleware WSGI que define SCRIPT_NAME para proxy reverso"""
+    def __init__(self, app, script_name):
+        self.app = app
+        self.script_name = script_name
+    
+    def __call__(self, environ, start_response):
+        # Definir SCRIPT_NAME para Flask gerar URLs corretas
+        environ['SCRIPT_NAME'] = self.script_name
+        
+        # Se PATH_INFO começa com o script_name, remover
+        path_info = environ.get('PATH_INFO', '')
+        if path_info.startswith(self.script_name):
+            environ['PATH_INFO'] = path_info[len(self.script_name):]
+            if not environ['PATH_INFO']:
+                environ['PATH_INFO'] = '/'
+        
+        return self.app(environ, start_response)
+
 def create_app(config_name=None):
+       
     """Factory para criar aplicação Flask"""
     
     # Criar instância Flask
     app = Flask(__name__)
+    scheduler = APScheduler()
     
+    def setup_scheduler(app):
+            # 1. Garante que só inicia uma vez (evita duplicados no debug mode)
+            if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+                scheduler.init_app(app)
+                
+                # 2. Define a tarefa (Ajuste o horário para 1 ou 2 minutos à frente de agora para testar)
+                @scheduler.task('cron', id='do_monthly_birthdays', day='1', hour='8', minute='00')
+                def scheduled_birthdays():
+                    with app.app_context():
+                        print("⏰ [APScheduler] Iniciando tarefa automática de aniversários...")
+                        try:
+                            # Ajuste este import conforme a estrutura real das pastas
+                            from scripts.test_birth import run_monthly_automated_birthdays
+                            run_monthly_automated_birthdays()
+                            print("✅ [APScheduler] Tarefa concluída com sucesso.")
+                        except Exception as e:
+                            print(f"❌ [APScheduler] Erro na tarefa: {e}")
+
+                # 3. Inicia o agendador FORA da função da tarefa
+                scheduler.start()
+                print("🚀 [APScheduler] Agendador ativo e monitorando tarefas.")
+
     # Carregar configurações
-    from app.config.settings import Config
-    app.config.from_object(Config)
+    selected_config = config_name or os.environ.get('FLASK_CONFIG') or 'default'
+    config_class = CONFIG_MAP.get(selected_config, Config)
+    app.config.from_object(config_class)
+    config_class.init_app(app)
+    
+    # Ajustes quando atrás de proxy (IIS/ARR): respeitar X-Forwarded-*
+    if os.getenv('RUNNING_ON_IIS', '0') in ('1', 'true', 'True') or os.getenv('BEHIND_PROXY', '0') in ('1', 'true', 'True'):
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+    # Adicionar middleware WSGI para proxy reverso com subpath (ex.: /mac)
+    app_root = app.config.get('APPLICATION_ROOT') or '/mac'
+    if app_root and isinstance(app_root, str):
+        app.wsgi_app = ScriptNameMiddleware(app.wsgi_app, app_root)
     
     # Inicializar extensões
-    from app.extensions.database import init_db
     init_db(app)
+    # CSRF Protection (initialized via extensions)
+    from app.extensions.database import csrf
+    csrf.init_app(app)
     
-    # Configurar CORS
-    CORS(app, origins=['http://localhost:3000', 'http://127.0.0.1:3000'])
+    # Configurar CORS (permitir qualquer origem via proxy)
+    CORS(app)
     
     @app.context_processor
     def inject_current_user():
         if 'user_id' in session:
+            from app.models.employee import Employee
+            user_id = session.get('user_id')
+            employee = Employee.query.get(user_id) if user_id else None
+            
             return {
-                'current_user': {
-                    'id': session.get('user_id'),
-                    'name': session.get('user_name'),
-                    'email': session.get('user_email'),
-                    'role': session.get('user_role'),
-                    'restaurant_id': session.get('restaurant_id')
-                }
+                'current_user': SimpleNamespace(
+                    id=session.get('user_id'),
+                    name=session.get('user_name'),
+                    email=session.get('user_email'),
+                    role=session.get('user_role'),
+                    restaurant_id=session.get('restaurant_id'),
+                    photo_filename=employee.photo_filename if employee else None
+                )
             }
         return {'current_user': None}
 
+    @app.context_processor
+    def inject_valid_roles():
+        return {
+            'VALID_ROLES': app.config.get('VALID_ROLES')
+        }
+
+    @app.context_processor
+    def inject_csrf_token():
+        # Disponibiliza csrf_token() para templates
+        return {'csrf_token': generate_csrf}
+
+    @app.context_processor
+    def inject_current_year():
+        return {"year": datetime.now().year}
+    
+    @app.context_processor
+    def inject_app_name():
+        return {"nome": "Mc Calendar"}
+
+    @app.context_processor
+    def inject_notifications():
+        from app.models.settings import UserSettings
+        from app.models.notification import Notification
+        user_id = session.get('user_id')
+        user_role = session.get('user_role')
+        restaurant_id = session.get('restaurant_id')
+        settings = UserSettings.query.filter_by(user_id=user_id).first() if user_id else None
+        enabled = settings.notifications_enabled if settings else True
+        unread_count = 0
+        if user_id and enabled:
+            unread_count = Notification.unread_count_for(user_id, user_role, restaurant_id)
+        return {
+            'notifications_enabled': enabled if user_id else False,
+            'notifications_unread_count': unread_count
+        }
+
+
     # Registrar middlewares
-    from app.middleware.security import init_security
     init_security(app)
+    add_security_headers(app)
+    configure_https(app)
     
     # Registrar blueprints da API
-    from app.api.auth import auth_bp
-    from app.api.calendar import calendar_bp
-    from app.api.employees import employees_bp
-    from app.api.restaurants import restaurants_bp
-    from app.api.documents import documents_bp
-    from app.api.profile import profile_bp
-    
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(calendar_bp, url_prefix='/api/calendar')
     app.register_blueprint(employees_bp, url_prefix='/api/employees')
     app.register_blueprint(restaurants_bp, url_prefix='/api/restaurants')
     app.register_blueprint(documents_bp, url_prefix='/api/documents')
+    app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
     app.register_blueprint(profile_bp, url_prefix='/api/profile')
+    app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
+    app.register_blueprint(ai_bp, url_prefix='/api/ai')
     
     # Registrar blueprints de interface web
-    from app.auth.routes import auth_web_bp
-    from app.web.routes import web_bp
-    
     app.register_blueprint(auth_web_bp, url_prefix='/auth')
     app.register_blueprint(web_bp)
     
@@ -74,20 +190,56 @@ def create_app(config_name=None):
     
     @app.route('/api/health')
     def api_health():
-        from datetime import datetime
         return {
             'status': 'healthy',
             'timestamp': datetime.utcnow().isoformat(),
             'service': 'mac-calendar'
         }
     
-    # Manipuladores de erro
-    @app.errorhandler(404)
-    def not_found(error):
-        return {'error': 'Recurso não encontrado'}, 404
+    # Servir arquivos gerados (documentos, cartões, etc)
+    @app.route('/uploads/generated/<filename>')
+    def serve_generated_file(filename):
+        # Validar filename para evitar path traversal
+        if '..' in filename or filename.startswith('/'):
+            return {'error': 'Acesso negado'}, 403
+        
+        try:
+            uploads_dir = os.path.join(os.path.dirname(__file__), '..', 'uploads', 'generated')
+            return send_from_directory(uploads_dir, filename, as_attachment=False)
+        except FileNotFoundError:
+            return {'error': 'Arquivo não encontrado'}, 404
+        except Exception:
+            return {'error': 'Erro ao servir arquivo'}, 500
     
-    @app.errorhandler(500)
-    def internal_error(error):
-        return {'error': 'Erro interno do servidor'}, 500
+    # Servir fotos de colaboradores via rota estática
+    @app.route('/uploads/employees/<filename>')
+    def serve_employee_photo(filename):
+        # Validar filename para evitar path traversal
+        if '..' in filename or filename.startswith('/'):
+            return {'error': 'Acesso negado'}, 403
+        
+        try:
+            uploads_dir = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'employees')
+            return send_from_directory(uploads_dir, filename, as_attachment=False)
+        except FileNotFoundError:
+            return {'error': 'Arquivo não encontrado'}, 404
+        except Exception:
+            return {'error': 'Erro ao servir arquivo'}, 500
+
+    # Servir fotos de workers (não usuários)
+    @app.route('/uploads/workers/<filename>')
+    def serve_worker_photo(filename):
+        if '..' in filename or filename.startswith('/'):
+            return {'error': 'Acesso negado'}, 403
+        try:
+            uploads_dir = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'workers')
+            return send_from_directory(uploads_dir, filename, as_attachment=False)
+        except FileNotFoundError:
+            return {'error': 'Arquivo não encontrado'}, 404
+        except Exception:
+            return {'error': 'Erro ao servir arquivo'}, 500
     
+    # Registar error handlers centralizados
+    register_error_handlers(app)
+    setup_scheduler(app)
     return app

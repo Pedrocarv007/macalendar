@@ -1,0 +1,56 @@
+<#
+  WinSW Configuration for MAC Calendar
+  
+  Usage:
+    1. Download winsw.exe from https://github.com/winsw/winsw/releases
+    2. Rename to MACCalendar-service.exe
+    3. Place this file in same directory as MACCalendar-service.xml
+    4. Run: .\MACCalendar-service.exe install
+    5. Run: .\MACCalendar-service.exe start
+#>
+<service>
+  <id>MACCalendar</id>
+  <name>MAC Calendar Server</name>
+  <description>MAC Calendar - Sistema de gestão para restaurantes (Waitress WSGI Server)</description>
+  <executable>I:\server_apps\macalendar\.venv\Scripts\python.exe</executable>
+  <arguments>-m waitress --listen=127.0.0.1:6005 --threads=8 run:app</arguments>
+  <workingdirectory>I:\server_apps\macalendar</workingdirectory>
+  
+  <!-- Logging -->
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+  <logpath>I:\server_apps\macalendar\logs</logpath>
+  
+  <!-- Service startup -->
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  
+  <!-- Service failure actions -->
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="20 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  
+  <!-- Environment variables -->
+  <env name="FLASK_CONFIG" value="production"/>
+  <env name="RUNNING_ON_IIS" value="1"/>
+  <env name="BEHIND_PROXY" value="1"/>
+  <env name="PYTHONUNBUFFERED" value="1"/>
+  
+  <!-- Load additional env from .env file -->
+  <!-- Note: WinSW doesn't natively support .env files, 
+       so you may need to add critical vars manually here or use a wrapper script -->
+  
+  <!-- Process management -->
+  <priority>Normal</priority>
+  <stoptimeout>30 sec</stoptimeout>
+  
+  <!-- Security (run as specific user if needed) -->
+  <!-- <serviceaccount>
+    <domain>MYDOMAIN</domain>
+    <user>ServiceAccount</user>
+    <password>MyPassword</password>
+  </serviceaccount> -->
+</service>

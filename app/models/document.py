@@ -13,13 +13,15 @@ class Document(db.Model):
     title = db.Column(db.String(200), nullable=False)
     document_type = db.Column(db.String(50), nullable=False, index=True)  # birthday, praise, certificate, memo
     template_name = db.Column(db.String(100), nullable=False)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=True)
+    worker_id = db.Column(db.Integer, db.ForeignKey('workers.id'), nullable=True)
     restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurants.id'), nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
     content = db.Column(db.Text, nullable=True)  # Conteúdo específico (como texto do elogio)
     filename = db.Column(db.String(255), nullable=True)
     file_path = db.Column(db.String(500), nullable=True)
     file_size = db.Column(db.Integer, nullable=True)  # Tamanho em bytes
+    file_extension = db.Column(db.String(10), nullable=True)
     description = db.Column(db.Text, nullable=True)
     tags = db.Column(db.String(500), nullable=True)
     is_public = db.Column(db.Boolean, default=False, nullable=False)
@@ -29,6 +31,7 @@ class Document(db.Model):
     
     # Relacionamentos
     employee_ref = db.relationship('Employee', foreign_keys=[employee_id], overlaps='documents')
+    worker_ref = db.relationship('Worker', foreign_keys=[worker_id])
     creator = db.relationship('Employee', foreign_keys=[created_by], overlaps='created_documents')
     # Restaurant relationship is auto-created by Restaurant.documents backref
     
@@ -60,6 +63,8 @@ class Document(db.Model):
             'template_name': self.template_name,
             'employee_id': self.employee_id,
             'employee_name': self.employee.name if self.employee else None,
+            'worker_id': self.worker_id,
+            'worker_name': self.worker_ref.name if self.worker_ref else None,
             'restaurant_id': self.restaurant_id,
             'restaurant_name': self.restaurant.name if self.restaurant else None,
             'created_by': self.created_by,

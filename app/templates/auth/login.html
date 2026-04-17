@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Login - MAC Calendar{% endblock %}
+{% block title %}Login - Thecarv Dashboard{% endblock %}
 
 {% block nav_links %}{% endblock %}
 
@@ -13,6 +13,7 @@
         </div>
 
         <form id="loginForm" class="auth-form" method="POST" action="{{ url_for('auth_web.login') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-3">
                 <label for="email" class="form-label">Email</label>
                 <div class="input-group">
@@ -73,20 +74,13 @@
                 <i class="fas fa-sign-in-alt me-2"></i>
                 Entrar
             </button>
-
-            <div class="text-center">
-                <span class="text-muted">Não tem uma conta? </span>
-                <a href="/auth/register" class="text-decoration-none">
-                    Criar conta
-                </a>
-            </div>
         </form>
 
     <!-- Footer -->
     <div class="auth-footer">
         <div class="text-center">
             <small class="text-muted">
-                © 2024 MAC Restaurantes. Todos os direitos reservados.
+                © {{ year }} Thecarv. Todos os direitos reservados.
             </small>
         </div>
         <div class="text-center mt-2">

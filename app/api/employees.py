@@ -1,20 +1,58 @@
 """
 Rotas da API de Colaboradores
 """
-from flask import Blueprint, request, jsonify, g
-from flask_jwt_extended import get_jwt_identity, get_jwt
-from werkzeug.utils import secure_filename
-from datetime import datetime, date
 import os
+import traceback
+from datetime import datetime, date
+import secrets
+import string
+import shutil
+
+from flask import Blueprint, request, jsonify, g, current_app, url_for, Response
+import io
+import csv
+from flask_jwt_extended import get_jwt_identity, get_jwt, create_access_token
 from PIL import Image
+from werkzeug.utils import secure_filename
+
 from app.extensions.database import db
+from app.middleware.security import api_login_required, role_required, allowed_file, validate_email
 from app.models.employee import Employee
+from app.models.workers import Worker
 from app.models.restaurant import Restaurant
-from app.middleware.security import api_login_required, role_required, allowed_file
+from app.models.activity_log import ActivityLog
+from app.utils.email import send_email_async
+from app.utils.notifications import notify_employee_change
+from app.utils.registration_token import create_registration_token
+import requests
 
 employees_bp = Blueprint('employees', __name__)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+
+def _normalize_birthday(original_date, target_year):
+    """Ajusta data para lidar com aniversários em 29/02."""
+    try:
+        return original_date.replace(year=target_year)
+    except ValueError:
+        return original_date.replace(year=target_year, day=28)
+
+
+def _save_worker_photo(file_storage, worker_id):
+    """Salvar foto de worker retornando filename; usa uploads/workers com caminho absoluto."""
+    timestamp = int(datetime.utcnow().timestamp() * 1000)
+    filename = secure_filename(f"worker_{worker_id}_{timestamp}.png")
+    base_dir = current_app.root_path  # .../app
+    upload_dir = os.path.join(base_dir, 'static', 'uploads', 'workers')
+    os.makedirs(upload_dir, exist_ok=True)
+    upload_path = os.path.join(upload_dir, filename)
+
+    img = Image.open(file_storage.stream)
+    img.thumbnail((500, 500))
+    img.save(upload_path, 'PNG')
+
+    return filename
 
 @employees_bp.route('', methods=['GET'])
 @api_login_required
@@ -29,24 +67,29 @@ def get_employees():
         restaurant_id = request.args.get('restaurant_id', type=int)
         
         # Query base
-        query = Employee.query
+        query = Employee.query.filter(Employee.id != 999)
+        worker_query = Worker.query
         
         # Filtrar por permissões
         if user_role in ['admin', 'rh', 'marketing']:
             # Pode ver todos os restaurantes
             if restaurant_id:
                 query = query.filter(Employee.restaurant_id == restaurant_id)
+                worker_query = worker_query.filter(Worker.restaurant_id == restaurant_id)
         else:
             # Só pode ver do próprio restaurante
             if user_restaurant_id:
                 query = query.filter(Employee.restaurant_id == user_restaurant_id)
+                worker_query = worker_query.filter(Worker.restaurant_id == user_restaurant_id)
             else:
                 return jsonify({'employees': []}), 200
         
         employees = query.all()
+        workers = worker_query.all()
         
         return jsonify({
-            'employees': [employee.to_dict() for employee in employees]
+            'employees': [employee.to_dict() for employee in employees],
+            'workers': [worker.to_dict() for worker in workers]
         }), 200
         
     except Exception as e:
@@ -62,24 +105,33 @@ def create_employee():
         user_role = g.get('current_user_role')
         user_restaurant_id = g.get('current_user_restaurant_id')
         
-        data = request.get_json()
         
-                # DEBUG: Ver o que está sendo enviado
-        print("DEBUG - Dados recebidos:", data)
-        print("DEBUG - User role:", user_role)
-        print("DEBUG - User restaurant_id:", user_restaurant_id)
+        # Suportar tanto JSON quanto FormData
+        if request.is_json:
+            data = request.get_json()
+        else:
+            # FormData
+            data = request.form.to_dict()
+           
 
         if not data:
             return jsonify({'error': 'Dados não fornecidos'}), 400
         
         # Validar dados obrigatórios
-        required_fields = ['name', 'position', 'birth_date', 'restaurant_id']
+        required_fields = ['name', 'email', 'position', 'restaurant_id']
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'error': f'{field} é obrigatório'}), 400
+
+        email = data['email'].strip().lower()
+        if not validate_email(email):
+            return jsonify({'error': 'Formato de email inválido'}), 400
+
+        if Employee.query.filter_by(email=email).first():
+            return jsonify({'error': 'Email já cadastrado'}), 409
         
         # Verificar se o usuário pode criar funcionário neste restaurante
-        restaurant_id = data['restaurant_id']
+        restaurant_id = int(data['restaurant_id'])
         if user_role not in ['admin', 'rh'] and restaurant_id != user_restaurant_id:
             return jsonify({'error': 'Permissão negada para este restaurante'}), 403
         
@@ -88,22 +140,58 @@ def create_employee():
         if not restaurant:
             return jsonify({'error': 'Restaurante não encontrado'}), 404
         
-        try:
-            birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
-        except ValueError:
-            return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
+        # Data de nascimento é opcional agora
+        birth_date = None
+        if data.get('birth_date'):
+            try:
+                birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
         
-        # Converter hire_date apenas se fornecido (agora é opcional)
+        # Converter hire_date apenas se fornecido (opcional)
         hire_date = None
         if data.get('hire_date'):
             try:
                 hire_date = datetime.strptime(data['hire_date'], '%Y-%m-%d').date()
             except ValueError:
                 return jsonify({'error': 'Formato de data de contratação inválido. Use YYYY-MM-DD'}), 400
+        
+        # Determinar role do colaborador
+        valid_roles = current_app.config.get('VALID_ROLES')
+        requested_role = (data.get('role') or '').strip().lower() if data.get('role') else None
+        role_to_set = 'employee'
+
+        if requested_role:
+            if requested_role not in valid_roles:
+                return jsonify({'error': f"Role inválido. Deve ser um de: {', '.join(valid_roles)}"}), 400
+            # Restrições: manager só pode criar 'employee'
+            if user_role == 'manager' and requested_role != 'employee':
+                return jsonify({'error': 'Gerentes só podem criar colaboradores com role "employee"'}), 403
+            role_to_set = requested_role
+        else:
+            # Inferir role a partir de position/department (mapeamento atualizado)
+            pos = (data.get('position') or '').strip().lower()
+            dept = (data.get('department') or '').strip().lower()
+            text = f"{pos} {dept}".replace('_', ' ')
+            if any(k in text for k in ['rh', 'recursos humanos']):
+                role_to_set = 'rh'
+            elif any(k in text for k in ['gerente', 'sub gerente', 'gerente de turno', 'manager']):
+                role_to_set = 'manager'
+            elif any(k in text for k in ['rp', 'relações públicas', 'relacoes publicas', 'marketing']):
+                role_to_set = 'marketing'
+            elif any(k in text for k in ['admin', 'administração', 'administracao', 'desenvolvedor', 'developer', 'dev']):
+                role_to_set = 'admin'
+            else:
+                role_to_set = 'employee'
+
+            # Restrições para manager no papel inferido
+            if user_role == 'manager' and role_to_set != 'employee':
+                role_to_set = 'employee'
+
         # Criar colaborador
         employee = Employee(
             name=data['name'],
-            email=data.get('email'),
+            email=email,
             phone=data.get('phone'),
             position=data['position'],
             department=data.get('department'),
@@ -111,22 +199,120 @@ def create_employee():
             birth_date=birth_date,
             hire_date=hire_date,
             restaurant_id=restaurant_id,
-            notes=data.get('notes')
+            notes=data.get('notes'),
+            role=role_to_set
         )
         
         db.session.add(employee)
+        db.session.flush()  # Obter ID antes de processar a foto
+
+        try:
+            # Use a senha REAL gerada, não "11111111"
+              
+                payload = {
+                    "name": data['name'],
+                    "email": email,
+                    "status": "active",
+                    "system_name": "mac_calendar",
+                    "system_url": "http://localhost:5006/mac/auth/callback",    
+                }
+
+                url = "http://127.0.0.1:5005/api/auth/callback/register"
+                
+                response = requests.post(url, json=payload, timeout=10)
+
+                print(payload)
+                
+                # Se o retorno não for 2xx, imprime o erro para debug
+                if response.status_code != 200:
+                    print(f"Erro SSO ({response.status_code}): {response.text}")
+
+        except Exception as e:  
+            print(f"Falha na comunicação com SSO: {str(e)}")
+
+        
+        # Processar upload de foto se fornecido
+        if 'photo' in request.files:
+            file = request.files['photo']
+            if file and file.filename and allowed_file(file.filename, ALLOWED_EXTENSIONS):
+                try:
+                    # Salvar foto
+                    timestamp = int(datetime.utcnow().timestamp() * 1000)  # em milissegundos
+                    filename = secure_filename(f"employee_{employee.id}_{timestamp}.png")
+                    
+                    # Usar caminho absoluto baseado no diretório da aplicação (pasta 'app')
+                    base_dir = os.path.dirname(os.path.abspath(__file__))  # .../app/api
+                    app_dir = os.path.normpath(os.path.join(base_dir, '..'))  # .../app
+                    upload_dir = os.path.join(app_dir, 'static', 'uploads', 'employees')
+                    upload_path = os.path.join(upload_dir, filename)
+                    
+                    # Garantir que o diretório existe
+                    os.makedirs(upload_dir, exist_ok=True)
+                    
+                    # Redimensionar imagem
+                    img = Image.open(file.stream)
+                    img.thumbnail((500, 500))
+                    img.save(upload_path, 'PNG')
+                    
+                    
+                    # Atualizar URL da foto
+                    employee.photo_url = f'/uploads/employees/{filename}'
+                except Exception as e:
+                    print(f'Erro ao processar foto: {str(e)}')
+                    # Continuar mesmo se falhar a foto
+        
+        # Registrar atividade
+        current_user = Employee.query.get(current_user_id)
+        ActivityLog.log_activity(
+            activity_type='employee_created',
+            description=f'Novo colaborador adicionado: {employee.name} por {current_user.name if current_user else "Sistema"}',
+            user_id=current_user_id,
+            restaurant_id=restaurant_id,
+            target_id=employee.id,
+            target_type='employee'
+        )
+        
         db.session.commit()
+
+        # Notificar criação
+        try:
+            notify_employee_change('criado', employee, current_user)
+        except Exception:
+            pass
+        
+
+       
         
         return jsonify({
             'message': 'Colaborador criado com sucesso',
-            'employee': employee.to_dict()
+            'employee': employee.to_dict(),
         }), 201
         
     except Exception as e:
         db.session.rollback()
-        print(f"DEBUG - Erro ao criar colaborador: {str(e)}")
-        import traceback
         traceback.print_exc()
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+@employees_bp.route('/<int:employee_id>', methods=['GET'])
+@api_login_required
+def get_employee(employee_id):
+    """Obter colaborador por ID"""
+    try:
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+        
+        employee = Employee.query.get(employee_id)
+        
+        if not employee:
+            return jsonify({'error': 'Colaborador não encontrado'}), 404
+        
+        # Verificar permissões
+        if user_role not in ['admin', 'rh', 'marketing'] and employee.restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada'}), 403
+        
+        return jsonify({'employee': employee.to_dict()}), 200
+        
+    except Exception as e:
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @employees_bp.route('/<int:employee_id>', methods=['PUT'])
@@ -147,7 +333,14 @@ def update_employee(employee_id):
             if employee.restaurant_id != user_restaurant_id:
                 return jsonify({'error': 'Permissão negada'}), 403
         
-        data = request.get_json()
+       
+        
+        # Suportar tanto JSON quanto FormData
+        if request.is_json:
+            data = request.get_json()
+        else:
+            # FormData (incluindo upload de foto)
+            data = request.form.to_dict()
         
         if not data:
             return jsonify({'error': 'Dados não fornecidos'}), 400
@@ -159,29 +352,103 @@ def update_employee(employee_id):
             employee.email = data['email']
         if 'phone' in data:
             employee.phone = data['phone']
+        position_changed = False
+        department_changed = False
         if 'position' in data:
             employee.position = data['position']
+            position_changed = True
         if 'department' in data:
             employee.department = data['department']
+            department_changed = True
         if 'address' in data:
             employee.address = data['address']
-        if 'birth_date' in data:
+        if 'role' in data and data['role']:
+            requested_role = data['role'].strip().lower()
+            valid_roles = current_app.config.get('VALID_ROLES')
+            if requested_role not in valid_roles:
+                return jsonify({'error': f"Role inválido. Deve ser um de: {', '.join(valid_roles)}"}), 400
+            if user_role == 'manager' and requested_role != 'employee':
+                return jsonify({'error': 'Gerentes só podem definir role "employee"'}), 403
+            employee.role = requested_role
+        elif position_changed or department_changed:
+            # Inferir novo role automaticamente quando cargo/departamento mudarem
+            pos = (employee.position or '').strip().lower()
+            dept = (employee.department or '').strip().lower()
+            text = f"{pos} {dept}".replace('_', ' ')
+            inferred_role = 'employee'
+            if any(k in text for k in ['rh', 'recursos humanos']):
+                inferred_role = 'rh'
+            elif any(k in text for k in ['gerente', 'sub gerente', 'gerente de turno', 'manager']):
+                inferred_role = 'manager'
+            elif any(k in text for k in ['rp', 'relações públicas', 'relacoes publicas', 'marketing']):
+                inferred_role = 'marketing'
+            elif any(k in text for k in ['admin', 'administração', 'administracao', 'desenvolvedor', 'developer', 'dev']):
+                inferred_role = 'admin'
+            # Restrições: manager não pode elevar
+            if user_role == 'manager' and inferred_role != 'employee':
+                inferred_role = 'employee'
+            employee.role = inferred_role
+        if 'birth_date' in data and data['birth_date']:
             employee.birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
-        if 'hire_date' in data:
+        if 'hire_date' in data and data['hire_date']:
             employee.hire_date = datetime.strptime(data['hire_date'], '%Y-%m-%d').date()
         if 'is_active' in data:
-            employee.is_active = data['is_active']
+            # Converter string para boolean
+            is_active_value = data['is_active']
+            if isinstance(is_active_value, str):
+                employee.is_active = is_active_value.lower() in ['true', '1', 'yes', 'on']
+            else:
+                employee.is_active = bool(is_active_value)
         if 'notes' in data:
             employee.notes = data['notes']
         if 'restaurant_id' in data:
             # Validar restaurante
-            restaurant = Restaurant.query.get(data['restaurant_id'])
+            restaurant = Restaurant.query.get(int(data['restaurant_id']))
             if not restaurant:
                 return jsonify({'error': 'Restaurante não encontrado'}), 404
-            employee.restaurant_id = data['restaurant_id']
+            employee.restaurant_id = int(data['restaurant_id'])
+        
+        # Processar upload de foto se fornecido
+        if 'photo' in request.files:
+            file = request.files['photo']
+            if file and file.filename and allowed_file(file.filename, ALLOWED_EXTENSIONS):
+                try:
+                    # Salvar foto
+                    timestamp = int(datetime.utcnow().timestamp() * 1000)  # em milissegundos
+                    filename = secure_filename(f"employee_{employee_id}_{timestamp}.png")
+                    
+                    # Usar caminho absoluto baseado no diretório da aplicação (pasta 'app')
+                    base_dir = os.path.dirname(os.path.abspath(__file__))  # .../app/api
+                    app_dir = os.path.normpath(os.path.join(base_dir, '..'))  # .../app
+                    upload_dir = os.path.join(app_dir, 'static', 'uploads', 'employees')
+                    upload_path = os.path.join(upload_dir, filename)
+                    
+                    # Garantir que o diretório existe
+                    os.makedirs(upload_dir, exist_ok=True)
+                    
+                    # Redimensionar imagem
+                    img = Image.open(file.stream)
+                    img.thumbnail((500, 500))
+                    img.save(upload_path, 'PNG')
+
+                    
+                    # Atualizar URL da foto
+                    employee.photo_url = f'/uploads/employees/{filename}'
+                except Exception as e:
+                    print(f'Erro ao processar foto: {str(e)}')
+                    import traceback
+                    traceback.print_exc()
+                    # Continuar mesmo se falhar a foto
         
         employee.updated_at = datetime.utcnow()
         db.session.commit()
+
+        # Notificar atualização
+        try:
+            actor = Employee.query.get(g.get('current_user_id'))
+            notify_employee_change('atualizado', employee, actor)
+        except Exception:
+            pass
         
         return jsonify({
             'message': 'Colaborador atualizado com sucesso',
@@ -190,6 +457,7 @@ def update_employee(employee_id):
         
     except Exception as e:
         db.session.rollback()
+        print(traceback.format_exc())
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @employees_bp.route('/<int:employee_id>/photo', methods=['POST'])
@@ -283,9 +551,305 @@ def delete_employee(employee_id):
         employee.is_active = False
         employee.updated_at = datetime.utcnow()
         db.session.commit()
+
+        # Notificar desativação
+        try:
+            actor = Employee.query.get(g.get('current_user_id'))
+            notify_employee_change('desativado', employee, actor)
+        except Exception:
+            pass
         
         return jsonify({'message': 'Colaborador removido com sucesso'}), 200
         
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+
+# ----------------------
+# Rotas para Workers (somente para templates automáticos)
+# ----------------------
+
+@employees_bp.route('/workers', methods=['GET'])
+@api_login_required
+def get_workers():
+    """Listar workers (não usuários), filtrando por restaurante e ativo."""
+    try:
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+        restaurant_id = request.args.get('restaurant_id', type=int)
+
+        query = Worker.query.filter(Worker.is_active == True)
+        if user_role not in ['admin', 'rh', 'marketing']:
+            if user_restaurant_id:
+                query = query.filter(Worker.restaurant_id == user_restaurant_id)
+            else:
+                return jsonify({'workers': []}), 200
+        elif restaurant_id:
+            query = query.filter(Worker.restaurant_id == restaurant_id)
+
+        workers = query.order_by(Worker.name.asc()).all()
+        return jsonify({'workers': [w.to_dict() for w in workers]}), 200
+    except Exception as e:
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+
+@employees_bp.route('/workers', methods=['POST'])
+@api_login_required
+@role_required('admin', 'rh', 'manager')
+def create_worker():
+    """Criar worker (apenas nome, datas e foto)."""
+    try:
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+
+        data = request.get_json() if request.is_json else request.form.to_dict()
+        if not data:
+            return jsonify({'error': 'Dados não fornecidos'}), 400
+
+        required_fields = ['name', 'birth_date', 'restaurant_id']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'{field} é obrigatório'}), 400
+
+        restaurant_id = int(data['restaurant_id'])
+        if user_role not in ['admin', 'rh'] and restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada para este restaurante'}), 403
+
+        # Validar datas
+        try:
+            birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Formato de birth_date inválido. Use YYYY-MM-DD'}), 400
+
+        hire_date = None
+        if data.get('hire_date'):
+            try:
+                hire_date = datetime.strptime(data['hire_date'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'error': 'Formato de hire_date inválido. Use YYYY-MM-DD'}), 400
+
+        worker = Worker(
+            name=data['name'],
+            birth_date=birth_date,
+            hire_date=hire_date,
+            restaurant_id=restaurant_id,
+            is_active=True
+        )
+
+        db.session.add(worker)
+        db.session.flush()  # obter ID
+
+        # Foto opcional
+        if 'photo' in request.files:
+            file = request.files['photo']
+            if file and file.filename and allowed_file(file.filename, ALLOWED_EXTENSIONS):
+                filename = _save_worker_photo(file, worker.id)
+                worker.photo_filename = filename
+
+        db.session.commit()
+        return jsonify({'message': 'Worker criado com sucesso', 'worker': worker.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+
+@employees_bp.route('/workers/<int:worker_id>', methods=['PUT'])
+@api_login_required
+@role_required('admin', 'rh', 'manager')
+def update_worker(worker_id):
+    """Editar worker."""
+    try:
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+
+        worker = Worker.query.get(worker_id)
+        if not worker or not worker.is_active:
+            return jsonify({'error': 'Worker não encontrado'}), 404
+
+        if user_role not in ['admin', 'rh'] and worker.restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada'}), 403
+
+        data = request.get_json() if request.is_json else request.form.to_dict()
+        if not data and 'photo' not in request.files:
+            return jsonify({'error': 'Dados não fornecidos'}), 400
+
+        if 'name' in data:
+            worker.name = data['name']
+        if 'birth_date' in data and data['birth_date']:
+            try:
+                worker.birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'error': 'Formato de birth_date inválido. Use YYYY-MM-DD'}), 400
+        if 'hire_date' in data:
+            if data['hire_date']:
+                try:
+                    worker.hire_date = datetime.strptime(data['hire_date'], '%Y-%m-%d').date()
+                except ValueError:
+                    return jsonify({'error': 'Formato de hire_date inválido. Use YYYY-MM-DD'}), 400
+            else:
+                worker.hire_date = None
+        if 'restaurant_id' in data:
+            new_restaurant_id = int(data['restaurant_id'])
+            if user_role not in ['admin', 'rh'] and new_restaurant_id != user_restaurant_id:
+                return jsonify({'error': 'Permissão negada para este restaurante'}), 403
+            worker.restaurant_id = new_restaurant_id
+
+        # Atualizar foto
+        if 'photo' in request.files:
+            file = request.files['photo']
+            if file and file.filename and allowed_file(file.filename, ALLOWED_EXTENSIONS):
+                # remover foto anterior
+                if worker.photo_filename:
+                    old_path = os.path.join(current_app.root_path, 'static', 'uploads', 'workers', worker.photo_filename)
+                    if os.path.exists(old_path):
+                        try:
+                            os.remove(old_path)
+                        except Exception:
+                            pass
+                filename = _save_worker_photo(file, worker.id)
+                worker.photo_filename = filename
+
+        worker.updated_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify({'message': 'Worker atualizado com sucesso', 'worker': worker.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+
+@employees_bp.route('/workers/<int:worker_id>', methods=['DELETE'])
+@api_login_required
+@role_required('admin', 'rh', 'manager')
+def delete_worker(worker_id):
+    """Remover worker (soft delete)."""
+    try:
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+
+        worker = Worker.query.get(worker_id)
+        if not worker or not worker.is_active:
+            return jsonify({'error': 'Worker não encontrado'}), 404
+
+        if user_role not in ['admin', 'rh'] and worker.restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada'}), 403
+
+        worker.is_active = False
+        worker.updated_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify({'message': 'Worker removido com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+
+
+@employees_bp.route('/workers/<int:worker_id>/convert', methods=['POST'])
+@api_login_required
+@role_required('admin', 'rh', 'manager')
+def convert_worker_to_employee(worker_id):
+    """Converter um worker em employee, enviando OTP por email se for novo."""
+    try:
+        user_role = g.get('current_user_role')
+        user_restaurant_id = g.get('current_user_restaurant_id')
+
+        worker = Worker.query.get(worker_id)
+        if not worker or not worker.is_active:
+            return jsonify({'error': 'Worker não encontrado'}), 404
+
+        data = request.get_json() if request.is_json else request.form.to_dict()
+        if not data:
+            return jsonify({'error': 'Dados não fornecidos'}), 400
+
+        email = (data.get('email') or '').strip().lower()
+        if not email:
+            return jsonify({'error': 'Email é obrigatório para converter'}), 400
+        if not validate_email(email):
+            return jsonify({'error': 'Formato de email inválido'}), 400
+        if Employee.query.filter_by(email=email).first():
+            return jsonify({'error': 'Email já cadastrado em employees'}), 409
+
+        # Permissão por restaurante
+        target_restaurant_id = int(data.get('restaurant_id') or worker.restaurant_id)
+        if user_role not in ['admin', 'rh'] and target_restaurant_id != user_restaurant_id:
+            return jsonify({'error': 'Permissão negada para este restaurante'}), 403
+
+        position = data.get('position') or 'Colaborador'
+        hire_date = worker.hire_date
+        if data.get('hire_date'):
+            try:
+                hire_date = datetime.strptime(data['hire_date'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'error': 'Formato de hire_date inválido. Use YYYY-MM-DD'}), 400
+        birth_date = worker.birth_date
+        if data.get('birth_date'):
+            try:
+                birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'error': 'Formato de birth_date inválido. Use YYYY-MM-DD'}), 400
+
+        employee = Employee(
+            name=worker.name,
+            email=email,
+            phone=data.get('phone'),
+            position=position,
+            department=data.get('department'),
+            address=data.get('address'),
+            birth_date=birth_date,
+            hire_date=hire_date,
+            restaurant_id=target_restaurant_id,
+            notes=data.get('notes'),
+            role='employee'
+        )
+
+        db.session.add(employee)
+        db.session.flush()
+
+        # Senha temporária
+        alphabet = string.ascii_letters + string.digits + '!@#$%^&*()_+-='
+        temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+        employee.set_password(temp_password)
+
+        # Copiar foto do worker para pasta de employees se existir
+        if worker.photo_filename:
+            try:
+                src = os.path.join(current_app.root_path, 'static', 'uploads', 'workers', worker.photo_filename)
+                if os.path.exists(src):
+                    ext = os.path.splitext(worker.photo_filename)[1] or '.png'
+                    dest_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'employees')
+                    os.makedirs(dest_dir, exist_ok=True)
+                    dest_filename = secure_filename(f"employee_{employee.id}_{int(datetime.utcnow().timestamp()*1000)}{ext}")
+                    dest_path = os.path.join(dest_dir, dest_filename)
+                    shutil.copyfile(src, dest_path)
+                    employee.photo_filename = dest_filename
+            except Exception as copy_err:
+                current_app.logger.warning(f'Falha ao copiar foto de worker: {copy_err}')
+
+        # Marcar worker como inativo
+        worker.is_active = False
+        worker.updated_at = datetime.utcnow()
+
+        db.session.commit()
+
+        # Enviar email com OTP
+        try:
+            login_url = url_for('auth_web.login', _external=True)
+            html_content = f"""
+                <h3>Bem-vindo ao MAC Calendar</h3>
+                <p>Olá {employee.name}, sua conta foi criada.</p>
+                <p><strong>Email:</strong> {employee.email}<br>
+                <strong>Senha temporária (OTP):</strong> {temp_password}</p>
+                <p>Faça login e altere sua senha: <a href="{login_url}">{login_url}</a></p>
+            """
+            send_email_async(
+                to=employee.email,
+                subject='Sua conta MAC Calendar',
+                html=html_content,
+                mail_profile="noreply"
+            )
+        except Exception as mail_err:
+            current_app.logger.warning(f'Falha ao enviar email de OTP: {mail_err}')
+
+        return jsonify({'message': 'Worker convertido para employee com sucesso', 'employee': employee.to_dict()}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
@@ -317,7 +881,7 @@ def get_birthdays_this_month():
         birthdays = []
         
         for employee in employees:
-            birthday_this_year = employee.birth_date.replace(year=current_year)
+            birthday_this_year = _normalize_birthday(employee.birth_date, current_year)
             age = current_year - employee.birth_date.year
             
             birthdays.append({

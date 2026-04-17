@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - MAC Calendar{% endblock %}
+{% block title %}Thecarv Dashboard  - Sistema de Gestão McDonalds{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -10,15 +10,7 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h1 class="text-gradient mb-1">Dashboard</h1>
-                    <p class="text-muted mb-0">Visão geral do sistema MAC</p>
-                </div>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#quickActionModal">
-                        <i class="fas fa-plus me-1"></i>Ação Rápida
-                    </button>
-                    <button class="btn btn-outline-primary" onclick="refreshDashboard()">
-                        <i class="fas fa-sync-alt me-1"></i>Atualizar
-                    </button>
+                    <p class="text-muted mb-0">Visão geral do sistema {{ nome }}</p>
                 </div>
             </div>
         </div>
@@ -38,10 +30,6 @@
                             <div class="stats-label">Colaboradores</div>
                         </div>
                     </div>
-                    <div class="stats-change positive mt-2">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+12% este mês</span>
-                    </div>
                 </div>
             </div>
         </div>
@@ -57,10 +45,6 @@
                             <div class="stats-number" id="todayEvents">0</div>
                             <div class="stats-label">Eventos Hoje</div>
                         </div>
-                    </div>
-                    <div class="stats-change neutral mt-2">
-                        <i class="fas fa-minus"></i>
-                        <span>Sem alteração</span>
                     </div>
                 </div>
             </div>
@@ -78,10 +62,6 @@
                             <div class="stats-label">Restaurantes</div>
                         </div>
                     </div>
-                    <div class="stats-change positive mt-2">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+5% este mês</span>
-                    </div>
                 </div>
             </div>
         </div>
@@ -98,10 +78,6 @@
                             <div class="stats-label">Documentos</div>
                         </div>
                     </div>
-                    <div class="stats-change positive mt-2">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+8% este mês</span>
-                    </div>
                 </div>
             </div>
         </div>
@@ -110,7 +86,7 @@
     <!-- Main Content Row -->
     <div class="row g-4">
         <!-- Left Column -->
-        <div class="col-lg-8">
+        <div class="col-lg-6">
             <!-- Recent Events -->
             <div class="card glass-card mb-4">
                 <div class="card-header">
@@ -118,11 +94,11 @@
                         <h5 class="card-title mb-0">
                             <i class="fas fa-calendar me-2"></i>Próximos Eventos
                         </h5>
-                        <a href="/calendar" class="btn btn-sm btn-outline-primary">Ver Todos</a>
+                        <a href="/mac/calendar" class="btn btn-sm btn-outline-primary">Ver Todos</a>
                     </div>
                 </div>
                 <div class="card-body">
-                    <div id="recentEvents" class="row g-3">
+                    <div id="recentEvents" class="row g-3" style="max-height: 250px; overflow-y: auto;">
                         <!-- Events will be loaded here -->
                         <div class="col-12 text-center py-4">
                             <div class="spinner-border text-primary" role="status">
@@ -132,271 +108,52 @@
                     </div>
                 </div>
             </div>
+        </div>
 
+        <!-- Right Column -->
+        <div class="col-lg-6">
             <!-- Activity Feed -->
-            <div class="card glass-card">
+            <div class="card glass-card mb-4">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="fas fa-bell me-2"></i>Atividades Recentes
                     </h5>
                 </div>
-                <div class="card-body">
-                    <div id="activityFeed">
+                <div class="card-body" >
+                    <div id="activityFeed" class="row g-3" style="max-height: 250px; overflow-y: auto;">
                         <!-- Activity items will be loaded here -->
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Right Column -->
-        <div class="col-lg-4">
-            <!-- Quick Actions -->
-            <div class="card glass-card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-bolt me-2"></i>Ações Rápidas
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-primary btn-lg" onclick="openModal('addEmployee')">
-                            <i class="fas fa-user-plus me-2"></i>Novo Colaborador
-                        </button>
-                        <button class="btn btn-success btn-lg" onclick="openModal('addEvent')">
-                            <i class="fas fa-calendar-plus me-2"></i>Novo Evento
-                        </button>
-                        <button class="btn btn-info btn-lg" onclick="openModal('generateDocument')">
-                            <i class="fas fa-file-plus me-2"></i>Gerar Documento
-                        </button>
-                        <button class="btn btn-warning btn-lg" onclick="exportData()">
-                            <i class="fas fa-download me-2"></i>Exportar Dados
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- System Status -->
-            <div class="card glass-card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-server me-2"></i>Status do Sistema
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="status-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span>Banco de Dados</span>
-                            <span class="badge bg-success">Online</span>
-                        </div>
-                        <div class="progress mt-2" style="height: 4px;">
-                            <div class="progress-bar bg-success" style="width: 95%"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="status-item mt-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span>API Status</span>
-                            <span class="badge bg-success">Ativo</span>
-                        </div>
-                        <div class="progress mt-2" style="height: 4px;">
-                            <div class="progress-bar bg-success" style="width: 98%"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="status-item mt-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span>Backup</span>
-                            <span class="badge bg-warning">Agendado</span>
-                        </div>
-                        <div class="progress mt-2" style="height: 4px;">
-                            <div class="progress-bar bg-warning" style="width: 70%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
-<!-- Quick Action Modal -->
-<div class="modal fade" id="quickActionModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Ação Rápida</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="row g-3">
-                    <div class="col-6">
-                        <button class="btn btn-outline-primary w-100 h-100" onclick="window.location.href='/employees/new'">
-                            <i class="fas fa-user-plus d-block mb-2" style="font-size: 2rem;"></i>
-                            Novo Colaborador
-                        </button>
-                    </div>
-                    <div class="col-6">
-                        <button class="btn btn-outline-success w-100 h-100" onclick="window.location.href='/calendar/new'">
-                            <i class="fas fa-calendar-plus d-block mb-2" style="font-size: 2rem;"></i>
-                            Novo Evento
-                        </button>
-                    </div>
-                    <div class="col-6">
-                        <button class="btn btn-outline-info w-100 h-100" onclick="window.location.href='/documents/new'">
-                            <i class="fas fa-file-plus d-block mb-2" style="font-size: 2rem;"></i>
-                            Gerar Documento
-                        </button>
-                    </div>
-                    <div class="col-6">
-                        <button class="btn btn-outline-warning w-100 h-100" onclick="window.location.href='/restaurants/new'">
-                            <i class="fas fa-store d-block mb-2" style="font-size: 2rem;"></i>
-                            Novo Restaurante
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
+<!-- Dashboard é inicializado automaticamente pelo DashboardModule quando carregado -->
 <script>
+// Handlers para ações do dashboard podem ser adicionados aqui
 document.addEventListener('DOMContentLoaded', function() {
-    loadDashboardData();
+    // Handlers de botões
+    const refreshBtn = document.querySelector('[data-action="refresh-dashboard"]');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            if (typeof DashboardModule !== 'undefined') {
+                DashboardModule.loadDashboardData();
+            }
+        });
+    }
+
+    const exportBtn = document.querySelector('[data-action="export-data"]');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            if (typeof DashboardModule !== 'undefined') {
+                DashboardModule.exportData();
+            }
+        });
+    }
 });
-
-async function loadDashboardData() {
-    try {
-        // Load stats (usando rotas web ao invés de API)
-        const stats = await fetch('/dashboard/stats').then(r => r.json());
-        document.getElementById('totalEmployees').textContent = stats.employees || 0;
-        document.getElementById('todayEvents').textContent = stats.todayEvents || 0;
-        document.getElementById('totalRestaurants').textContent = stats.restaurants || 0;
-        document.getElementById('totalDocuments').textContent = stats.documents || 0;
-
-        // Load recent events
-        const events = await fetch('/calendar/events/recent').then(r => r.json());
-        renderRecentEvents(events);
-
-        // Load activity feed
-        const activities = await fetch('/dashboard/activities').then(r => r.json());
-        renderActivityFeed(activities);
-
-    } catch (error) {
-        console.error('Erro ao carregar dados do dashboard:', error);
-        showAlert('Erro ao carregar dados do dashboard', 'error');
-    }
-}
-
-function renderRecentEvents(events) {
-    const container = document.getElementById('recentEvents');
-    
-    if (!events || events.length === 0) {
-        container.innerHTML = `
-            <div class="col-12 text-center py-4">
-                <i class="fas fa-calendar-times text-muted" style="font-size: 3rem;"></i>
-                <p class="text-muted mt-2">Nenhum evento próximo</p>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = events.map(event => `
-        <div class="col-md-6">
-            <div class="event-card">
-                <div class="d-flex align-items-center">
-                    <div class="event-date">
-                        <div class="day">${new Date(event.date).getDate()}</div>
-                        <div class="month">${new Date(event.date).toLocaleDateString('pt-BR', {month: 'short'})}</div>
-                    </div>
-                    <div class="ms-3 flex-grow-1">
-                        <h6 class="mb-1">${event.title}</h6>
-                        <p class="text-muted mb-0">${event.description || 'Sem descrição'}</p>
-                        <small class="text-muted">
-                            <i class="fas fa-clock me-1"></i>
-                            ${new Date(event.date).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-function renderActivityFeed(activities) {
-    const container = document.getElementById('activityFeed');
-    
-    if (!activities || activities.length === 0) {
-        container.innerHTML = `
-            <div class="text-center py-4">
-                <i class="fas fa-bell-slash text-muted" style="font-size: 3rem;"></i>
-                <p class="text-muted mt-2">Nenhuma atividade recente</p>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = activities.map(activity => `
-        <div class="activity-item">
-            <div class="activity-icon ${activity.type}">
-                <i class="fas fa-${activity.icon}"></i>
-            </div>
-            <div class="activity-content">
-                <div class="activity-title">${activity.title}</div>
-                <div class="activity-desc">${activity.description}</div>
-                <div class="activity-time">${formatRelativeTime(activity.timestamp)}</div>
-            </div>
-        </div>
-    `).join('');
-}
-
-
-function refreshDashboard() {
-    showAlert('Atualizando dashboard...', 'info');
-    loadDashboardData();
-}
-
-function exportData() {
-    showAlert('Iniciando exportação de dados...', 'info');
-    // Implement export functionality
-}
-
-function formatRelativeTime(timestamp) {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diff = now - time;
-    
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-    
-    if (minutes < 1) return 'Agora';
-    if (minutes < 60) return `${minutes}m atrás`;
-    if (hours < 24) return `${hours}h atrás`;
-    return `${days}d atrás`;
-}
-
-function showAlert(message, type = 'info') {
-    const alertContainer = document.getElementById('alert-container');
-    const alertId = 'alert-' + Date.now();
-    
-    const alertHtml = `
-        <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert">
-            <i class="fas fa-info-circle me-2"></i>
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    `;
-    
-    alertContainer.insertAdjacentHTML('beforeend', alertHtml);
-    
-    // Auto dismiss after 5 seconds
-    setTimeout(() => {
-        const alert = document.getElementById(alertId);
-        if (alert) {
-            bootstrap.Alert.getOrCreateInstance(alert).close();
-        }
-    }, 5000);
-}
 </script>
 {% endblock %}

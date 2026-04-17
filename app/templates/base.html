@@ -3,13 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}MAC Calendar - Sistema de Gestão{% endblock %}</title>
+    <title>{% block title %}Thecarv Dashboard  - Sistema de Gestão McDonalds{% endblock %}</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <!-- Font Awesome Icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <!-- Apple System Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,7 +23,9 @@
     <link href="{{ url_for('static', filename='css/import.css') }}" rel="stylesheet">
     
     <!-- Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
+    <link rel="icon" href="https://www.thecarv.com/thecarv-logo.png" type="image/png">
+    <!-- CSRF Token for JS requests -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     
     {% block extra_head %}{% endblock %}
 </head>
@@ -31,7 +36,7 @@
             <!-- Brand/Logo -->
             <a class="navbar-brand" href="{{ url_for('web.index') }}">
                 <i class="fas fa-calendar-alt"></i>
-                MC Calendar
+                {{ nome}}
             </a>
             
             <!-- Mobile Toggle Button -->
@@ -81,77 +86,66 @@
                         </a>
                     </li>
                     
-                    <!-- Menu Administrativo - Apenas Admin -->
-                    {% if session.user_role == 'admin' %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-cog me-1"></i>Administração
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="adminDropdown">
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('web.settings') }}">
-                                    <i class="fas fa-sliders-h me-2"></i>Configurações do Sistema
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item" href="/api">
-                                    <i class="fas fa-code me-2"></i>API Documentation
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="/api/health">
-                                    <i class="fas fa-heartbeat me-2"></i>Status do Sistema
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-                    {% endif %}
                 </ul>
                 
                 <!-- User Menu (Right Side) -->
                 <ul class="navbar-nav ms-auto">
+                    {% if notifications_enabled %}
                     <!-- Notificações -->
                     <li  class="nav-item dropdown">
                         <a class="nav-link position-relative" href="#" id="notificationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="margin-right: 20px;">
                             <i class="fas fa-bell"></i>
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
-                                0
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notificationsBadge" style="font-size: 0.6rem; display: {{ 'inline-block' if notifications_unread_count > 0 else 'none' }};">
+                                {{ notifications_unread_count if notifications_unread_count <= 99 else '99+' }}
                             </span>
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown" style="min-width: 300px;">
-                            <li class="dropdown-header">Notificações</li>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown" style="min-width: 320px; max-height: 420px; overflow-y: auto;" id="notificationsMenu">
+                            <li class="dropdown-header d-flex justify-content-between align-items-center">
+                                <span>Notificações</span>
+                                <small class="text-muted" id="notificationsHint">Recente</small>
+                            </li>
                             <li><hr class="dropdown-divider"></li>
-                            <li>
+                            <li id="notificationsEmpty">
                                 <a class="dropdown-item text-muted text-center py-3" href="#">
                                     <i class="fas fa-inbox me-2"></i>Nenhuma notificação
                                 </a>
                             </li>
+                            <li class="p-0">
+                                <ul class="list-unstyled mb-0" id="notificationsList"></ul>
+                            </li>
                         </ul>
                     </li>
+                    {% endif %}
                     
                     <!-- User Profile Dropdown -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <div class="d-flex align-items-center">
                                 <div class="user-avatar me-2">
-                                    <i class="fas fa-user-circle fa-lg"></i>
+                                    {% if current_user and current_user.photo_filename %}
+                                    <img src="{{ url_for('static', filename='uploads/employees/' + current_user.photo_filename) }}" 
+                                         alt="{{ current_user.name }}" 
+                                         class="rounded-circle" 
+                                         style="width: 40px; height: 40px; object-fit: cover;">
+                                    {% else %}
+                                    <i class="fas fa-user-circle fa-2x text-muted"></i>
+                                    {% endif %}
                                 </div>
-                                <div class="d-none d-lg-block">
+                                <div class="d-none d-lg-block" id="userNavInfo">
                                     <div class="user-name" style="font-weight: 600; font-size: 0.9rem;">
-                                        {{ session.user_name }}
+                                        <span id="userNavName">{{ current_user.name if current_user else '-' }}</span>
                                     </div>
                                     <div class="user-role" style="font-size: 0.75rem; color: var(--mac-secondary-label);">
-                                        {{ session.user_role|title }}
+                                        <span id="userNavRole">{{ current_user.role|capitalize if current_user else '-' }}</span>
                                     </div>
                                 </div>
                             </div>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                            <li class="dropdown-header">
-                                <strong>{{ session.user_name }}</strong>
+                            <li class="dropdown-header" id="userDropdownHeader">
+                                <strong id="userDropdownName">-</strong>
                                 <br>
-                                <small class="text-muted">{{ session.user_email }}</small>
+                                <small class="text-muted" id="userDropdownEmail">-</small>
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
@@ -159,15 +153,15 @@
                                     <i class="fas fa-user me-2"></i>Meu Perfil
                                 </a>
                             </li>
-                            <li>
+                            <!-- <li>
                                 <a class="dropdown-item" href="{{ url_for('web.settings') }}">
                                     <i class="fas fa-cog me-2"></i>Configurações
                                 </a>
-                            </li>
+                            </li> -->
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <a class="dropdown-item" href="#">
-                                    <i class="fas fa-question-circle me-2"></i>Ajuda
+                                <a class="dropdown-item" href="{{ url_for('web.manual') }}">
+                                    <i class="fas fa-book-open me-2"></i>Manual do Usuário
                                 </a>
                             </li>
                             <li>
@@ -213,8 +207,59 @@
     <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Custom JS -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <!-- Core JS Modules (carregados em ordem) -->
+    <!-- 1. API Client -->
+    <script src="https://www.thecarv.com/plugins/alert/thecarv.js"></script>
+    
+    <script src="{{ url_for('static', filename='js/api-client.js') }}"></script>
+    
+    <!-- 2. App State -->
+    <script src="{{ url_for('static', filename='js/app-state.js') }}"></script>
+    
+    <!-- 3. Utilities -->
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+    
+    <!-- 4. DOM Utilities -->
+    <script src="{{ url_for('static', filename='js/dom.js') }}"></script>
+
+
+    
+    <!-- 5. Page Modules (conforme necessário) -->
+    {% if 'dashboard' in request.path %}
+    <script src="{{ url_for('static', filename='js/modules/dashboard.js') }}"></script>
+    {% endif %}
+    
+    {% if 'employees' in request.path %}
+    <script src="{{ url_for('static', filename='js/modules/employees.js') }}"></script>
+    {% endif %}
+    
+    {% if 'restaurants' in request.path %}
+    <script src="{{ url_for('static', filename='js/modules/restaurants.js') }}"></script>
+    {% endif %}
+    
+    {% if 'documents' in request.path %}
+    <script src="{{ url_for('static', filename='js/modules/documents.js') }}"></script>
+    {% endif %}
+    
+    {% if 'profile' in request.path %}
+    <script src="{{ url_for('static', filename='js/modules/profile.js') }}"></script>
+    {% endif %}
+
+    {% if notifications_enabled %}
+    <script src="{{ url_for('static', filename='js/modules/notifications.js') }}"></script>
+    <script>
+        window.NOTIFICATIONS_UNREAD = {{ notifications_unread_count or 0 }};
+        window.NOTIFICATIONS_ENABLED = true;
+    </script>
+    {% endif %}
+    
+    <!-- 6. Main App Initialization -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    <!-- Expose config to front-end -->
+    <script>
+        window.VALID_ROLES = {{ VALID_ROLES | tojson }};
+    </script>
     
     <!-- Page Specific Scripts -->
     {% block scripts %}{% endblock %}
@@ -235,5 +280,55 @@
             });
         });
     </script>
+
+    <!-- Update user info dynamically -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            function renderUser(user) {
+                if (!user) return;
+                const userName = user.name || 'Usuário';
+                const userEmail = user.email || '';
+                const userRole = user.role || '';
+
+                const navNameEl = document.getElementById('userNavName');
+                const navRoleEl = document.getElementById('userNavRole');
+                const ddNameEl = document.getElementById('userDropdownName');
+                const ddEmailEl = document.getElementById('userDropdownEmail');
+
+                if (navNameEl) navNameEl.textContent = userName;
+                if (navRoleEl) navRoleEl.textContent = (userRole ? (userRole.charAt(0).toUpperCase() + userRole.slice(1)) : '');
+                if (ddNameEl) ddNameEl.textContent = userName;
+                if (ddEmailEl) ddEmailEl.textContent = userEmail;
+
+                if (typeof userRestaurantId === 'undefined' || userRestaurantId === null) {
+                    window.userRestaurantId = user.restaurant_id || null;
+                }
+            }
+
+            // 1) Immediate update if user already available
+            if (typeof appState !== 'undefined' && appState.user) {
+                renderUser(appState.user);
+            } else {
+                // 2) Short fallback poll to catch async auth
+                let attempts = 20; // ~3s at 150ms
+                const timer = setInterval(() => {
+                    if (typeof appState !== 'undefined' && appState.user) {
+                        clearInterval(timer);
+                        renderUser(appState.user);
+                    } else if (--attempts <= 0) {
+                        clearInterval(timer);
+                    }
+                }, 150);
+            }
+
+            // 3) React to future updates via custom event
+            window.addEventListener('app:userUpdated', (e) => renderUser(e.detail));
+        });
+
+
+
+        
+    </script>
+
 </body>
 </html>

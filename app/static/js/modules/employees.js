@@ -1,0 +1,796 @@
+/**
+ * MAC Calendar - Employees Module
+ * Gerencia funcionalidades de colaboradores
+ */
+
+const EmployeesModule = {
+    employees: [],
+    restaurants: [],
+    currentFilter: '',
+    stats: {},
+    currentFormMode: 'employee',
+
+    /**
+     * Inicializar módulo
+     */
+    init() {
+        this.setupHandlers();
+        this.loadRestaurants();
+        this.loadEmployees();
+        // Inicializar preview se o formulário já estiver presente
+        setTimeout(() => updateRolePreview(), 0);
+    },
+
+    
+    /**
+     * Atualizar UI de estatísticas
+     */
+    updateStatsUI() {
+        // Derivar estatísticas a partir da lista carregada
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        const derived = {
+            totalEmployees: this.employees.length,
+            activeEmployees: this.employees.filter(emp => emp.is_active).length,
+            birthdaysThisMonth: this.employees.filter(emp => {
+                if (!emp.birth_date) return false;
+                const d = new Date(emp.birth_date);
+                return !Number.isNaN(d) && d.getMonth() === currentMonth;
+            }).length,
+            newThisMonth: this.employees.filter(emp => {
+                const dateStr = emp.hire_date || emp.created_at;
+                if (!dateStr) return false;
+                const d = new Date(dateStr);
+                return !Number.isNaN(d) && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+            }).length
+        };
+
+        this.stats = derived;
+
+        const elements = {
+            totalEmployees: derived.totalEmployees,
+            activeEmployees: derived.activeEmployees,
+            birthdaysThisMonth: derived.birthdaysThisMonth,
+            newThisMonth: derived.newThisMonth
+        };
+
+        Object.entries(elements).forEach(([elementId, value]) => {
+            const el = document.getElementById(elementId);
+            if (el) el.textContent = value;
+        });
+    },
+    
+
+    /**
+     * Setup event handlers
+     */
+    setupHandlers() {
+        // Buscar colaboradores
+        const searchInput = DOM.$('#searchEmployee');
+        if (searchInput) {
+            DOM.on(searchInput, 'input', (e) => {
+                this.currentFilter = e.target.value;
+                this.filterAndDisplay();
+            });
+        }
+
+        // Adicionar novo
+        DOM.on('[data-bs-target="#employeeModal"]', 'click', (e) => {
+            e.preventDefault();
+            this.showAddForm();
+        });
+
+        // Trocar tipo (employee vs worker) – aplicar listener em todos os radios
+        DOM.$$('input[name="employeeType"]').forEach((el) => {
+            DOM.on(el, 'change', (e) => {
+                const mode = e.target.value === 'worker' ? 'worker' : 'employee';
+                this.setFormMode(mode);
+            });
+        });
+
+        // Os event listeners para editar e deletar agora usam onclick direto nos botões
+    },
+
+    /**
+     * Carregar colaboradores
+     */
+    async loadEmployees() {
+        try {
+            // Mostrar loading
+            const loadingDiv = DOM.$('#employeesLoading');
+            if (loadingDiv) loadingDiv.style.display = 'block';
+            
+            const response = await api.get('/employees');
+            const employees = (response.employees || []).map(e => ({ ...e, is_worker: false }));
+            const workers = (response.workers || []).map(w => ({
+                ...w,
+                is_worker: true,
+                position: w.position || 'Worker',
+                department: w.department || 'Template',
+                email: w.email || '',
+                phone: w.phone || '',
+                role: 'worker',
+                is_active: w.is_active !== false,
+            }));
+            this.employees = [...employees, ...workers];
+            this.updateStatsUI();
+            
+            // Esconder loading
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            
+            this.display();
+        } catch (error) {
+            const loadingDiv = DOM.$('#employeesLoading');
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            if (window.App && window.App.notify) {
+                window.App.notify('Erro ao carregar colaboradores', 'danger');
+            }
+        }
+    },
+
+    /**
+     * Carregar restaurantes
+     */
+    async loadRestaurants() {
+        try {
+            const response = await api.get('/restaurants');
+            this.restaurants = response.restaurants || [];
+            
+            // Preencher o select de restaurantes
+            const restaurantSelect = DOM.$('#employeeRestaurant');
+            if (restaurantSelect && this.restaurants.length > 0) {
+                const currentValue = restaurantSelect.value;
+                restaurantSelect.innerHTML = '<option value="">Selecione o restaurante...</option>' + 
+                    this.restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+                restaurantSelect.value = currentValue;
+            }
+        } catch (error) {
+            // Silenciar erro
+        }
+    },
+
+    /**
+     * Filtrar e exibir
+     */
+    filterAndDisplay() {
+        const filtered = this.employees.filter(emp => {
+            const searchTerm = this.currentFilter.toLowerCase();
+            return (
+                emp.name?.toLowerCase().includes(searchTerm) ||
+                emp.email?.toLowerCase().includes(searchTerm) ||
+                emp.department?.toLowerCase().includes(searchTerm)
+            );
+        });
+        this.displayTable(filtered);
+    },
+
+    /**
+     * Exibir colaboradores
+     */
+    display() {
+        this.displayTable(this.employees);
+    },
+
+    /**
+     * Exibir tabela de colaboradores
+     */
+    displayTable(employees) {
+        const tbody = DOM.$('#employeesTableBody');
+        const thead = DOM.$('#employeesTableHead');
+        const listView = DOM.$('#employeesList');
+        const noResults = DOM.$('#noEmployees');
+        const currentUser = appState?.user || {};
+        const isPrivileged = ['admin', 'rh', 'marketing', 'manager'].includes((currentUser.role || '').toLowerCase());
+        
+        if (!tbody) return;
+        
+        // Mostrar/ocultar seções
+        if (employees.length === 0) {
+            if (listView) listView.style.display = 'none';
+            if (noResults) noResults.style.display = 'block';
+            return;
+        }
+
+        if (listView) listView.style.display = 'block';
+        if (noResults) noResults.style.display = 'none';
+
+        if (thead) {
+            if (isPrivileged) {
+                thead.innerHTML = `
+                    <tr>
+                        <th>Foto</th>
+                        <th>Nome</th>
+                        <th>Cargo</th>
+                        <th>Departamento</th>
+                        <th>Telefone</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>`;
+            } else {
+                thead.innerHTML = `
+                    <tr>
+                        <th>Foto</th>
+                        <th>Nome</th>
+                        <th>Cargo</th>
+                        <th>Departamento</th>
+                    </tr>`;
+            }
+        }
+
+        const prefix = window.APP_PREFIX || '';
+        tbody.innerHTML = employees.map(emp => {
+            const isOwn = currentUser && emp.id === currentUser.id;
+            const canSeeSensitive = isPrivileged || isOwn;
+            const baseUpload = emp.is_worker ? '/uploads/workers/' : '/uploads/employees/';
+            const photoUrl = emp.photo_url 
+                ? `${prefix}${emp.photo_url}` 
+                : (emp.photo_filename ? `${prefix}${baseUpload}${emp.photo_filename}` : `${prefix}/static/images/placeholder-user.jpg`);
+            if (isPrivileged) {
+                return `
+                <tr data-id="${emp.id}" data-is-worker="${emp.is_worker ? 'true' : 'false'}">
+                    <td>
+                        <img src="${photoUrl}" 
+                             alt="${emp.name}" class="employee-avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" onerror="this.src='${prefix}/static/images/placeholder-user.jpg'">
+                    </td>
+                    <td>${emp.name} ${emp.is_worker ? '<span class="badge bg-secondary ms-1">Worker</span>' : ''}</td>
+                    <td>${emp.position || '-'}</td>
+                    <td>${emp.department || '-'}</td>
+                    <td>${emp.phone || '-'}</td>
+                    <td><span class="badge ${emp.is_active ? 'bg-success' : 'bg-danger'}">${emp.is_active ? 'Ativo' : 'Inativo'}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary btn-edit-employee" data-id="${emp.id}" onclick="EmployeesModule.editEmployee(${emp.id}, ${emp.is_worker ? 'true' : 'false'})"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-danger btn-delete-employee" data-id="${emp.id}" onclick="EmployeesModule.deleteEmployee(${emp.id}, ${emp.is_worker ? 'true' : 'false'})"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+            }
+            return `
+                <tr data-id="${emp.id}" data-is-worker="${emp.is_worker ? 'true' : 'false'}">
+                    <td>
+                        <img src="${photoUrl}" 
+                             alt="${emp.name}" class="employee-avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" onerror="this.src='${prefix}/static/images/placeholder-user.jpg'">
+                    </td>
+                    <td>${emp.name} ${emp.is_worker ? '<span class="badge bg-secondary ms-1">Worker</span>' : ''}</td>
+                    <td>${emp.position || '-'}</td>
+                    <td>${emp.department || '-'}</td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    /**
+     * Exibir grid de colaboradores
+     */
+    displayGrid(employees) {
+        const gridContainer = DOM.$('#employeesGridContainer');
+        const gridView = DOM.$('#employeesGrid');
+        const noResults = DOM.$('#noEmployees');
+        const currentUser = appState?.user || {};
+        const isPrivileged = ['admin', 'rh', 'marketing', 'manager'].includes((currentUser.role || '').toLowerCase());
+        
+        if (!gridContainer) return;
+
+        // Mostrar/ocultar seções
+        if (employees.length === 0) {
+            if (gridView) gridView.style.display = 'none';
+            if (noResults) noResults.style.display = 'block';
+            return;
+        }
+
+        if (gridView) gridView.style.display = 'block';
+        if (noResults) noResults.style.display = 'none';
+
+        const prefix = window.APP_PREFIX || '';
+        gridContainer.innerHTML = employees.map(emp => {
+            const isOwn = currentUser && emp.id === currentUser.id;
+            const canSeeSensitive = isPrivileged || isOwn;
+            const baseUpload = emp.is_worker ? '/uploads/workers/' : '/uploads/employees/';
+            const photoUrl = emp.photo_url 
+                ? `${prefix}${emp.photo_url}` 
+                : (emp.photo_filename ? `${prefix}${baseUpload}${emp.photo_filename}` : `${prefix}/static/images/placeholder-user.jpg`);
+            if (isPrivileged) {
+                return `
+                <div class="col-lg-3 col-md-4 col-sm-6" data-id="${emp.id}" data-is-worker="${emp.is_worker ? 'true' : 'false'}">
+                    <div class="card h-100 employee-card">
+                        <div class="card-body text-center">
+                            <img src="${photoUrl}" 
+                                 alt="${emp.name}" class="rounded-circle mb-3" style="width: 100px; height: 100px; object-fit: cover;" onerror="this.src='${prefix}/static/images/placeholder-user.jpg'">
+                            <h5 class="card-title">${emp.name} ${emp.is_worker ? '<span class="badge bg-secondary ms-1">Worker</span>' : ''}</h5>
+                            <p class="text-muted small">${emp.department || '-'}</p>
+                            <p class="text-muted small">${emp.role || '-'}</p>
+                            <p class="text-muted small"><i class="fas fa-phone"></i> ${emp.phone || '-'}</p>
+                            <div class="mt-3 d-flex gap-2 justify-content-center">
+                                <button class="btn btn-sm btn-primary btn-edit-employee" data-id="${emp.id}" onclick="EmployeesModule.editEmployee(${emp.id}, ${emp.is_worker ? 'true' : 'false'})"><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-sm btn-danger btn-delete-employee" data-id="${emp.id}" onclick="EmployeesModule.deleteEmployee(${emp.id}, ${emp.is_worker ? 'true' : 'false'})"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            }
+            return `
+                <div class="col-lg-3 col-md-4 col-sm-6" data-id="${emp.id}" data-is-worker="${emp.is_worker ? 'true' : 'false'}">
+                    <div class="card h-100 employee-card">
+                        <div class="card-body text-center">
+                            <img src="${photoUrl}" 
+                                 alt="${emp.name}" class="rounded-circle mb-3" style="width: 100px; height: 100px; object-fit: cover;" onerror="this.src='${prefix}/static/images/placeholder-user.jpg'">
+                            <h5 class="card-title">${emp.name} ${emp.is_worker ? '<span class="badge bg-secondary ms-1">Worker</span>' : ''}</h5>
+                            <p class="text-muted small">${emp.department || '-'}</p>
+                            <p class="text-muted small">${emp.role || '-'}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+ 
+
+    /**
+     * Exibir formulário de adicionar
+     */
+    showAddForm() {
+        const modal = DOM.$('#employeeModal');
+        const form = DOM.$('#employeeForm');
+        const title = DOM.$('#employeeModalTitle');
+        const deleteBtn = DOM.$('#deleteEmployeeBtn');
+        
+        if (form) {
+            form.reset();
+            DOM.$('#employeeId').value = '';
+            const isWorkerFlag = DOM.$('#isWorkerFlag');
+            if (isWorkerFlag) isWorkerFlag.value = 'false';
+            
+            // Resetar foto para padrão
+            DOM.$('#employeePhotoPreview').src = 'https://www.thecarv.com/mac/static/images/user_demo.jpg';
+            DOM.$('#removePhotoBtn').style.display = 'none';
+            
+            // Esconder botão de deletar
+            if (deleteBtn) deleteBtn.style.display = 'none';
+        }
+        
+        if (title) title.textContent = 'Novo Colaborador';
+        // reset mode to employee by default
+        const typeEmployee = DOM.$('#typeEmployee');
+        if (typeEmployee) typeEmployee.checked = true;
+        this.setFormMode('employee');
+        
+        // Recarregar restaurantes antes de abrir modal
+        this.loadRestaurants();
+        
+        // Mostrar modal via Bootstrap
+        if (modal) {
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+        }
+
+        // Resetar preview de role
+        updateRolePreview();
+    },
+
+    /**
+     * Editar colaborador
+     */
+    async editEmployee(id, isWorker = false) {
+        try {
+            let employee;
+            if (isWorker) {
+                employee = this.employees.find(e => e.id === id && e.is_worker);
+                if (!employee) throw new Error('Worker não encontrado');
+            } else {
+                const response = await api.get(`/employees/${id}`);
+                employee = response.employee;
+                employee.is_worker = false;
+            }
+            
+            const modal = DOM.$('#employeeModal');
+            const form = DOM.$('#employeeForm');
+            const title = DOM.$('#employeeModalTitle');
+            
+            if (form && employee) {
+                // Preencher todos os campos que existem
+                DOM.$('#employeeId').value = employee.id || '';
+                const isWorkerFlag = DOM.$('#isWorkerFlag');
+                if (isWorkerFlag) isWorkerFlag.value = isWorker ? 'true' : 'false';
+
+                DOM.$('#employeeName').value = employee.name || '';
+                DOM.$('#employeeEmail').value = employee.email || '';
+                DOM.$('#employeePhone').value = employee.phone || '';
+                DOM.$('#employeePosition').value = employee.position || employee.department || employee.role || '';
+                const deptHidden = DOM.$('#employeeDepartmentHidden');
+                if (deptHidden) deptHidden.value = employee.department || employee.position || '';
+                DOM.$('#employeeBirthDate').value = employee.birth_date ? employee.birth_date.split('T')[0] : '';
+                DOM.$('#employeeActive').checked = employee.is_active !== false;
+                DOM.$('#employeeAddress').value = employee.address || '';
+                DOM.$('#employeeNotes').value = employee.notes || '';
+                
+                // Recarregar restaurantes antes de preencher
+                await this.loadRestaurants();
+                
+                // Preencher restaurant_id se existir
+                const restaurantSelect = DOM.$('#employeeRestaurant');
+                if (restaurantSelect && employee.restaurant_id) {
+                    restaurantSelect.value = employee.restaurant_id;
+                }
+                
+                // Mostrar foto se existir
+                if (employee.photo_url || employee.photo_filename) {
+                    const prefix = window.APP_PREFIX || '';
+                    const baseUpload = employee.is_worker ? '/uploads/workers/' : '/uploads/employees/';
+                    const photoUrl = employee.photo_url 
+                        ? `${prefix}${employee.photo_url}` 
+                        : `${prefix}${baseUpload}${employee.photo_filename}`;
+                    DOM.$('#employeePhotoPreview').src = photoUrl;
+                    DOM.$('#removePhotoBtn').style.display = 'inline-block';
+                } else {
+                    const prefix = window.APP_PREFIX || '';
+                    DOM.$('#employeePhotoPreview').src = `${prefix}/static/images/placeholder-user.jpg`;
+                    DOM.$('#removePhotoBtn').style.display = 'none';
+                }
+
+                updateRolePreview(employee.role || undefined);
+                
+                // Mostrar botão de deletar
+                const deleteBtn = DOM.$('#deleteEmployeeBtn');
+                if (deleteBtn) deleteBtn.style.display = 'inline-block';
+                
+                // Ajustar modal conforme worker/employee
+                if (isWorker) {
+                    const typeWorker = DOM.$('#typeWorker');
+                    const typeEmployee = DOM.$('#typeEmployee');
+                    if (typeWorker) typeWorker.checked = true;
+                    if (typeEmployee) typeEmployee.checked = false;
+                    this.setFormMode('worker');
+                    if (title) title.textContent = `Editar Worker - ${employee.name}`;
+                } else {
+                    const typeEmployee = DOM.$('#typeEmployee');
+                    if (typeEmployee) typeEmployee.checked = true;
+                    this.setFormMode('employee');
+                    if (title) title.textContent = `Editar Colaborador - ${employee.name}`;
+                }
+                
+                // Mostrar modal via Bootstrap
+                if (modal) {
+                    const bsModal = new bootstrap.Modal(modal);
+                    bsModal.show();
+                }
+            } else {
+                if (window.App && window.App.notify) {
+                    window.App.notify('Erro ao carregar dados do colaborador', 'danger');
+                }
+            }
+        } catch (error) {
+            if (window.App && window.App.notify) {
+                window.App.notify('Erro ao carregar colaborador', 'danger');
+            }
+        }
+    },
+
+    /**
+     * Deletar colaborador
+     */
+    async deleteEmployee(id, isWorker = false) {
+        if (!confirm('Tem certeza que deseja remover este colaborador?')) {
+            return;
+        }
+
+        try {
+            if (isWorker) {
+                await api.delete(`/employees/workers/${id}`);
+            } else {
+                await api.delete(`/employees/${id}`);
+            }
+            if (window.App && window.App.notify) {
+                window.App.notify(isWorker ? 'Worker removido com sucesso' : 'Colaborador removido com sucesso', 'success');
+            }
+            this.loadEmployees();
+        } catch (error) {
+            if (window.App && window.App.notify) {
+                window.App.notify('Erro ao remover', 'danger');
+            }
+        }
+    }
+};
+
+/**
+ * Salvar colaborador (novo ou editado)
+ */
+async function saveEmployee() {
+    const form = DOM.$('#employeeForm');
+    const employeeId = DOM.$('#employeeId')?.value;
+    const mode = document.querySelector('input[name="employeeType"]:checked')?.value || 'employee';
+    
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+
+    try {
+        const formData = new FormData(form);
+        // Normalizar datas
+        if (formData.has('hire_date') && !formData.get('hire_date')) formData.delete('hire_date');
+        if (formData.has('birth_date') && !formData.get('birth_date')) formData.delete('birth_date');
+        const isWorkerFlag = (DOM.$('#isWorkerFlag')?.value || 'false') === 'true';
+        
+        if (mode === 'employee') {
+            // Converter is_active para booleano
+            if (formData.has('is_active')) {
+                formData.set('is_active', formData.get('is_active') === 'on' ? 'true' : 'false');
+            } else {
+                formData.set('is_active', 'false');
+            }
+        } else {
+            // Worker: remover campos que não existem no modelo
+            ['email','phone','position','department','address','notes','is_active','role','password','confirm_password'].forEach(k => formData.delete(k));
+        }
+        
+        // Remover campos vazios (exceto arquivo de foto e is_active)
+        const keysToDelete = [];
+        for (let key of formData.keys()) {
+            const value = formData.get(key);
+            // Se é arquivo vazio, deletar; se é outro campo vazio, deletar
+            if (key === 'photo' && value && value instanceof File && value.size === 0) {
+                keysToDelete.push(key);
+            } else if (key !== 'is_active' && !value) {
+                keysToDelete.push(key);
+            }
+        }
+        keysToDelete.forEach(key => formData.delete(key));
+        
+        let response;
+        if (mode === 'employee') {
+            if (isWorkerFlag && employeeId) {
+                // converter worker para employee
+                response = await api.post(`/employees/workers/${employeeId}/convert`, formData);
+                if (window.App && window.App.notify) window.App.notify('Worker convertido para employee com OTP enviada', 'success');
+            } else if (employeeId && employeeId !== '') {
+                response = await api.put(`/employees/${employeeId}`, formData);
+                if (window.App && window.App.notify) window.App.notify('Colaborador atualizado com sucesso', 'success');
+            } else {
+                response = await api.post('/employees', formData);
+                if (window.App && window.App.notify) window.App.notify('Colaborador criado com sucesso', 'success');
+            }
+        } else {
+            // worker create or update
+            if (employeeId) {
+                response = await api.put(`/employees/workers/${employeeId}`, formData);
+                if (window.App && window.App.notify) window.App.notify('Worker atualizado com sucesso', 'success');
+            } else {
+                response = await api.post('/employees/workers', formData);
+                if (window.App && window.App.notify) window.App.notify('Worker criado com sucesso', 'success');
+            }
+        }
+
+        // Fechar modal
+        const modal = DOM.$('#employeeModal');
+        if (modal) {
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) bsModal.hide();
+        }
+
+        // Recarregar lista
+        EmployeesModule.loadEmployees();
+        
+    } catch (error) {
+        if (window.App && window.App.notify) {
+            window.App.notify(error.message || 'Erro ao salvar colaborador', 'danger');
+        }
+    }
+}
+
+/**
+ * Deletar colaborador (versão global para o botão do modal)
+ */
+function deleteEmployee() {
+    const employeeId = DOM.$('#employeeId')?.value;
+    if (!employeeId) {
+        if (window.App && window.App.notify) {
+            window.App.notify('ID do colaborador não encontrado', 'danger');
+        }
+        return;
+    }
+
+    if (!confirm('Tem certeza que deseja remover este colaborador?')) {
+        return;
+    }
+
+    EmployeesModule.deleteEmployee(employeeId);
+}
+
+// Alternar campos employee/worker
+EmployeesModule.setFormMode = function(mode) {
+    this.currentFormMode = mode;
+    const employeeFields = document.querySelectorAll('[data-mode="employee"]');
+    employeeFields.forEach(el => {
+        el.style.display = mode === 'employee' ? '' : 'none';
+        const inputs = el.querySelectorAll('input, select, textarea');
+        inputs.forEach(inp => {
+            if (mode === 'employee') {
+                if (inp.dataset.originalRequired === 'true') inp.required = true;
+            } else {
+                // guardar required original
+                if (inp.required && !inp.dataset.originalRequired) inp.dataset.originalRequired = 'true';
+                inp.required = false;
+            }
+        });
+    });
+
+    // Ajustar título
+    const title = DOM.$('#employeeModalTitle');
+    if (title) {
+        title.textContent = mode === 'worker' ? 'Novo Worker (template)' : 'Novo Colaborador';
+    }
+};
+
+/**
+ * Alterna entre view de lista e grid
+ */
+function toggleView(view) {
+    const listView = DOM.$('#employeesList');
+    const gridView = DOM.$('#employeesGrid');
+    const listBtn = DOM.$('#listViewBtn');
+    const gridBtn = DOM.$('#gridViewBtn');
+    
+    if (view === 'list') {
+        if (listView) listView.style.display = 'block';
+        if (gridView) gridView.style.display = 'none';
+        if (listBtn) listBtn.classList.add('btn-primary');
+        if (listBtn) listBtn.classList.remove('btn-outline-primary');
+        if (gridBtn) gridBtn.classList.remove('btn-primary');
+        if (gridBtn) gridBtn.classList.add('btn-outline-primary');
+    } else {
+        if (listView) listView.style.display = 'none';
+        if (gridView) gridView.style.display = 'block';
+        if (listBtn) listBtn.classList.remove('btn-primary');
+        if (listBtn) listBtn.classList.add('btn-outline-primary');
+        if (gridBtn) gridBtn.classList.add('btn-primary');
+        if (gridBtn) gridBtn.classList.remove('btn-outline-primary');
+        
+        // Renderizar grid quando mudar para grid view
+        EmployeesModule.displayGrid(EmployeesModule.employees);
+    }
+}
+
+/**
+ * Filtra colaboradores baseado nos filtros aplicados
+ */
+function filterEmployees() {
+    const searchTerm = DOM.$('#searchEmployee')?.value || '';
+    const department = DOM.$('#filterDepartment')?.value || '';
+    const status = DOM.$('#filterStatus')?.value || '';
+    
+    let filtered = EmployeesModule.employees;
+    
+    if (searchTerm) {
+        filtered = filtered.filter(emp =>
+            emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            emp.email?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }
+    
+    if (department) {
+        filtered = filtered.filter(emp => emp.department === department);
+    }
+    
+    if (status) {
+        const isActive = status === 'true';
+        filtered = filtered.filter(emp => emp.is_active === isActive);
+    }
+    
+    EmployeesModule.displayTable(filtered);
+}
+
+/**
+ * Ordena colaboradores
+ */
+function sortEmployees() {
+    const sortBy = DOM.$('#sortBy')?.value || 'name';
+    
+    const sorted = [...EmployeesModule.employees].sort((a, b) => {
+        let aVal = a[sortBy] || '';
+        let bVal = b[sortBy] || '';
+        
+        if (sortBy === 'hire_date' || sortBy === 'birth_date') {
+            return new Date(aVal) - new Date(bVal);
+        }
+        
+        return String(aVal).localeCompare(String(bVal));
+    });
+    
+    EmployeesModule.displayTable(sorted);
+}
+
+/**
+ * Limpa todos os filtros
+ */
+function clearFilters() {
+    DOM.$('#searchEmployee').value = '';
+    DOM.$('#filterDepartment').value = '';
+    DOM.$('#filterStatus').value = '';
+    DOM.$('#sortBy').value = 'name';
+    EmployeesModule.displayTable(EmployeesModule.employees);
+}
+
+/**
+ * Preview da foto antes de upload
+ */
+function previewPhoto(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = DOM.$('#employeePhotoPreview');
+            if (preview) {
+                preview.src = e.target.result;
+                DOM.$('#removePhotoBtn').style.display = 'inline-block';
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+/**
+ * Remove foto selecionada
+ */
+function removePhoto() {
+    const input = DOM.$('#employeePhoto');
+    if (input) input.value = '';
+    
+    const preview = DOM.$('#employeePhotoPreview');
+    if (preview) preview.src = 'https://www.thecarv.com/mac/static/images/user_demo.jpg';
+    
+    DOM.$('#removePhotoBtn').style.display = 'none';
+}
+
+/**
+ * Sincroniza Cargo para Departamento
+ */
+function syncPositionToDepartment() {
+    const positionSelect = DOM.$('#employeePosition');
+    const departmentHidden = DOM.$('#employeeDepartmentHidden');
+    if (positionSelect && departmentHidden) {
+        departmentHidden.value = positionSelect.value || '';
+    }
+    updateRolePreview();
+}
+
+/**
+ * Sincroniza Departamento para Cargo
+ */
+function syncDepartmentToPosition() {
+    // Mantido por compatibilidade; não usado pois só há um seletor visível
+}
+
+/**
+ * Infere o role a partir de um texto (cargo/departamento)
+ */
+function inferRoleFromText(text) {
+    const t = (text || '').toString().trim().toLowerCase().replace(/_/g, ' ');
+    if (!t) return 'employee';
+    if (t.includes('rh') || t.includes('recursos humanos')) return 'rh';
+    if (t.includes('gerente')) return 'manager';
+    if (t.includes('manager')) return 'manager';
+    if (t.includes('relações públicas') || t.includes('relacoes publicas') || t.includes('rp') || t.includes('marketing')) return 'marketing';
+    if (t.includes('admin') || t.includes('administração') || t.includes('administracao')) return 'admin';
+    if (t.includes('desenvolvedor') || t.includes('developer') || t.includes('dev')) return 'admin';
+    return 'employee';
+}
+
+/**
+ * Atualiza o preview visual do role previsto
+ */
+function updateRolePreview(roleFromEmployee) {
+    const previewEl = DOM.$('#inferredRolePreview');
+    if (!previewEl) return;
+    let role = roleFromEmployee;
+    if (!role) {
+        const pos = DOM.$('#employeePosition')?.value || '';
+        const dept = DOM.$('#employeeDepartmentHidden')?.value || '';
+        role = inferRoleFromText(`${pos} ${dept}`);
+    }
+    previewEl.textContent = role ? role : '-';
+}
+
+// Removido: binding global de exportEmployees; use link para /api/employees/export

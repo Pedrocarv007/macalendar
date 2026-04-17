@@ -13,10 +13,10 @@ class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(128), nullable=True)
     phone = db.Column(db.String(20), nullable=True)
     position = db.Column(db.String(50), nullable=False)
     department = db.Column(db.String(50), nullable=True)
+    folder = db.Column(db.String(100), nullable=True)
     birth_date = db.Column(db.Date, nullable=False, index=True)
     hire_date = db.Column(db.Date, nullable=True)
     photo_filename = db.Column(db.String(255), nullable=True)
@@ -83,8 +83,36 @@ class Employee(db.Model):
         today = date.today()
         return today.year - self.hire_date.year - ((today.month, today.day) < (self.hire_date.month, self.hire_date.day))
     
+    @property
+    def photo_url(self):
+        """URL da foto"""
+        if self.photo_filename:
+            return f'/uploads/employees/{self.photo_filename}'
+        return None
+    
+    @photo_url.setter
+    def photo_url(self, value):
+        """Setter para photo_url que atualiza photo_filename"""
+        if value:
+            # Extrair nome do arquivo da URL
+            if '/uploads/employees/' in value:
+                self.photo_filename = value.split('/uploads/employees/')[-1]
+            else:
+                self.photo_filename = value
+        else:
+            self.photo_filename = None
+    
     def to_dict(self):
         """Converter para dicionário"""
+        # Para birth_date, retorna o aniversário no ano atual (não o ano de nascimento)
+        birth_date_current_year = None
+        if self.birth_date:
+            try:
+                birth_date_current_year = self.birth_date.replace(year=date.today().year)
+            except ValueError:
+                # Lidar com 29/02 em anos não bissextos
+                birth_date_current_year = self.birth_date.replace(year=date.today().year, day=28)
+        
         return {
             'id': self.id,
             'name': self.name,
@@ -92,12 +120,14 @@ class Employee(db.Model):
             'phone': self.phone,
             'position': self.position,
             'department': self.department,
-            'birth_date': self.birth_date.isoformat(),
+            'birth_date': birth_date_current_year.isoformat() if birth_date_current_year else None,
             'hire_date': self.hire_date.isoformat() if self.hire_date else None,
             'photo_filename': self.photo_filename,
+            'photo_url': self.photo_url,
             'restaurant_id': self.restaurant_id,
             'restaurant_name': self.restaurant.name if self.restaurant else None,
             'is_active': self.is_active,
+            'is_worker': False,
             'address': self.address,
             'notes': self.notes,
             'role': self.role,

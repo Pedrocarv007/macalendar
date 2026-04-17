@@ -100,6 +100,54 @@
     animation: bounce 2s infinite;
 }
 
+/* ========== Activity Feed ========== */
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    padding: var(--space-md);
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.2s;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-item:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.activity-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: white;
+    font-size: 1rem;
+    margin-right: var(--space-md);
+}
+
+.activity-content {
+    flex: 1;
+}
+
+.activity-title {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.activity-meta {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
 /* ========== Responsive ========== */
 @media (max-width: 768px) {
     .stats-card {

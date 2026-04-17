@@ -7,12 +7,12 @@
     <!-- Header Section -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center calendar-actions">
                 <div>
                     <h1 class="text-gradient mb-1">Calendário</h1>
                     <p class="text-muted mb-0">Gerencie eventos e compromissos</p>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 calendar-actions-right">
                     <button class="btn btn-outline-primary" onclick="prevMonth()">
                         <i class="fas fa-chevron-left"></i>
                     </button>
@@ -21,6 +21,9 @@
                     </button>
                     <button class="btn btn-outline-primary" onclick="nextMonth()">
                         <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#mysteryModal">
+                        <i class="fas fa-magic me-1"></i>Desafio Mistério
                     </button>
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#eventModal">
                         <i class="fas fa-plus me-1"></i>Novo Evento
@@ -107,22 +110,22 @@
                         <div class="category-item">
                             <span class="category-color" style="background: var(--mac-blue);"></span>
                             <span>Reuniões</span>
-                            <span class="badge bg-primary">5</span>
+                            <span class="badge bg-primary" id="cat-meeting"></span>
                         </div>
                         <div class="category-item">
                             <span class="category-color" style="background: var(--mac-green);"></span>
                             <span>Treinamentos</span>
-                            <span class="badge bg-success">3</span>
+                            <span class="badge bg-success" id="cat-training"></span>
                         </div>
                         <div class="category-item">
                             <span class="category-color" style="background: var(--mac-orange);"></span>
                             <span>Eventos</span>
-                            <span class="badge bg-warning">2</span>
+                            <span class="badge bg-warning" id="cat-event"></span>
                         </div>
                         <div class="category-item">
                             <span class="category-color" style="background: var(--mac-red);"></span>
                             <span>Urgente</span>
-                            <span class="badge bg-danger">1</span>
+                            <span class="badge bg-danger" id="cat-urgent"></span>
                         </div>
                     </div>
                 </div>
@@ -131,9 +134,61 @@
     </div>
 </div>
 
+<!-- Mystery Challenge Modal -->
+<div class="modal fade" id="mysteryModal" tabindex="-1">
+    <div class="modal-dialog modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Gerar Desafios de Terça</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="mysteryForm">
+                    <div class="mb-3">
+                        <label class="form-label">Mês</label>
+                        <input type="number" min="1" max="12" class="form-control" id="mysteryMonth" value="{{ current_date.month if current_date else 12 }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ano</label>
+                        <input type="number" min="2024" class="form-control" id="mysteryYear" value="{{ current_date.year if current_date else 2025 }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Restaurante</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-store"></i></span>
+                            <select class="form-select input-like" id="mysteryRestaurant" required>
+                                <option value="">Carregando...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3" id="mysteryImageGroup" style="display: none;">
+                        <label class="form-label">URL da Imagem</label>
+                        <input type="url" class="form-control" id="mysteryImage" placeholder="https://..." value="https://www.thecarv.com/desafio.jpg" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Temas/Respostas dos Enigmas</label>
+                        <textarea class="form-control" id="mysteryTopics" rows="3" placeholder="Ex: Big Mac, McFlurry, Batata Frita, McNuggets"></textarea>
+                        <div class="form-text">Separe os temas por vírgulas. Cada terça receberá um tema na ordem. A IA criará enigmas escondendo essas respostas.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Hora de início (0-23)</label>
+                        <input type="number" min="0" max="23" class="form-control" id="mysteryHour" value="10">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="generateMystery()">
+                    <i class="fas fa-magic me-1"></i>Gerar Desafios e Respostas
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Event Modal -->
 <div class="modal fade" id="eventModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="eventModalTitle">Novo Evento</h5>
@@ -141,8 +196,47 @@
             </div>
             <div class="modal-body">
                 <form id="eventForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" id="eventId" name="eventId">
+
+                    <div class="mb-3">
+                        <label for="photo" class="form-label">Foto do Evento</label>
+                        <input type="file" class="form-control" id="photo" name="photo" accept="image/*">
+                        <div class="form-text">Opcional. Envie uma imagem para o evento.</div>
+                    </div>
+
+                        <div class="col-md-6">
+                            <label for="selectedDate" class="form-label">Dia selecionado</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                <input type="date" class="form-control" id="selectedDate" disabled>
+                            </div>
+                        </div>
                     
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Tipo de Evento *</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-tags"></i></span>
+                            <select class="form-select input-like" id="category" name="event_type" required>
+                                <option value="meeting">Reunião</option>
+                                <option value="training">Treinamento</option>
+                                <option value="event">Evento</option>
+                                <option value="urgent">Urgente</option>
+                                <option value="desafio_misterio">Desafio Mistério</option>
+                                <option value="birthday_party">Festa de aniversário</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Campos específicos de Festa de Aniversário -->
+                    <div class="mb-3" id="birthdayFields" style="display: none;">
+                        <label for="peopleCount" class="form-label">Número de Pessoas</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-users"></i></span>
+                            <input type="number" class="form-control" id="peopleCount" name="peopleCount" min="1" step="1" placeholder="Ex.: 20">
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label for="title" class="form-label">Título *</label>
                         <input type="text" class="form-control" id="title" name="title" required>
@@ -150,30 +244,40 @@
                     
                     <div class="mb-3">
                         <label for="description" class="form-label">Descrição</label>
-                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="Descrição do evento."></textarea>
                     </div>
-                    
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <label for="startDate" class="form-label">Data de Início *</label>
-                            <input type="datetime-local" class="form-control" id="startDate" name="startDate" required>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label for="endDate" class="form-label">Data de Fim</label>
-                            <input type="datetime-local" class="form-control" id="endDate" name="endDate">
-                        </div>
-                    </div>
-                    
+
                     <div class="mb-3">
-                        <label for="category" class="form-label">Categoria</label>
-                        <select class="form-select" id="category" name="category">
-                            <option value="meeting">Reunião</option>
-                            <option value="training">Treinamento</option>
-                            <option value="event">Evento</option>
-                            <option value="urgent">Urgente</option>
-                        </select>
+                        <label for="location" class="form-label">Link/Imagem</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-link"></i></span>
+                            <input type="url" class="form-control" id="location" name="location" placeholder="https://...">
+                            <a class="btn btn-outline-secondary" id="locationPreview" href="#" target="_blank" rel="noopener" style="display: none;">Abrir</a>
+                        </div>
+                        <div class="form-text">Use para anexar a imagem do post ou um link relevante (ex.: Desafio Mistério).</div>
                     </div>
+                    
+                    <div class="row g-3 mb-3 align-items-end" style="display: flex; flex-wrap: wrap;">
+                        <div class="col-md-3 d-flex flex-column justify-content-end" style="min-width: 180px;">
+                            <label for="startTime" class="form-label" style="min-height: 2.2em;">Hora de Início *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-clock"></i></span>
+                                <input type="time" class="form-control time-only" id="startTime" step="3600" required>
+                            </div>
+                        </div>
+                        <div class="col-md-3 d-flex flex-column justify-content-end" style="min-width: 180px;">
+                            <label for="endTime" class="form-label" style="min-height: 2.2em;">Hora de Fim</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-clock"></i></span>
+                                <input type="time" class="form-control time-only" id="endTime" step="3600">
+                            </div>
+                        </div>
+                        <!-- Campos originais mantidos como ocultos para compatibilidade -->
+                        <input type="hidden" id="startDate" name="startDate">
+                        <input type="hidden" id="endDate" name="endDate">
+                    </div>
+                    
+                    
                     
                     <div class="mb-3">
                         <div class="form-check">
@@ -199,8 +303,53 @@
                 <button type="button" class="btn btn-danger" id="deleteEventBtn" style="display: none;" onclick="deleteEvent()">
                     <i class="fas fa-trash me-1"></i>Excluir
                 </button>
+                <button type="button" class="btn btn-success" id="markPostedBtn" style="display: none;" onclick="markPostedFromModal()">
+                    <i class="fas fa-check me-1"></i>Marcar como postado
+                </button>
                 <button type="button" class="btn btn-primary" onclick="saveEvent()">
                     <i class="fas fa-save me-1"></i>Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Event Details Modal -->
+<div class="modal fade" id="eventDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="detailsTitle">Detalhes do Evento</h5>
+                    <div class="text-muted" id="detailsWhen"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="badge bg-primary" id="detailsCategory">Categoria</div>
+                    <button type="button" class="btn btn-sm btn-outline-success" id="detailsMarkPosted"  onclick="markPostedFromDetails()">
+                        <i class="fas fa-check me-1"></i>Marcar como postado
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Descrição</label>
+                    <div class="border rounded p-3 bg-light" id="detailsDescription" style="min-height: 80px;"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Imagem</label>
+                    <div id="detailsImageWrapper" style="display: none;">
+                        <img id="detailsImage" src="" alt="Prévia" class="img-fluid rounded border">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-danger" onclick="deleteEventFromDetails()">
+                    <i class="fas fa-trash me-1"></i>Remover
+                </button>
+                <button type="button" class="btn btn-primary" onclick="editEventFromDetails()">
+                    <i class="fas fa-edit me-1"></i>Editar
                 </button>
             </div>
         </div>
@@ -209,358 +358,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-let currentDate = new Date();
-let events = [];
-let viewType = 'month';
-const userRestaurantId = {{ current_user.restaurant_id if current_user and current_user.restaurant_id else 'null' }};
-
-document.addEventListener('DOMContentLoaded', function() {
-    initCalendar();
-    loadEvents();
-    
-    // View type change handlers
-    document.querySelectorAll('input[name="viewType"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            viewType = this.id.replace('View', '');
-            renderCalendar();
-        });
-    });
-    
-    // Reset modal quando abrir para novo evento
-    const eventModal = document.getElementById('eventModal');
-    eventModal.addEventListener('show.bs.modal', function(event) {
-        // Se não foi acionado pelo botão de editar, resetar o formulário
-        if (!event.relatedTarget || event.relatedTarget.getAttribute('data-bs-toggle') === 'modal') {
-            document.getElementById('eventForm').reset();
-            document.getElementById('eventId').value = '';
-            document.getElementById('deleteEventBtn').style.display = 'none';
-            document.getElementById('eventModalTitle').textContent = 'Novo Evento';
-        }
-    });
-});
-
-function initCalendar() {
-    renderCalendar();
-    updateCurrentMonth();
-}
-
-function renderCalendar() {
-    const container = document.getElementById('calendarGrid');
-    container.innerHTML = '';
-    
-    // Adicionar cabeçalho dos dias da semana
-    const dayHeaders = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    dayHeaders.forEach(day => {
-        const header = document.createElement('div');
-        header.className = 'day-header';
-        header.textContent = day;
-        container.appendChild(header);
-    });
-    
-    if (viewType === 'month') {
-        renderMonthView(container);
-    } else if (viewType === 'week') {
-        renderWeekView(container);
-    } else {
-        renderDayView(container);
-    }
-}
-
-function renderMonthView(container) {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay());
-    
-    // Criar 42 células (6 semanas x 7 dias) diretamente no container
-    for (let i = 0; i < 42; i++) {
-        const cellDate = new Date(startDate);
-        cellDate.setDate(startDate.getDate() + i);
-        
-        const dayCell = createDayCell(cellDate, month);
-        container.appendChild(dayCell);
-    }
-}
-
-function createDayCell(date, currentMonth) {
-    const cell = document.createElement('div');
-    cell.className = 'calendar-day';
-    
-    if (date.getMonth() !== currentMonth) {
-        cell.classList.add('other-month');
-    }
-    
-    if (isToday(date)) {
-        cell.classList.add('today');
-    }
-    
-    cell.innerHTML = `
-        <div class="day-number">${date.getDate()}</div>
-        <div class="day-events"></div>
-    `;
-    
-    cell.addEventListener('click', () => selectDate(date));
-    
-    // Add events for this day
-    const dayEvents = events.filter(event => isSameDay(new Date(event.start), date));
-    const eventsContainer = cell.querySelector('.day-events');
-    
-    dayEvents.forEach(event => {
-        const eventElement = document.createElement('div');
-        eventElement.className = `event event-${event.category || 'default'}`;
-        eventElement.textContent = event.title;
-        eventElement.addEventListener('click', (e) => {
-            e.stopPropagation();
-            editEvent(event);
-        });
-        eventsContainer.appendChild(eventElement);
-    });
-    
-    return cell;
-}
-
-function renderWeekView(container) {
-    // Simplified week view
-    container.innerHTML = '<div class="week-view"><p class="text-center py-4">Visualização semanal em desenvolvimento</p></div>';
-}
-
-function renderDayView(container) {
-    // Simplified day view
-    container.innerHTML = '<div class="day-view"><p class="text-center py-4">Visualização diária em desenvolvimento</p></div>';
-}
-
-function updateCurrentMonth() {
-    const monthNames = [
-        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
-    
-    document.getElementById('currentMonth').innerHTML = `
-        <i class="fas fa-calendar me-2"></i>
-        ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}
-    `;
-}
-
-function prevMonth() {
-    currentDate.setMonth(currentDate.getMonth() - 1);
-    renderCalendar();
-    updateCurrentMonth();
-}
-
-function nextMonth() {
-    currentDate.setMonth(currentDate.getMonth() + 1);
-    renderCalendar();
-    updateCurrentMonth();
-}
-
-function today() {
-    currentDate = new Date();
-    renderCalendar();
-    updateCurrentMonth();
-}
-
-function selectDate(date) {
-    // Set default time for new event
-    const startDate = new Date(date);
-    startDate.setHours(9, 0); // 9:00 AM
-    
-    const endDate = new Date(date);
-    endDate.setHours(10, 0); // 10:00 AM
-    
-    document.getElementById('startDate').value = formatDateTimeLocal(startDate);
-    document.getElementById('endDate').value = formatDateTimeLocal(endDate);
-    
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('eventModal'));
-    modal.show();
-}
-
-function editEvent(event) {
-    document.getElementById('eventModalTitle').textContent = 'Editar Evento';
-    document.getElementById('eventId').value = event.id;
-    document.getElementById('title').value = event.title;
-    document.getElementById('description').value = event.description || '';
-    document.getElementById('startDate').value = formatDateTimeLocal(new Date(event.start));
-    document.getElementById('endDate').value = formatDateTimeLocal(new Date(event.end));
-    document.getElementById('category').value = event.extendedProps?.event_type || 'meeting';
-    document.getElementById('allDay').checked = event.allDay || false;
-    document.getElementById('recurring').checked = event.extendedProps?.is_recurring || false;
-    
-    document.getElementById('deleteEventBtn').style.display = 'inline-block';
-    
-    const modal = new bootstrap.Modal(document.getElementById('eventModal'));
-    modal.show();
-}
-
-async function saveEvent() {
-    const form = document.getElementById('eventForm');
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData);
-    
-    try {
-        const eventId = data.eventId;
-        const url = eventId ? `/api/calendar/events/${eventId}` : '/api/calendar/events';
-        const method = eventId ? 'PUT' : 'POST';
-        
-        const response = await fetch(url, {
-            method: method,
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                title: data.title,
-                description: data.description,
-                start_date: data.startDate,
-                end_date: data.endDate,
-                event_type: data.category || 'meeting',
-                restaurant_id: userRestaurantId,
-                is_all_day: data.allDay === 'on',
-                is_recurring: data.recurring === 'on'
-            })
-        });
-        
-        if (!response.ok) throw new Error('Erro ao salvar');
-        
-        Utils.showToast(eventId ? 'Evento atualizado!' : 'Evento criado!', 'success');
-        
-        // Close modal and refresh
-        bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-        form.reset();
-        document.getElementById('deleteEventBtn').style.display = 'none';
-        document.getElementById('eventModalTitle').textContent = 'Novo Evento';
-        
-        loadEvents();
-        
-    } catch (error) {
-        Utils.showAlert('Erro ao salvar evento: ' + error.message, 'error');
-    }
-}
-
-async function deleteEvent() {
-    const eventId = document.getElementById('eventId').value;
-    
-    if (!confirm('Tem certeza que deseja excluir este evento?')) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/calendar/events/${eventId}`, {
-            method: 'DELETE'
-        });
-        
-        if (!response.ok) throw new Error('Erro ao excluir');
-        
-        Utils.showToast('Evento excluído!', 'success');
-        
-        // Close modal and refresh
-        bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-        loadEvents();
-        
-    } catch (error) {
-        Utils.showAlert('Erro ao excluir evento: ' + error.message, 'error');
-    }
-}
-
-async function loadEvents() {
-    try {
-        const response = await fetch('/api/calendar/events');
-        if (!response.ok) throw new Error('Erro ao carregar');
-        const data = await response.json();
-        events = data.events || [];
-        renderCalendar();
-        renderTodayEvents();
-        renderUpcomingEvents();
-    } catch (error) {
-        console.error('Erro ao carregar eventos:', error);
-        events = [];
-    }
-}
-
-function renderTodayEvents() {
-    const container = document.getElementById('todayEvents');
-    const today = new Date();
-    const todayEvents = events.filter(event => isSameDay(new Date(event.start), today));
-    
-    if (todayEvents.length === 0) {
-        container.innerHTML = `
-            <div class="text-center py-4">
-                <i class="fas fa-calendar-day text-muted" style="font-size: 3rem;"></i>
-                <p class="text-muted mt-2">Nenhum evento hoje</p>
-            </div>
-        `;
-        return;
-    }
-    
-    container.innerHTML = todayEvents.map(event => `
-        <div class="event-item" onclick="editEvent(${JSON.stringify(event).replace(/"/g, '&quot;')})">
-            <div class="event-time">${formatTime(new Date(event.start))}</div>
-            <div class="event-title">${event.title}</div>
-            <div class="event-category badge bg-${getCategoryColor(event.extendedProps?.event_type)}">${event.extendedProps?.event_type || 'Geral'}</div>
-        </div>
-    `).join('');
-}
-
-function renderUpcomingEvents() {
-    const container = document.getElementById('upcomingEvents');
-    const today = new Date();
-    const upcomingEvents = events
-        .filter(event => new Date(event.start) > today)
-        .sort((a, b) => new Date(a.start) - new Date(b.start))
-        .slice(0, 5);
-    
-    if (upcomingEvents.length === 0) {
-        container.innerHTML = '<p class="text-muted">Nenhum evento próximo</p>';
-        return;
-    }
-    
-    container.innerHTML = upcomingEvents.map(event => `
-        <div class="event-item small" onclick="editEvent(${JSON.stringify(event).replace(/"/g, '&quot;')})">
-            <div class="event-date">${formatDate(new Date(event.start))}</div>
-            <div class="event-title">${event.title}</div>
-        </div>
-    `).join('');
-}
-
-// Utility functions
-function isToday(date) {
-    const today = new Date();
-    return isSameDay(date, today);
-}
-
-function isSameDay(date1, date2) {
-    return date1.getDate() === date2.getDate() &&
-           date1.getMonth() === date2.getMonth() &&
-           date1.getFullYear() === date2.getFullYear();
-}
-
-function formatDateTimeLocal(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
-
-function formatTime(date) {
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
-function formatDate(date) {
-    return date.toLocaleDateString('pt-BR');
-}
-
-function getCategoryColor(category) {
-    const colors = {
-        meeting: 'primary',
-        training: 'success',
-        event: 'warning',
-        urgent: 'danger'
-    };
-    return colors[category] || 'secondary';
-}
-</script>
+<script src="{{ url_for('static', filename='js/modules/calendar.js') }}"></script>
 {% endblock %}

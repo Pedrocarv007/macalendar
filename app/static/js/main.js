@@ -1,7 +1,8 @@
 // MAC Calendar - Main JavaScript
 
 // API Configuration
-const API_BASE_URL = '/api';
+const API_BASE_URL = window.API_BASE_URL || '/api';
+
 const STORAGE_KEYS = {
     AUTH_TOKEN: 'mac_auth_token',
     USER_DATA: 'mac_user_data',
@@ -42,7 +43,7 @@ class AppState {
                 this.settings = JSON.parse(settings);
             }
         } catch (error) {
-            console.error('Error loading from storage:', error);
+            // Silenciar erro
         }
     }
 
@@ -50,7 +51,7 @@ class AppState {
         try {
             localStorage.setItem(key, JSON.stringify(data));
         } catch (error) {
-            console.error('Error saving to storage:', error);
+            // Silenciar erro
         }
     }
 
@@ -209,8 +210,9 @@ class Utils {
 
     static async makeRequest(url, options = {}) {
         const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-        
-        const defaultOptions = {
+
+        const config = {
+            method: options.method || 'GET',
             headers: {
                 'Content-Type': 'application/json',
                 ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -218,34 +220,34 @@ class Utils {
             }
         };
 
+        if (options.body && typeof options.body === 'string') {
+            config.body = options.body;
+        } else if (options.body && typeof options.body === 'object') {
+            config.body = JSON.stringify(options.body);
+        }
+
         try {
-            const response = await fetch(API_BASE_URL + url, {
-                ...defaultOptions,
-                ...options
-            });
-            
+            const response = await fetch(`${API_BASE_URL}${url}`, config);
+
             if (response.status === 401) {
-                this.handleUnauthorized();
-                throw new Error('Unauthorized');
+                Utils.handleUnauthorized();
+                throw new Error('Não autorizado');
             }
-            
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
             }
-            
+
+            if (response.status === 204) {
+                return { success: true };
+            }
+
             return await response.json();
         } catch (error) {
-            console.error('Request failed:', error);
-            this.showAlert('Erro na requisição: ' + error.message, 'error');
+            Utils.showAlert('Erro na requisição: ' + error.message, 'error');
             throw error;
         }
-    }
-
-    static handleUnauthorized() {
-        localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-        localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-        window.location.href = '/auth/login';
     }
 
     static isAuthenticated() {
@@ -260,7 +262,8 @@ class Utils {
     static logout() {
         localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
         localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-        window.location.href = '/auth/login';
+        const loginPath = window.APP_PREFIX ? `${window.APP_PREFIX}/auth/login` : '/auth/login';
+        window.location.href = loginPath;
     }
 
     static validateForm(form) {
@@ -474,7 +477,8 @@ class AuthAPI {
 class CalendarAPI {
     static async getEvents(params = {}) {
         const queryString = new URLSearchParams(params).toString();
-        return await Utils.makeRequest(`/calendar/events?${queryString}`);
+        const endpoint = queryString ? `/calendar/events?${queryString}` : '/calendar/events';
+        return await Utils.makeRequest(endpoint);
     }
 
     static async createEvent(eventData) {
@@ -725,7 +729,6 @@ class FormHandler {
             Utils.showToast('Formulário enviado com sucesso!', 'success');
 
         } catch (error) {
-            console.error('Form submission error:', error);
             Utils.showAlert('Erro ao enviar formulário: ' + error.message, 'error');
         } finally {
             // Restore button state
@@ -767,7 +770,7 @@ class FormHandler {
                     Utils.showAlert('Dados anteriores restaurados automaticamente', 'info');
                 }
             } catch (error) {
-                console.error('Error loading autosave:', error);
+                // Silenciar erro
             }
         }
     }
@@ -812,8 +815,6 @@ const appState = new AppState();
 
 // Global initialization
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('MAC Calendar System initialized');
-
     // Initialize tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -828,13 +829,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Setup global error handling
     window.addEventListener('error', function(event) {
-        console.error('Global error:', event.error);
         Utils.showAlert('Ocorreu um erro inesperado. Tente novamente.', 'error');
     });
 
     // Setup AJAX error handling
     window.addEventListener('unhandledrejection', function(event) {
-        console.error('Unhandled promise rejection:', event.reason);
         Utils.showAlert('Erro de conexão. Verifique sua internet.', 'error');
     });
 
@@ -844,7 +843,7 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 await AuthAPI.refreshToken();
             } catch (error) {
-                console.error('Token refresh failed:', error);
+                // Silenciar erro
             }
         }, 30 * 60 * 1000);
     }

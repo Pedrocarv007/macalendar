@@ -47,6 +47,32 @@
     font-size: 0.9rem;
 }
 
+/* Harmonize selects with text inputs */
+.select-like-input {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23666' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M4.5 6l3.5 3.5L11.5 6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 16px;
+}
+
+/* Radio buttons as pill buttons */
+.type-toggle .btn {
+    border-radius: 0.6rem;
+    padding: 0.45rem 1.05rem;
+    font-weight: 600;
+}
+.type-toggle {
+    gap: 0.75rem;
+    justify-content: center;
+}
+
 /* ========== Responsive ========== */
 @media (max-width: 768px) {
     .employee-photo {

@@ -1,12 +1,22 @@
 """
 Rotas da API de Perfil do Usuário
 """
-from flask import Blueprint, request, jsonify, g, session
-from werkzeug.security import check_password_hash
+import os
 from datetime import datetime
+
+from flask import Blueprint, request, jsonify, g, session
+from PIL import Image
+from werkzeug.utils import secure_filename
+
 from app.extensions.database import db
+from app.middleware.security import (
+    allowed_file,
+    api_login_required,
+    validate_password_strength,
+)
 from app.models.employee import Employee
-from app.middleware.security import api_login_required
+from app.models.settings import UserSettings
+from app.extensions.database import csrf
 
 profile_bp = Blueprint('profile', __name__)
 
@@ -24,7 +34,7 @@ def get_profile():
         return jsonify(employee.to_dict()), 200
         
     except Exception as e:
-        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
+        return jsonify({'error': 'Erro ao obter perfil'}), 500
 
 @profile_bp.route('/me', methods=['PUT'])
 @api_login_required
@@ -33,8 +43,6 @@ def update_profile():
     try:
         user_id = g.get('current_user_id')
         data = request.get_json()
-        
-        print(f"[PROFILE UPDATE] User ID: {user_id}, Data recebida: {data}")
         
         employee = Employee.query.get(user_id)
         if not employee:
@@ -71,45 +79,34 @@ def update_profile():
             if 'birthDate' in data and data['birthDate']:
                 try:
                     employee.birth_date = datetime.strptime(data['birthDate'], '%Y-%m-%d').date()
-                    print(f"[PROFILE UPDATE] Birth date atualizada para: {employee.birth_date}")
-                except ValueError as e:
-                    print(f"[PROFILE UPDATE] Erro ao parsear birthDate: {e}")
+                except ValueError:
                     return jsonify({'error': 'Formato de data de nascimento inválido'}), 400
             
             if 'hireDate' in data and data['hireDate']:
                 try:
                     employee.hire_date = datetime.strptime(data['hireDate'], '%Y-%m-%d').date()
-                    print(f"[PROFILE UPDATE] Hire date atualizada para: {employee.hire_date}")
-                except ValueError as e:
-                    print(f"[PROFILE UPDATE] Erro ao parsear hireDate: {e}")
+                except ValueError:
                     return jsonify({'error': 'Formato de data de contratação inválido'}), 400
         
         # Atualizar timestamp
         employee.updated_at = datetime.utcnow()
         
         db.session.commit()
-        print(f"[PROFILE UPDATE] Salvo com sucesso para user {user_id}")
         
         return jsonify({
             'message': 'Perfil atualizado com sucesso',
             'user': employee.to_dict()
         }), 200
         
-    except Exception as e:
-        print(f"[PROFILE UPDATE] Erro: {str(e)}")
+    except Exception:
         db.session.rollback()
-        return jsonify({'error': f'Erro ao atualizar perfil: {str(e)}'}), 500
+        return jsonify({'error': 'Erro ao atualizar perfil'}), 500
 
 @profile_bp.route('/me/photo', methods=['POST'])
 @api_login_required
 def upload_profile_photo():
     """Upload de foto do perfil"""
     try:
-        import os
-        from werkzeug.utils import secure_filename
-        from PIL import Image
-        from app.middleware.security import allowed_file
-        
         if 'file' not in request.files:
             return jsonify({'error': 'Arquivo não fornecido'}), 400
         
@@ -167,15 +164,13 @@ def upload_profile_photo():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Erro ao processar foto: {str(e)}'}), 500
+        return jsonify({'error': 'Erro ao processar foto'}), 500
 
 @profile_bp.route('/me/photo', methods=['DELETE'])
 @api_login_required
 def delete_profile_photo():
     """Deletar foto do perfil"""
     try:
-        import os
-        
         user_id = g.get('current_user_id')
         employee = Employee.query.get(user_id)
         if not employee:
@@ -194,7 +189,7 @@ def delete_profile_photo():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Erro ao deletar foto: {str(e)}'}), 500
+        return jsonify({'error': 'Erro ao deletar foto'}), 500
 
 @profile_bp.route('/me/password', methods=['POST'])
 @api_login_required
@@ -216,17 +211,89 @@ def change_password():
         if not employee.check_password(data['current_password']):
             return jsonify({'error': 'Senha atual incorreta'}), 401
         
-        # Validar comprimento da nova senha
-        if len(data['new_password']) < 6:
-            return jsonify({'error': 'Nova senha deve ter no mínimo 6 caracteres'}), 400
+        is_valid, message = validate_password_strength(data['new_password'])
+        if not is_valid:
+            return jsonify({'error': message}), 400
         
         # Definir nova senha
         employee.set_password(data['new_password'])
         employee.updated_at = datetime.utcnow()
         db.session.commit()
         
+        # Limpar flag de mudança obrigatória de senha no primeiro login
+        session.pop('must_change_pw', None)
+        
         return jsonify({'message': 'Senha alterada com sucesso'}), 200
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Erro ao alterar senha: {str(e)}'}), 500
+        return jsonify({'error': 'Erro ao alterar senha'}), 500
+
+@profile_bp.route('/settings', methods=['GET'])
+@api_login_required
+def get_user_settings():
+    """Obter configurações do usuário atual."""
+    try:
+        user_id = g.get('current_user_id')
+        settings = UserSettings.query.filter_by(user_id=user_id).first()
+        if not settings:
+            # Não criar ainda; apenas retornar defaults
+            defaults = UserSettings(user_id=user_id)  # usa defaults do modelo
+            return jsonify({'settings': defaults.to_dict()}), 200
+        return jsonify({'settings': settings.to_dict()}), 200
+    except Exception:
+        return jsonify({'error': 'Erro ao obter configurações'}), 500
+
+@profile_bp.route('/settings', methods=['PUT'])
+@api_login_required
+@csrf.exempt
+def update_user_settings():
+    """Criar/atualizar configurações do usuário atual."""
+    try:
+        user_id = g.get('current_user_id')
+        data = request.get_json() or {}
+
+        settings = UserSettings.query.filter_by(user_id=user_id).first()
+        created = False
+        if not settings:
+            settings = UserSettings(user_id=user_id)
+            created = True
+
+        # Mapear campos recebidos
+        if 'timezone' in data:
+            settings.timezone = str(data['timezone']) or settings.timezone
+        if 'notifications_enabled' in data:
+            raw = data['notifications_enabled']
+            settings.notifications_enabled = (str(raw).lower() in ['true','1','yes','on']) if isinstance(raw, str) else bool(raw)
+        if 'email_notifications' in data:
+            raw = data['email_notifications']
+            settings.email_notifications = (str(raw).lower() in ['true','1','yes','on']) if isinstance(raw, str) else bool(raw)
+        if 'two_factor_enabled' in data:
+            raw = data['two_factor_enabled']
+            settings.two_factor_enabled = (str(raw).lower() in ['true','1','yes','on']) if isinstance(raw, str) else bool(raw)
+        if 'auto_logout_enabled' in data:
+            raw = data['auto_logout_enabled']
+            settings.auto_logout_enabled = (str(raw).lower() in ['true','1','yes','on']) if isinstance(raw, str) else bool(raw)
+        if 'session_timeout_minutes' in data:
+            try:
+                settings.session_timeout_minutes = int(data['session_timeout_minutes'])
+            except Exception:
+                pass
+        if 'items_per_page' in data:
+            try:
+                settings.items_per_page = int(data['items_per_page'])
+            except Exception:
+                pass
+        if 'dark_mode' in data:
+            raw = data['dark_mode']
+            settings.dark_mode = (str(raw).lower() in ['true','1','yes','on']) if isinstance(raw, str) else bool(raw)
+
+        settings.updated_at = datetime.utcnow()
+        if created:
+            db.session.add(settings)
+        db.session.commit()
+
+        return jsonify({'message': 'Configurações salvas', 'settings': settings.to_dict()}), 200
+    except Exception:
+        db.session.rollback()
+        return jsonify({'error': 'Erro ao salvar configurações'}), 500

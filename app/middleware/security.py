@@ -2,6 +2,7 @@
 Middleware de segurança e validações
 """
 from flask import request, jsonify, g, session, redirect, url_for, flash
+from datetime import datetime
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_jwt
 from functools import wraps
 import re
@@ -17,6 +18,44 @@ def init_security(app):
         if app.config.get('LOG_REQUESTS'):
             app.logger.info(f"{request.method} {request.path} - IP: {request.remote_addr}")
         
+        # Implementar timeout de sessão por inatividade, respeitando configurações do usuário
+        try:
+            if 'user_id' in session:
+                # Ignorar em rotas de autenticação e estáticos
+                path = request.path or ''
+                skip_paths = {'/auth/login', '/auth/logout'}
+                if not (path.startswith('/static/') or path in skip_paths):
+                    # Obter configurações do usuário
+                    try:
+                        from app.models.settings import UserSettings
+                        settings = UserSettings.query.filter_by(user_id=session.get('user_id')).first()
+                    except Exception:
+                        settings = None
+
+                    auto_enabled = bool(getattr(settings, 'auto_logout_enabled', False))
+                    timeout_minutes = int(getattr(settings, 'session_timeout_minutes', 0) or 0)
+
+                    # Atualizar / verificar carimbo de última atividade
+                    now = datetime.utcnow()
+                    last_ts = session.get('last_activity')
+                    last_dt = datetime.utcfromtimestamp(last_ts) if isinstance(last_ts, (int, float)) else None
+
+                    if auto_enabled and timeout_minutes > 0 and last_dt:
+                        idle_seconds = (now - last_dt).total_seconds()
+                        if idle_seconds > timeout_minutes * 60:
+                            # Sessão expirada por inatividade: limpar e responder adequadamente
+                            session.clear()
+                            if path.startswith('/api/'):
+                                return jsonify({'error': 'Sessão expirada'}), 401
+                            flash('Sessão expirada por inatividade. Faça login novamente.', 'warning')
+                            return redirect(url_for('auth_web.login'))
+
+                    # Atualizar marcação de atividade
+                    session['last_activity'] = int(now.timestamp())
+        except Exception:
+            # Em caso de erro, não bloquear a request
+            pass
+
         # Verificar se é uma rota da API que precisa de autenticação
         if request.path.startswith('/api/') and request.endpoint != 'auth.login':
             # Pular verificação para rotas públicas
@@ -29,7 +68,11 @@ def init_security(app):
                 '/health'
             ]
             
-            if request.path not in public_routes:
+            # Permitir rotas da API que requerem autenticação mas já verificam via session
+            # (a verificação será feita pelo before_request que checa session primeiro)
+            session_authenticated_routes = []
+            
+            if request.path not in public_routes and request.path not in session_authenticated_routes:
                 # Tentar autenticação por sessão primeiro
                 if 'user_id' in session:
                     g.current_user_id = session.get('user_id')
@@ -43,6 +86,13 @@ def init_security(app):
                     g.current_user_claims = get_jwt()
                 except Exception as e:
                     return jsonify({'error': 'Autenticação necessária'}), 401
+            
+            # Para rotas autenticadas por sessão, apenas verificar se tem sessão
+            if request.path in session_authenticated_routes:
+                if 'user_id' not in session:
+                    return jsonify({'error': 'Autenticação necessária'}), 401
+                g.current_user_id = session.get('user_id')
+                g.current_user_role = session.get('user_role')
 
 def api_login_required(f):
     """Decorator para rotas API que aceita JWT ou Session"""
@@ -194,6 +244,12 @@ def login_required(f):
         if 'user_id' not in session:
             flash('Por favor, faça login para acessar esta página.', 'warning')
             return redirect(url_for('auth_web.login', next=request.url))
+        # Enforce password change on first login: redirect everything to profile except profile/settings and logout
+        must_change = session.get('must_change_pw')
+        allowed_paths = {'/profile', '/logout'}
+        if must_change and request.path not in allowed_paths:
+            flash('Você precisa alterar sua senha antes de continuar.', 'warning')
+            return redirect(url_for('web.profile'))
         return f(*args, **kwargs)
     return decorated_function
 
