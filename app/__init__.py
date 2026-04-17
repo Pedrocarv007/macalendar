@@ -26,6 +26,8 @@ from app.middleware.security import init_security
 from app.middleware.security_headers import add_security_headers, configure_https
 from app.web.routes import web_bp
 from app.errors import register_error_handlers
+from types import SimpleNamespace
+from flask_apscheduler import APScheduler
 
 class ScriptNameMiddleware:
     """Middleware WSGI que define SCRIPT_NAME para proxy reverso"""
@@ -47,11 +49,35 @@ class ScriptNameMiddleware:
         return self.app(environ, start_response)
 
 def create_app(config_name=None):
+       
     """Factory para criar aplicação Flask"""
     
     # Criar instância Flask
     app = Flask(__name__)
+    scheduler = APScheduler()
     
+    def setup_scheduler(app):
+            # 1. Garante que só inicia uma vez (evita duplicados no debug mode)
+            if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+                scheduler.init_app(app)
+                
+                # 2. Define a tarefa (Ajuste o horário para 1 ou 2 minutos à frente de agora para testar)
+                @scheduler.task('cron', id='do_monthly_birthdays', day='1', hour='8', minute='00')
+                def scheduled_birthdays():
+                    with app.app_context():
+                        print("⏰ [APScheduler] Iniciando tarefa automática de aniversários...")
+                        try:
+                            # Ajuste este import conforme a estrutura real das pastas
+                            from scripts.test_birth import run_monthly_automated_birthdays
+                            run_monthly_automated_birthdays()
+                            print("✅ [APScheduler] Tarefa concluída com sucesso.")
+                        except Exception as e:
+                            print(f"❌ [APScheduler] Erro na tarefa: {e}")
+
+                # 3. Inicia o agendador FORA da função da tarefa
+                scheduler.start()
+                print("🚀 [APScheduler] Agendador ativo e monitorando tarefas.")
+
     # Carregar configurações
     selected_config = config_name or os.environ.get('FLASK_CONFIG') or 'default'
     config_class = CONFIG_MAP.get(selected_config, Config)
@@ -84,14 +110,14 @@ def create_app(config_name=None):
             employee = Employee.query.get(user_id) if user_id else None
             
             return {
-                'current_user': {
-                    'id': session.get('user_id'),
-                    'name': session.get('user_name'),
-                    'email': session.get('user_email'),
-                    'role': session.get('user_role'),
-                    'restaurant_id': session.get('restaurant_id'),
-                    'photo_filename': employee.photo_filename if employee else None
-                }
+                'current_user': SimpleNamespace(
+                    id=session.get('user_id'),
+                    name=session.get('user_name'),
+                    email=session.get('user_email'),
+                    role=session.get('user_role'),
+                    restaurant_id=session.get('restaurant_id'),
+                    photo_filename=employee.photo_filename if employee else None
+                )
             }
         return {'current_user': None}
 
@@ -215,5 +241,5 @@ def create_app(config_name=None):
     
     # Registar error handlers centralizados
     register_error_handlers(app)
-    
+    setup_scheduler(app)
     return app

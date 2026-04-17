@@ -2,6 +2,7 @@
 Módulo para gerar documentos automaticamente usando PIL/Canva
 Gera cartões de boas-vindas e aniversário
 """
+from fileinput import filename
 from PIL import Image, ImageDraw, ImageFont
 import os
 from datetime import datetime
@@ -15,7 +16,15 @@ class DocumentGenerator:
         return ''.join(c if ord(c) < 128 else '?' for c in text)
 
 
-    """Gerador de documentos com templates"""
+    
+    def _generate_filename(self, prefix):
+        """Gerar nome de arquivo único com timestamp e uuid"""
+        import uuid
+        import time
+        timestamp = int(time.time() * 1000) # Milissegundos
+        unique_id = uuid.uuid4().hex[:8]
+        return f"{prefix}_{timestamp}_{unique_id}.png"
+
     def generate_employee_of_the_month_card(self, employee_name, month_year, reason=None, employee_photo_path=None):
         """Gerar cartão de Funcionário do Mês com nome, mês/ano, motivo e foto"""
         try:
@@ -70,10 +79,12 @@ class DocumentGenerator:
                 except Exception:
                     pass
 
-            filename = f"cartao_funcionario_mes_{int(datetime.now().timestamp())}.png"
+            filename = self._generate_filename("cartao_funcionario_mes")
             filepath = self.uploads_dir / filename
             fundo.save(str(filepath), 'PNG')
-            return str(filepath), filename
+            
+            # Retorna caminho relativo para o banco de dados
+            return f"uploads/generated/{filename}", filename
         except Exception:
             raise
 
@@ -81,7 +92,8 @@ class DocumentGenerator:
     def __init__(self):
         # Diretórios
         self.base_dir = Path(__file__).parent.parent.parent
-        self.uploads_dir = self.base_dir / 'uploads' / 'generated'
+        # Mudança: salvar em app/static/uploads/generated para servir via /static/...
+        self.uploads_dir = self.base_dir / 'app' / 'static' / 'uploads' / 'generated'
         
         # Criar diretório se não existir
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
@@ -105,22 +117,36 @@ class DocumentGenerator:
         # Fallback para fonte padrão PIL
         return ImageFont.load_default()
     
-    def _get_template_image(self, template_name):
-        """Obter imagem de template"""
+    def _get_template_image(self, template_name, restaurant_id):
+        """Obter imagem de template baseada na sigla do restaurante"""
+        from app.models.restaurant import Restaurant
+        
         templates = {
             'bem_vindo': 'bem_vindo.png',
             'aniversario': 'aniversario.png',
-            'welcome': 'bem_vindo.png',
-            'birthday': 'aniversario.png',
             'funcionario_mes': 'funcionario_mes.png',
-            'funcionariomes': 'funcionario_mes.png',
-            'employee_of_the_month': 'funcionario_mes.png'
         }
-        filename = templates.get(template_name.lower(), 'bem_vindo.png')
-        template_path = self.base_dir / filename
+        
+        # 1. Define o nome do arquivo base
+        base_filename = templates.get(template_name.lower(), 'bem_vindo.png')
+
+        res = Restaurant.query.get(restaurant_id)
+        
+       
+        nome = res.name.lower() if res and hasattr(res, 'name') else None
+        
+        # 3. Tenta montar o caminho dinâmico: self.base_dir / 'ag' / 'bem_vindo.png'
+        if nome:
+            template_path = self.base_dir / 'templates_generate' / nome / base_filename
+        else:
+           
+            template_path = self.base_dir / base_filename
+
+        # 5. Renderização ou Imagem em Branco
         if not os.path.exists(template_path):
-            # Se não existir template, criar imagem em branco
+            
             return Image.new('RGBA', (1920, 1280), color=(240, 240, 240, 255))
+            
         return Image.open(template_path).convert('RGBA')
     
     def _apply_rounded_corners(self, image, radius=50):
@@ -154,11 +180,11 @@ class DocumentGenerator:
         
         return placeholder
     
-    def generate_welcome_card(self, employee_name, employee_photo_path=None, restaurant_name=None):
+    def generate_welcome_card(self, employee_name, employee_photo_path=None, restaurant_id=None):
         """Gerar cartão de boas-vindas - APENAS com foto, nome e data"""
         try:
             # Carregar template
-            fundo = self._get_template_image('bem_vindo')
+            fundo = self._get_template_image('bem_vindo', restaurant_id)
             largura, altura = fundo.size
             
             centro_x = largura // 2
@@ -202,20 +228,21 @@ class DocumentGenerator:
                 pass
             
             # Salvar
-            filename = f"cartao_bemvindo_{int(datetime.now().timestamp())}.png"
+            filename = self._generate_filename("cartao_bemvindo")
             filepath = self.uploads_dir / filename
             fundo.save(str(filepath), 'PNG')
             
-            return str(filepath), filename
+            # Retorna caminho relativo para o banco de dados
+            return f"uploads/generated/{filename}", filename
             
         except Exception:
             raise
     
-    def generate_birthday_card(self, employee_name, birth_date, employee_photo_path=None):
+    def generate_birthday_card(self, employee_name, birth_date, employee_photo_path=None, restaurant_id=None):
         """Gerar cartão de aniversário - APENAS com foto, nome e data"""
         try:
             # Carregar template
-            fundo = self._get_template_image('aniversario')
+            fundo = self._get_template_image('aniversario', restaurant_id)
             largura, altura = fundo.size
             
             centro_x = largura // 2
@@ -269,17 +296,18 @@ class DocumentGenerator:
                 pass
             
             # Salvar
-            filename = f"cartao_aniversario_{int(datetime.now().timestamp())}.png"
+            filename = self._generate_filename("cartao_aniversario")
             filepath = self.uploads_dir / filename
             fundo.save(str(filepath), 'PNG')
             
-            return str(filepath), filename
+            # Retorna caminho relativo para o banco de dados
+            return f"uploads/generated/{filename}", filename
             
         except Exception:
             raise
     
     def generate_custom_card(self, title, employee_name, template='bem_vindo', 
-                           additional_text=None, employee_photo_path=None):
+                           additional_text=None, employee_photo_path=None, restaurant_id=None):
         """Gerar cartão customizado - APENAS com foto, nome e data"""
         try:
             fundo = self._get_template_image(template)
@@ -328,7 +356,7 @@ class DocumentGenerator:
             
             # Salvar
             filename = f"cartao_custom_{int(datetime.now().timestamp())}.png"
-            filepath = self.uploads_dir / filename
+            filepath = "I:\\server_apps\\macalendar\\app\\static\\uploads\\documents\\" + filename
             fundo.save(str(filepath), 'PNG')
             
             return str(filepath), filename

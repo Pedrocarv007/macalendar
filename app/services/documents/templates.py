@@ -17,33 +17,41 @@ def get_strategies(target, restaurant, photo_path, data, generator):
     Mapeia os tipos de documentos para os métodos da classe DocumentGenerator
     que você postou.
     """
+    names = target.name.strip().split()
+    if len(names) > 1:
+        nome_reduzido = f"{names[0]} {names[-1]}"
+    else:
+        nome_reduzido = names[0]
+   
     return {
         'bem_vindo': {
             'method': generator.generate_welcome_card,
             'category': 'Boas-vindas',
             'params': {
-                'employee_name': target.name,
+                'employee_name': nome_reduzido,
                 'employee_photo_path': photo_path,
-                'restaurant_name': restaurant.name
+                'restaurant_id': restaurant.id
             }
         },
         'aniversario': {
             'method': generator.generate_birthday_card,
             'category': 'Aniversário',
             'params': {
-                'employee_name': target.name,
+                'employee_name': nome_reduzido,
                 'birth_date': get_birthday_for_current_year(getattr(target, 'birth_date', None)),
-                'employee_photo_path': photo_path
+                'employee_photo_path': photo_path,
+                'restaurant_id': restaurant.id
             }
         },
         'funcionario_mes': {
             'method': generator.generate_employee_of_the_month_card,
             'category': 'Funcionário do Mês',
             'params': {
-                'employee_name': target.name,
+                'employee_name': nome_reduzido,
                 'month_year': data.get('month_year') or data.get('mes_ano'),
                 'reason': data.get('reason') or data.get('motivo'),
-                'employee_photo_path': photo_path
+                'employee_photo_path': photo_path,
+                'restaurant_id': restaurant.id
             }
         }
     }

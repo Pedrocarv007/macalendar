@@ -21,6 +21,7 @@ const DocumentsModule = {
             this.currentUser = await api.get('/auth/user');
             this.setupHandlers();
             await this.loadDocuments();
+            await this.loadRestaurantsForAdmin();
             console.log("🚀 DocumentsModule iniciado com sucesso.");
         } catch (error) {
             console.warn('Erro na inicialização:', error);
@@ -201,10 +202,10 @@ const DocumentsModule = {
         if (!params.has('page')) params.append('page', this.currentPage);
         try {
             const response = await api.get(`/documents?${params.toString()}`);
-            this.data = response.documents || [];
+            this.data = response.items || [];
             this.render();
-            this.updateStats(response.stats);
-            this.updatePagination(response.stats);
+            this.updateStats(response);
+            this.updatePagination(response);
         } catch (error) { Thecarv.notify('Erro ao carregar', 'error'); }
         finally { if (loading) loading.style.display = 'none'; }
     },
@@ -220,18 +221,73 @@ const DocumentsModule = {
 
     changePage(p) { this.currentPage = p; window.scrollTo({ top: 0, behavior: 'smooth' }); this.filterAndDisplay(); },
 
-    filterAndDisplay() {
-        const params = new URLSearchParams({
-            search: document.getElementById('searchDocument')?.value || '',
-            type: document.getElementById('filterType')?.value || '',
-            document_type: document.getElementById('filterCategory')?.value || '',
-            sortBy: document.getElementById('sortBy')?.value || 'upload_date',
-            page: this.currentPage
-        });
-        this.loadDocuments(params.toString());
-    },
+   filterAndDisplay() {
+    // 1. Pegamos os elementos
+    const searchInput = document.getElementById('searchDocument');
+    const categorySelect = document.getElementById('filterCategory');
+    const restaurantSelect = document.getElementById('filterRestaurant'); // Pode ser null se não for admin
+    const sortSelect = document.getElementById('sortBy');
 
-    render() {
+    // 2. Criamos os parâmetros
+    const params = new URLSearchParams();
+    
+    if (searchInput?.value) params.append('search', searchInput.value);
+    
+    // Só envia o filtro se não for "todos"
+    if (categorySelect?.value && categorySelect.value !== 'todos') {
+        params.append('document_type', categorySelect.value);
+    }
+
+    if (restaurantSelect?.value && restaurantSelect.value !== 'todos') {
+        params.append('restaurant_id', restaurantSelect.value);
+    }
+
+    params.append('sortBy', sortSelect?.value || 'upload_date');
+    params.append('page', this.currentPage || 1);
+
+    // 3. Chama o carregamento com a string formatada: ?search=...&document_type=...
+    this.loadDocuments(params.toString());
+    this.updateStats()
+},
+
+        async clearFilters() {
+        // 1. Limpa os valores dos campos
+        if (document.getElementById('filterRestaurant')) document.getElementById('filterRestaurant').value = 'todos';
+        if (document.getElementById('filterCategory')) document.getElementById('filterCategory').value = 'todos';
+        if (document.getElementById('searchDocument')) document.getElementById('searchDocument').value = '';
+        
+        // 2. Reseta a página para a primeira
+        this.currentPage = 1; 
+        
+        // 3. Atualiza a exibição
+        await this.filterAndDisplay();
+    },
+    // Chame esta função no init() para carregar os restaurantes se for Admin
+    async loadRestaurantsForAdmin() {
+        const select = document.getElementById('filterRestaurant');
+        if (!select) return; // Se não existe o campo, não é admin
+
+        try {
+            const response = await api.get('/restaurants'); 
+            const lista = response.restaurants || [];
+
+            // --- CORREÇÃO AQUI: Limpa o select mas mantém a primeira opção "Todos" ---
+            select.innerHTML = '<option value="todos">Todos os Restaurantes</option>';
+
+            lista.forEach(res => {
+                const opt = document.createElement('option');
+                opt.value = res.id;
+                opt.textContent = res.name;
+                select.appendChild(opt);
+            });
+            
+            console.log("✅ Filtro de restaurantes carregado sem duplicatas.");
+        } catch (error) {
+            console.error("Erro ao carregar lista de restaurantes:", error);
+            // Evita usar Thecarv.notify aqui para não poluir a tela no init
+        }
+    },
+        render() {
         const container = document.getElementById(this.currentView === 'list' ? 'documentsTableBody' : 'documentsGridContainer');
         const noResults = document.getElementById('noDocuments');
         document.getElementById('documentsList').style.display = this.currentView === 'list' ? '' : 'none';
@@ -257,6 +313,7 @@ const DocumentsModule = {
             <td>${Utils.formatFileSize(doc.file_size)}</td>
             <td>${Utils.formatDate(new Date(doc.created_at))}</td>
             <td><div class="btn-group">
+                <button class="btn btn-sm btn-outline-info" onclick="DocumentsModule.view(${doc.id})"><i class="fas fa-eye"></i></button>
                 <button class="btn btn-sm btn-outline-primary" onclick="DocumentsModule.download(${doc.id})"><i class="fas fa-download"></i></button>
                 <button class="btn btn-sm btn-outline-warning doc-edit-btn" data-id="${doc.id}"><i class="fas fa-edit"></i></button>
             </div></td>
@@ -273,6 +330,7 @@ const DocumentsModule = {
                     <h6 class="card-title text-truncate">${doc.title}</h6>
                     <span class="badge bg-${color} mb-3">${doc.document_type}</span>
                     <div class="btn-group w-100">
+                        <button class="btn btn-sm btn-outline-info" onclick="DocumentsModule.view(${doc.id})"><i class="fas fa-eye"></i></button>
                         <button class="btn btn-sm btn-outline-primary" onclick="DocumentsModule.download(${doc.id})"><i class="fas fa-download"></i></button>
                         <button class="btn btn-sm btn-outline-warning doc-edit-btn" data-id="${doc.id}"><i class="fas fa-edit"></i></button>
                     </div>
@@ -281,19 +339,27 @@ const DocumentsModule = {
         </div>`;
     },
 
-    updateStats(stats) {
-        if (!stats) return;
-        ['totalDocuments', 'pdfCount', 'imageCount'].forEach(id => {
+    updateStats(response) {
+        if (!response) return;
+        
+        // Mapeamento manual para evitar erros de substituição de string
+        const mapeamento = {
+            'totalDocuments': response.total || 0,
+            'pdfCount': response.pdf || 0,
+            'imageCount': response.fotos || response.image || 0 // Tenta 'fotos' ou 'image'
+        };
+
+        Object.keys(mapeamento).forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.textContent = stats[id.replace('Count', '').replace('Documents', '')] || 0;
+            if (el) el.textContent = mapeamento[id];
         });
-        // Atualiza o tamanho total
-        const elSize = document.getElementById('totalSize');
-        if (elSize) {
-            const totalSize = (this.data || []).reduce((acc, doc) => acc + (doc.file_size || 0), 0);
-            elSize.textContent = Utils.formatFileSize(totalSize);
-        }
-    },
+            // Atualiza o tamanho total
+            const elSize = document.getElementById('totalSize');
+            if (elSize) {
+                const totalSize = (this.data || []).reduce((acc, doc) => acc + (doc.file_size || 0), 0);
+                elSize.textContent = Utils.formatFileSize(totalSize);
+            }
+        },
 
     toggleView(view) {
         this.currentView = view;
@@ -306,6 +372,48 @@ const DocumentsModule = {
         btnList?.classList.toggle('btn-outline-primary', view !== 'list');
         if (gridActions) gridActions.style.display = view === 'grid' ? 'block' : 'none';
         this.render();
+    },
+
+    view(id) {
+        const doc = this.data.find(d => String(d.id) === String(id));
+        if (!doc) return;
+
+        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        const title = document.getElementById('previewTitle');
+        const frame = document.getElementById('previewFrame');
+        const img = document.getElementById('previewImage');
+        const error = document.getElementById('previewError');
+        const spinner = document.getElementById('previewSpinner');
+        const downloadBtn = document.getElementById('previewDownloadBtn');
+
+        // Reset
+        title.textContent = doc.title;
+        frame.classList.add('d-none');
+        img.classList.add('d-none');
+        error.classList.add('d-none');
+        spinner.classList.remove('d-none');
+        downloadBtn.onclick = () => this.download(id);
+
+        const url = `${window.API_BASE_URL}/documents/view/${id}`;
+        
+        // Determinar tipo com segurança
+        const filename = doc.filename || '';
+        const ext = filename.indexOf('.') > 0 ? filename.split('.').pop().toLowerCase() : '';
+        
+        modal.show();
+
+        setTimeout(() => {
+            spinner.classList.add('d-none');
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+                img.src = url;
+                img.classList.remove('d-none');
+            } else if (['pdf'].includes(ext)) {
+                frame.src = url;
+                frame.classList.remove('d-none');
+            } else {
+                error.classList.remove('d-none');
+            }
+        }, 500);
     },
 
     download(id) {

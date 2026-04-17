@@ -70,5 +70,9 @@ def main():
 
         app.run(debug=debug, host=host, port=port)
 
+# Expor o objeto app para waitress/WSGI
+config_name = resolve_config_name()
+app = create_app(config_name)
+
 if __name__ == '__main__':
     main()
