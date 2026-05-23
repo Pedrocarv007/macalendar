@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Restaurantes{% endblock %}
+{% block page_title %}Restaurantes{% endblock %}
+
+{% block content %}
+<div x-data="restaurantsPage()" x-init="init()">
+
+  <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
+    <button @click="openCreate()" class="btn btn-primary">+ Adicionar</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+    <template x-for="r in restaurants" :key="r.id">
+      <div class="card" style="transition:box-shadow 150ms,transform 150ms" @mouseenter="$el.style.transform='translateY(-2px)'" @mouseleave="$el.style.transform=''">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px">
+          <img :src="r.photo_url" class="avatar" style="width:44px;height:44px;border-radius:10px;object-fit:cover;background:var(--surface-2)">
+          <div style="min-width:0">
+            <p style="font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="r.name"></p>
+            <p class="text-xs text-muted" style="margin-top:2px" x-text="r.address || '—'"></p>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;font-size:12px;color:var(--text-muted);margin-bottom:14px">
+          <span><strong style="color:var(--text-primary)" x-text="r.employees_count"></strong> func.</span>
+          <span><strong style="color:var(--text-primary)" x-text="r.workers_count"></strong> colab.</span>
+          <span x-show="r.capacity"><strong style="color:var(--text-primary)" x-text="r.capacity"></strong> lugares</span>
+        </div>
+        <button @click="openEdit(r)" class="btn btn-ghost btn-sm" style="color:var(--gold)">Editar</button>
+      </div>
+    </template>
+    <div x-show="restaurants.length === 0" class="empty-state">Sem restaurantes.</div>
+  </div>
+
+  <!-- Modal -->
+  <div x-show="showModal" x-transition class="mac-modal-overlay">
+    <div class="mac-modal">
+      <div class="mac-modal-title" x-text="editId ? 'Editar Restaurante' : 'Novo Restaurante'"></div>
+      <div class="form-group">
+        <label class="form-label">Nome</label>
+        <input x-model="form.name" type="text" placeholder="Nome" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Morada</label>
+        <input x-model="form.address" type="text" placeholder="Morada" class="form-input">
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Telefone</label>
+          <input x-model="form.phone" type="tel" placeholder="Telefone" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input x-model="form.email" type="email" placeholder="Email" class="form-input">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Capacidade</label>
+          <input x-model="form.capacity" type="number" placeholder="Lugares" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Horário</label>
+          <input x-model="form.opening_hours" type="text" placeholder="Ex: 12h-23h" class="form-input">
+        </div>
+      </div>
+      <div class="mac-modal-footer">
+        <button @click="save()" class="btn btn-primary" style="flex:1">Guardar</button>
+        <button @click="showModal=false" class="btn btn-secondary" style="flex:1">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="/static/js/modules/restaurants.js"></script>
+{% endblock %}

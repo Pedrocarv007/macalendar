@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Suporte{% endblock %}
+{% block page_title %}Suporte{% endblock %}
+
+{% block content %}
+<div x-data="ticketsPage()" x-init="init()">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+    <div style="display:flex;gap:6px">
+      <button @click="statusFilter=''; load()" class="btn btn-sm"
+        :class="statusFilter==='' ? 'btn-primary' : 'btn-secondary'">Todos</button>
+      <button @click="statusFilter='open'; load()" class="btn btn-sm"
+        :class="statusFilter==='open' ? 'btn-primary' : 'btn-secondary'">Abertos</button>
+      <button @click="statusFilter='resolved'; load()" class="btn btn-sm"
+        :class="statusFilter==='resolved' ? 'btn-primary' : 'btn-secondary'">Resolvidos</button>
+    </div>
+    <button @click="showCreate=true" class="btn btn-primary">+ Novo Ticket</button>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <template x-for="ticket in tickets" :key="ticket.id">
+      <div class="card" style="display:flex;align-items:flex-start;gap:16px;padding:16px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span class="badge"
+              :class="{
+                'badge-green': ticket.status==='open',
+                'badge-orange': ticket.status==='in_progress',
+                'badge-gray': ticket.status==='resolved' || ticket.status==='closed'
+              }" x-text="ticket.status"></span>
+            <span class="text-xs text-muted" x-text="'#' + ticket.id"></span>
+          </div>
+          <p style="font-size:13px;font-weight:500;color:var(--text-primary)" x-text="ticket.subject"></p>
+          <p class="text-xs text-muted truncate" style="margin-top:4px" x-text="ticket.message"></p>
+        </div>
+        <div style="flex-shrink:0;text-align:right">
+          <span class="badge"
+            :class="{
+              'badge-red': ticket.priority==='critical',
+              'badge-orange': ticket.priority==='high',
+              'badge-blue': ticket.priority==='medium',
+              'badge-gray': ticket.priority==='low'
+            }" x-text="ticket.priority"></span>
+          <p class="text-xs text-muted" style="margin-top:6px" x-text="new Date(ticket.created_at).toLocaleDateString('pt-PT')"></p>
+        </div>
+      </div>
+    </template>
+    <div x-show="tickets.length === 0" class="empty-state">Sem tickets.</div>
+  </div>
+
+  <!-- Modal novo ticket -->
+  <div x-show="showCreate" x-transition class="mac-modal-overlay">
+    <div class="mac-modal">
+      <div class="mac-modal-title">Novo Ticket de Suporte</div>
+      <div class="form-group">
+        <label class="form-label">Assunto</label>
+        <input x-model="form.subject" type="text" placeholder="Assunto" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descrição</label>
+        <textarea x-model="form.message" placeholder="Descreve o problema ou questão..." rows="4" class="form-input"></textarea>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Categoria</label>
+          <select x-model="form.category" class="form-input">
+            <option value="bug">Bug</option>
+            <option value="feature">Funcionalidade</option>
+            <option value="question">Questão</option>
+            <option value="other">Outro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prioridade</label>
+          <select x-model="form.priority" class="form-input">
+            <option value="low">Baixa</option>
+            <option value="medium">Média</option>
+            <option value="high">Alta</option>
+            <option value="critical">Crítica</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Screenshot (opcional)</label>
+        <input type="file" @change="form.screenshot = $event.target.files[0]" accept="image/*" class="form-input" style="height:auto;padding:8px 12px">
+      </div>
+      <div class="mac-modal-footer">
+        <button @click="submit()" class="btn btn-primary" style="flex:1">Enviar</button>
+        <button @click="showCreate=false" class="btn btn-secondary" style="flex:1">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="/static/js/modules/tickets.js"></script>
+{% endblock %}

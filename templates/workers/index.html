@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Colaboradores{% endblock %}
+{% block page_title %}Colaboradores{% endblock %}
+
+{% block content %}
+<div x-data="workersPage()" x-init="init()">
+
+  <!-- Toolbar -->
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:24px;">
+    <input x-model="search" @input.debounce.300ms="load()" type="text"
+      placeholder="Pesquisar por nome..." class="form-input" style="width:230px;">
+    <select x-model="restaurantFilter" @change="load()" class="form-input" style="width:190px;">
+      <option value="">Todos os restaurantes</option>
+      <template x-for="r in restaurants" :key="r.id">
+        <option :value="r.id" x-text="r.name"></option>
+      </template>
+    </select>
+    <select x-model="statusFilter" @change="load()" class="form-input" style="width:160px;">
+      <option value="">Todos os estados</option>
+      <option value="pendente">Pendente</option>
+      <option value="em_formacao">Em Formação</option>
+      <option value="concluido">Concluído</option>
+    </select>
+    <span class="text-xs text-muted" x-text="workers.length + ' colaboradores'"></span>
+  </div>
+
+  <!-- Grid de cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px;">
+    <template x-for="w in workers" :key="w.id">
+      <div class="card" style="text-align:center;padding:20px 14px 16px;cursor:pointer;transition:box-shadow 150ms,transform 150ms;position:relative;"
+        @click="openDetail(w)"
+        @mouseenter="$el.style.transform='translateY(-3px)';$el.style.boxShadow='0 8px 24px rgba(0,166,81,.15)'"
+        @mouseleave="$el.style.transform='';$el.style.boxShadow=''">
+
+        <!-- Badge formação -->
+        <template x-if="w.training_status && w.training_status !== 'pendente'">
+          <span style="position:absolute;top:10px;right:10px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--mc-light-green);color:var(--mc-dark-green);"
+            x-text="w.training_status === 'em_formacao' ? 'Formação' : 'Concluído'"></span>
+        </template>
+
+        <img :src="w.photo_url" class="avatar avatar-lg" style="margin:0 auto 12px;width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--mc-light-green);">
+        <p style="font-size:13px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="w.name"></p>
+        <p class="text-xs text-muted" style="margin-top:3px;" x-text="w.job_role || w.restaurant_name || '—'"></p>
+        <p class="text-xs text-muted" x-text="w.age ? w.age + ' anos' : '—'"></p>
+        <template x-if="w.employee_number">
+          <p style="font-size:10px;color:var(--text-muted);margin-top:2px;" x-text="'#' + w.employee_number"></p>
+        </template>
+        <p x-show="w.days_until_birthday !== null && w.days_until_birthday <= 7"
+          style="font-size:11px;color:var(--mc-green);margin-top:6px;font-weight:500;">
+          🎂 em <span x-text="w.days_until_birthday"></span> dias
+        </p>
+      </div>
+    </template>
+    <div x-show="workers.length === 0 && !loading" class="empty-state" style="grid-column:1/-1">
+      <p>Sem colaboradores.</p>
+      <p class="text-xs text-muted" style="margin-top:6px;">Os colaboradores são geridos no SSO Portal.</p>
+    </div>
+    <div x-show="loading" style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted);">
+      A carregar...
+    </div>
+  </div>
+
+  <!-- Modal detalhe do worker -->
+  <div x-show="showDetail" x-transition class="mac-modal-overlay" @click.self="showDetail=false">
+    <div class="mac-modal" style="max-width:500px;">
+
+      <!-- Cabeçalho com foto editável -->
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+        <div style="position:relative;flex-shrink:0;">
+          <img :src="selected.photo_url" x-ref="avatarImg"
+            style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--mc-light-green);">
+          <label title="Alterar foto"
+            style="position:absolute;bottom:0;right:0;width:26px;height:26px;border-radius:50%;background:var(--mc-green);cursor:pointer;display:flex;align-items:center;justify-content:center;border:2px solid #fff;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+            <input type="file" accept="image/*" style="display:none;" @change="uploadPhoto($event)">
+          </label>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:16px;font-weight:700;color:var(--text-primary);" x-text="selected.name"></div>
+          <div class="text-xs text-muted" style="margin-top:2px;" x-text="selected.job_role || '—'"></div>
+          <div x-show="photoUploading" class="text-xs" style="color:var(--mc-green);margin-top:4px;">A guardar foto...</div>
+        </div>
+      </div>
+
+      <!-- Campos de informação -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <p style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Matrícula</p>
+          <p style="font-size:13px;margin-top:2px;" x-text="selected.employee_number || '—'"></p>
+        </div>
+        <div>
+          <p style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Idade</p>
+          <p style="font-size:13px;margin-top:2px;" x-text="selected.age ? selected.age + ' anos' : '—'"></p>
+        </div>
+        <div>
+          <p style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Email</p>
+          <p style="font-size:13px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="selected.email || '—'"></p>
+        </div>
+        <div>
+          <p style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Telefone</p>
+          <p style="font-size:13px;margin-top:2px;" x-text="selected.phone || '—'"></p>
+        </div>
+        <div>
+          <p style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Admissão</p>
+          <p style="font-size:13px;margin-top:2px;" x-text="selected.hire_date || '—'"></p>
+        </div>
+        <div>
+          <p style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Nascimento</p>
+          <p style="font-size:13px;margin-top:2px;" x-text="selected.birth_date || '—'"></p>
+        </div>
+
+        <!-- Restaurante — editável -->
+        <div style="grid-column:1/-1;">
+          <p style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Restaurante</p>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select x-model="editRestaurantId" class="form-input" style="flex:1;font-size:13px;">
+              <option value="">— sem restaurante —</option>
+              <template x-for="r in restaurants" :key="r.id">
+                <option :value="r.id" x-text="r.name"></option>
+              </template>
+            </select>
+            <button @click="saveRestaurant()" :disabled="restaurantSaving"
+              class="btn btn-primary" style="font-size:12px;padding:6px 14px;white-space:nowrap;">
+              <span x-show="!restaurantSaving">Guardar</span>
+              <span x-show="restaurantSaving">...</span>
+            </button>
+          </div>
+        </div>
+
+        <template x-if="selected.training_status">
+          <div style="grid-column:1/-1;">
+            <p style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Estado de Formação</p>
+            <p style="font-size:13px;margin-top:2px;" x-text="selected.training_status"></p>
+          </div>
+        </template>
+      </div>
+
+      <div class="mac-modal-footer" style="margin-top:24px;">
+        <button @click="showDetail=false" class="btn btn-secondary" style="flex:1;">Fechar</button>
+        <a :href="'mailto:' + selected.email" class="btn btn-primary" x-show="selected.email" style="flex:1;text-decoration:none;text-align:center;">
+          Enviar Email
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="/static/js/modules/workers.js?v=2"></script>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Notificações{% endblock %}
+{% block page_title %}Notificações{% endblock %}
+
+{% block content %}
+<div x-data="notificationsPage()" x-init="init()">
+
+  <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
+    <button @click="markAllRead()" class="btn btn-ghost btn-sm">Marcar todas como lidas</button>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <template x-for="n in notifications" :key="n.id">
+      <div @click="markRead(n)" class="card" style="cursor:pointer;padding:16px;transition:border-color 150ms"
+        :style="!n.read_at ? 'border-left:3px solid var(--gold)' : ''">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+          <div style="min-width:0">
+            <p style="font-size:13px;font-weight:500;color:var(--text-primary)" x-text="n.title"></p>
+            <p class="text-xs text-muted" style="margin-top:3px" x-text="n.message"></p>
+          </div>
+          <div style="flex-shrink:0;text-align:right">
+            <p class="text-xs text-muted" x-text="new Date(n.created_at).toLocaleDateString('pt-PT')"></p>
+            <span x-show="!n.read_at"
+              style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-top:6px"></span>
+          </div>
+        </div>
+      </div>
+    </template>
+    <div x-show="notifications.length === 0" class="empty-state">Sem notificações.</div>
+  </div>
+
+</div>
+<script src="/static/js/modules/notifications.js"></script>
+{% endblock %}

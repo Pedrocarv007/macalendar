@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt" x-data="appState()" :class="{ 'dark': darkMode }">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrftoken" content="{{ csrf_token }}">
+  <meta name="user-role" content="{{ user.role }}">
+  <meta name="user-restaurant-id" content="{{ user.restaurant_id|default:'' }}">
+  <title>{% block title %}Mac Calendar{% endblock %} — TheCarv</title>
+  <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/app.css?v=2">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav class="navbar navbar-expand-lg navbar-light sticky-top">
+  <div class="container-fluid">
+
+    <!-- Brand -->
+    <a class="navbar-brand" href="/dashboard">
+      <i class="fas fa-calendar-alt"></i>
+      Mac Calendar
+    </a>
+
+    <!-- Mobile Toggle -->
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+      aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <!-- Nav Links -->
+    <div class="collapse navbar-collapse" id="navbarNav">
+      {% with request.resolver_match.url_name as url %}
+
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a class="nav-link {% if url == 'dashboard' %}active{% endif %}" href="/dashboard">
+            <i class="fas fa-home me-1"></i>Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if url == 'calendar' %}active{% endif %}" href="/calendar">
+            <i class="fas fa-calendar me-1"></i>Calendário
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if url == 'employees' %}active{% endif %}" href="/employees">
+            <i class="fas fa-users me-1"></i>Funcionários
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if url == 'workers' %}active{% endif %}" href="/workers">
+            <i class="fas fa-user me-1"></i>Colaboradores
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if url == 'documents' %}active{% endif %}" href="/documents">
+            <i class="fas fa-file-alt me-1"></i>Documentos
+          </a>
+        </li>
+      </ul>
+
+      <!-- Right Side -->
+      <ul class="navbar-nav ms-auto align-items-center">
+
+        <!-- Notifications -->
+        <li class="nav-item me-1">
+          <a class="nav-link position-relative" href="/notifications">
+            <i class="fas fa-bell fa-lg"></i>
+            <span x-show="unreadCount > 0" x-text="unreadCount"
+              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+              style="font-size:0.6rem"></span>
+          </a>
+        </li>
+
+        <!-- Dark Mode Toggle -->
+        <li class="nav-item me-2">
+          <button @click="toggleDark()" class="btn btn-ghost btn-sm" title="Alternar tema" style="height:34px">
+            <i x-show="!darkMode" class="fas fa-moon"></i>
+            <i x-show="darkMode" class="fas fa-sun"></i>
+          </button>
+        </li>
+
+        <!-- User Dropdown -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#"
+            id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <img src="{{ user.photo_url }}" alt="{{ user.name }}"
+              class="rounded-circle" style="width:34px;height:34px;object-fit:cover;border:2px solid rgba(0,166,81,0.3)">
+            <span class="d-none d-lg-block" style="font-weight:600;font-size:0.9rem">{{ user.name }}</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+            <li class="dropdown-header">
+              <strong>{{ user.name }}</strong><br>
+              <small class="text-muted">{{ user.get_role_display }}</small>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item" href="/profile">
+                <i class="fas fa-user me-2"></i>Meu Perfil
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/tickets">
+                <i class="fas fa-ticket-alt me-2"></i>Suporte
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item text-danger" href="/auth/logout">
+                <i class="fas fa-sign-out-alt me-2"></i>Sair
+              </a>
+            </li>
+          </ul>
+        </li>
+
+      </ul>
+      {% endwith %}
+    </div>
+  </div>
+</nav>
+
+<!-- ═══ MAIN CONTENT ═══ -->
+<main class="container-fluid py-4">
+
+  <!-- Page Title -->
+  <div class="mb-3">
+    <h4 class="text-gradient mb-0">{% block page_title %}{% endblock %}</h4>
+  </div>
+
+  {% block content %}{% endblock %}
+</main>
+
+<!-- Bootstrap Bundle (Popper included) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Alpine.js -->
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="/static/js/app.js"></script>
+<script src="/static/js/splash.js"></script>
+{% block extra_scripts %}{% endblock %}
+
+</body>
+</html>

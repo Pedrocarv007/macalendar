@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Funcionários{% endblock %}
+{% block page_title %}Funcionários{% endblock %}
+
+{% block content %}
+<div x-data="employeesPage()" x-init="init()">
+
+  <!-- Toolbar -->
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:20px">
+    <input x-model="search" @input.debounce.300ms="load()" type="text"
+      placeholder="Pesquisar..." class="form-input" style="width:200px">
+    <select x-model="roleFilter" @change="load()" class="form-input" style="width:160px">
+      <option value="">Todos os roles</option>
+      <option value="admin">Admin</option>
+      <option value="rh">RH</option>
+      <option value="marketing">Marketing</option>
+      <option value="gerente_loja">Gerente de Loja</option>
+      <option value="sub_gerente">Sub-Gerente</option>
+      <option value="gerente_turno">Gerente de Turno</option>
+      <option value="employee">Colaborador</option>
+    </select>
+    <button x-show="isManager" @click="openCreate()" class="btn btn-primary" style="margin-left:auto">+ Adicionar</button>
+  </div>
+
+  <!-- Table -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Role</th>
+          <th>Restaurante</th>
+          <th>Email</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="emp in employees" :key="emp.id">
+          <tr>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px">
+                <img :src="emp.photo_url" class="avatar avatar-sm">
+                <span style="font-weight:500" x-text="emp.name"></span>
+              </div>
+            </td>
+            <td>
+              <span class="role-badge" :class="'role-' + emp.role" x-text="emp.role"></span>
+            </td>
+            <td class="text-muted" x-text="emp.restaurant_name || '—'"></td>
+            <td class="text-muted text-xs" x-text="emp.email"></td>
+            <td style="text-align:right">
+              <button x-show="isManager" @click="openEdit(emp)" class="btn btn-ghost btn-sm">Editar</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+    <div x-show="employees.length === 0" class="empty-state">Sem resultados.</div>
+  </div>
+
+  <!-- Modal -->
+  <div x-show="showModal" x-transition class="mac-modal-overlay">
+    <div class="mac-modal">
+      <div class="mac-modal-title" x-text="editId ? 'Editar Funcionário' : 'Novo Funcionário'"></div>
+
+      <!-- Foto (só no modo edição) -->
+      <div x-show="editId" style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+        <div style="position:relative;flex-shrink:0">
+          <img :src="photoPreview" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--mc-light-green)">
+          <label title="Alterar foto"
+            style="position:absolute;bottom:0;right:0;width:24px;height:24px;border-radius:50%;background:var(--mc-green);cursor:pointer;display:flex;align-items:center;justify-content:center;border:2px solid #fff">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+            <input type="file" accept="image/*" style="display:none" @change="uploadPhoto($event)">
+          </label>
+        </div>
+        <div>
+          <span x-show="photoUploading" class="text-xs" style="color:var(--mc-green)">A guardar foto...</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Nome completo</label>
+        <input x-model="form.name" type="text" placeholder="Nome completo" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input x-model="form.email" type="email" placeholder="Email" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Telefone</label>
+        <input x-model="form.phone" type="tel" placeholder="Telefone" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select x-model="form.role" class="form-input">
+          <option value="employee">Colaborador</option>
+          <option value="gerente_turno">Gerente de Turno</option>
+          <option value="sub_gerente">Sub-Gerente</option>
+          <option value="gerente_loja">Gerente de Loja</option>
+          <option value="marketing">Marketing</option>
+          <option value="rh">RH</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cargo</label>
+        <input x-model="form.position" type="text" placeholder="Cargo" class="form-input">
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Nascimento</label>
+          <input x-model="form.birth_date" type="date" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Admissão</label>
+          <input x-model="form.hire_date" type="date" class="form-input">
+        </div>
+      </div>
+      <div class="form-group" x-show="!editId">
+        <label class="form-label">Palavra-passe</label>
+        <input x-model="form.password" type="password" placeholder="••••••••" class="form-input">
+      </div>
+      <div class="mac-modal-footer">
+        <button @click="save()" class="btn btn-primary" style="flex:1">Guardar</button>
+        <button @click="showModal=false" class="btn btn-secondary" style="flex:1">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="/static/js/modules/employees.js"></script>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Calendário{% endblock %}
+{% block page_title %}Calendário{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div x-data="calendarPage()">
+
+  <!-- Toolbar -->
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:20px">
+    <select x-model="filterType" @change="reloadEvents()" class="form-input" style="width:180px">
+      <option value="">Todos os tipos</option>
+      <option value="meeting">Reunião</option>
+      <option value="birthday">Aniversário</option>
+      <option value="training">Formação</option>
+      <option value="post">Post</option>
+      <option value="mystery_challenge">Desafio Mistério</option>
+    </select>
+
+    <!-- Restaurant filter — only for marketing+ -->
+    <template x-if="isSuperUser">
+      <div style="display:flex;align-items:center;gap:6px">
+        <select x-model="filterRestaurant" @change="reloadEvents()" class="form-input" style="width:200px">
+          <option value="">Todos os restaurantes</option>
+          <template x-for="r in restaurants" :key="r.id">
+            <option :value="r.id" x-text="r.name"></option>
+          </template>
+        </select>
+        <!-- Remove restaurant tag -->
+        <button x-show="filterRestaurant" @click="filterRestaurant=''; reloadEvents()"
+          class="btn btn-ghost btn-sm" title="Remover filtro de restaurante"
+          style="padding:4px 8px;line-height:1">✕</button>
+      </div>
+    </template>
+
+    <button @click="openCreateModal()" class="btn btn-primary" style="margin-left:auto">+ Novo Evento</button>
+  </div>
+
+  <!-- Calendar -->
+  <div class="card" style="padding:16px">
+    <div id="calendar"></div>
+  </div>
+
+  <!-- Modal -->
+  <div x-show="showModal" x-transition class="mac-modal-overlay">
+    <div class="mac-modal" style="max-width:520px">
+      <div class="mac-modal-title" x-text="editId ? 'Editar Evento' : 'Novo Evento'"></div>
+
+      <div class="form-group">
+        <label class="form-label">Título</label>
+        <input x-model="form.title" type="text" placeholder="Título do evento" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descrição</label>
+        <textarea x-model="form.description" placeholder="Descrição..." rows="2" class="form-input"></textarea>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Início</label>
+          <input x-model="form.start_date" type="datetime-local" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fim</label>
+          <input x-model="form.end_date" type="datetime-local" class="form-input">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo</label>
+        <select x-model="form.event_type" class="form-input">
+          <option value="meeting">Reunião</option>
+          <option value="birthday">Aniversário</option>
+          <option value="holiday">Feriado</option>
+          <option value="training">Formação</option>
+          <option value="post">Post</option>
+          <option value="other">Outro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Local</label>
+        <input x-model="form.location" type="text" placeholder="Local" class="form-input">
+      </div>
+      <!-- Restaurant selector — only for marketing+ -->
+      <div class="form-group" x-show="isSuperUser">
+        <label class="form-label">Restaurante</label>
+        <select x-model="form.restaurant" class="form-input">
+          <option value="">Global (todos os restaurantes)</option>
+          <template x-for="r in restaurants" :key="r.id">
+            <option :value="r.id" x-text="r.name"></option>
+          </template>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Link (opcional)</label>
+        <input x-model="form.link" type="url" placeholder="https://..." class="form-input">
+      </div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <label class="form-label" style="margin:0">Cor</label>
+          <input x-model="form.color" type="color" style="width:32px;height:32px;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:none;padding:2px">
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input x-model="form.is_all_day" type="checkbox" style="accent-color:var(--gold)">
+          <span class="text-xs text-muted">Dia inteiro</span>
+        </label>
+      </div>
+
+      <div class="mac-modal-footer">
+        <button @click="saveEvent()" class="btn btn-primary" style="flex:1">Guardar</button>
+        <button @click="showModal=false" class="btn btn-secondary" style="flex:1">Cancelar</button>
+        <button x-show="editId" @click="deleteEvent()" class="btn btn-danger">Apagar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+<script src="/static/js/modules/calendar.js"></script>
+{% endblock %}

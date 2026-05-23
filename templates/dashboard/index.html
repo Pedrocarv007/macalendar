@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div x-data="dashboard()" x-init="init()">
+
+  <!-- Stat cards -->
+  <div class="grid-4" style="margin-bottom:24px">
+
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(201,169,110,0.1)">
+        <svg style="width:18px;height:18px;color:var(--gold)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </div>
+      <div class="stat-value" x-text="stats.employees ?? '—'"></div>
+      <div class="stat-label">Funcionários</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(59,130,246,0.08)">
+        <svg style="width:18px;height:18px;color:#3b82f6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+      </div>
+      <div class="stat-value" x-text="stats.workers ?? '—'"></div>
+      <div class="stat-label">Colaboradores</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(16,185,129,0.08)">
+        <svg style="width:18px;height:18px;color:#10b981" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <div class="stat-value" x-text="stats.upcoming_events ?? '—'"></div>
+      <div class="stat-label">Eventos esta semana</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(139,92,246,0.08)">
+        <svg style="width:18px;height:18px;color:#8b5cf6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <div class="stat-value" x-text="stats.documents ?? '—'"></div>
+      <div class="stat-label">Documentos</div>
+    </div>
+
+  </div>
+
+  <!-- Content grid -->
+  <div style="display:grid;grid-template-columns:1fr 340px;gap:20px">
+
+    <!-- Upcoming events -->
+    <div class="card">
+      <div class="card-title">Próximos Eventos</div>
+
+      <div x-show="upcomingEvents.length === 0" class="empty-state">
+        Sem eventos nos próximos 7 dias.
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:1px">
+        <template x-for="event in upcomingEvents" :key="event.id">
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)">
+            <div class="event-dot" :style="`background:${event.color}`"></div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:500;color:var(--text-primary)" class="truncate" x-text="event.title"></div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px" x-text="formatDate(event.start_date)"></div>
+            </div>
+            <span class="badge badge-gray text-xs" style="flex-shrink:0" x-text="event.restaurant_name || 'Global'"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Activity feed -->
+    <div class="card">
+      <div class="card-title">Actividade Recente</div>
+
+      <div x-show="activities.length === 0" class="empty-state">
+        Sem actividade recente.
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <template x-for="act in activities.slice(0,12)" :key="act.id">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--gold);margin-top:5px;flex-shrink:0;opacity:0.6"></div>
+            <div>
+              <div style="font-size:12px;color:var(--text-primary);line-height:1.4" x-text="act.description"></div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px" x-text="formatDate(act.created_at)"></div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function dashboard() {
+  return {
+    stats: {},
+    upcomingEvents: [],
+    activities: [],
+
+    async init() {
+      const [s, e, a] = await Promise.all([
+        API.get('/api/dashboard/stats'),
+        API.get('/api/dashboard/events/upcoming'),
+        API.get('/api/dashboard/activities'),
+      ]);
+      this.stats = s || {};
+      this.upcomingEvents = e || [];
+      this.activities = a || [];
+    },
+
+    formatDate(dt) {
+      return new Date(dt).toLocaleString('pt-PT', {
+        day: '2-digit', month: 'short',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+  };
+}
+</script>
+{% endblock %}
