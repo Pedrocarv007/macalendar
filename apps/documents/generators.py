@@ -274,7 +274,7 @@ class DocumentGenerator:
 
         # ── Draw text ─────────────────────────────────────────────────
         if template_name == 'birthday':
-            _draw_centered(draw, person_name, _load_font(60), cy + 400, img_w)
+            _draw_centered(draw, person_name, _load_font(100), cy + 400, img_w)
             # Date of birth or today
             if birth_date:
                 if isinstance(birth_date, str):
@@ -288,10 +288,10 @@ class DocumentGenerator:
                     date_str = birth_date.strftime('%d/%m/%Y')
             else:
                 date_str = datetime.now().strftime('%d/%m/%Y')
-            _draw_centered(draw, date_str, _load_font(55), cy + 530, img_w)
+            _draw_centered(draw, date_str, _load_font(90), cy + 530, img_w)
 
         elif template_name == 'welcome':
-            _draw_centered(draw, person_name, _load_font(60), cy + 400, img_w)
+            _draw_centered(draw, person_name, _load_font(100), cy + 400, img_w)
             if hire_date:
                 if isinstance(hire_date, str):
                     try:
@@ -304,14 +304,14 @@ class DocumentGenerator:
                     date_str = hire_date.strftime('%d/%m/%Y')
             else:
                 date_str = datetime.now().strftime('%d/%m/%Y')
-            _draw_centered(draw, date_str, _load_font(55), cy + 505, img_w)
+            _draw_centered(draw, date_str, _load_font(90), cy + 505, img_w)
 
         elif template_name == 'employee_month':
             month_year = _safe_text(data.get('message', '') or datetime.now().strftime('%B %Y'))
             # Month/year at top
-            _draw_centered(draw, month_year, _load_font(55), cy - 450, img_w)
+            _draw_centered(draw, month_year, _load_font(100), cy - 450, img_w)
             # Name below photo
-            _draw_centered(draw, person_name, _load_font(60), cy + 540, img_w)
+            _draw_centered(draw, person_name, _load_font(100), cy + 540, img_w)
 
         # ── Save ──────────────────────────────────────────────────────
         ts = int(time.time() * 1000)

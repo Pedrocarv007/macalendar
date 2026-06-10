@@ -51,5 +51,7 @@ if settings.DEBUG or getattr(settings, 'SERVE_SSO_MEDIA_LOCALLY', False):
     )
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# Always serve media files (no nginx in this deployment; gunicorn is the only server)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

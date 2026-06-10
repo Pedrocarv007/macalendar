@@ -1,5 +1,6 @@
 import os
 import time
+import uuid
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import viewsets, status
@@ -101,6 +102,26 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
         ]
         results.sort(key=lambda x: x.get('days_until') or 999)
         return Response(results)
+
+    @action(detail=True, methods=['post'], url_path='photo')
+    def upload_photo(self, request, pk=None):
+        event = self.get_object()
+        photo = request.FILES.get('photo')
+        if not photo:
+            return Response({'error': 'Foto não fornecida.'}, status=status.HTTP_400_BAD_REQUEST)
+        ext = os.path.splitext(photo.name)[1].lower()
+        if ext not in ['.jpg', '.jpeg', '.png', '.gif']:
+            return Response({'error': 'Extensão inválida.'}, status=status.HTTP_400_BAD_REQUEST)
+        filename = f"event_{event.id}_{uuid.uuid4().hex[:8]}{ext}"
+        upload_dir = settings.MEDIA_ROOT / 'events' / 'photos'
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        full_path = upload_dir / filename
+        with open(full_path, 'wb') as f:
+            for chunk in photo.chunks():
+                f.write(chunk)
+        event.photo_path = f"/media/events/photos/{filename}"
+        event.save(update_fields=['photo_path'])
+        return Response({'photo_url': event.photo_path})
 
     @action(detail=False, methods=['post'], url_path='generate-mystery')
     def generate_mystery(self, request):
