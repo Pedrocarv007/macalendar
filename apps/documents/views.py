@@ -41,7 +41,14 @@ class DocumentViewSet(viewsets.ModelViewSet):
         if search:
             qs = qs.filter(title__icontains=search)
 
-        return qs.select_related('restaurant', 'created_by', 'employee', 'worker').order_by('-created_at')
+        # 'worker' is on the sso DB — select_related would attempt a cross-DB JOIN.
+        # Use prefetch_related instead: it issues a separate batched query that
+        # the SSORouter correctly routes to the sso connection.
+        return (
+            qs.select_related('restaurant', 'created_by', 'employee')
+              .prefetch_related('worker')
+              .order_by('-created_at')
+        )
 
     def perform_create(self, serializer):
         user = self.request.user

@@ -11,7 +11,7 @@ from pathlib import Path
 from django.conf import settings
 
 
-TEMPLATES_BASE = Path(getattr(settings, 'TEMPLATES_BASE_DIR', 'I:/server_apps/macalendar/templates_generate'))
+TEMPLATES_BASE = Path(getattr(settings, 'TEMPLATES_BASE_DIR'))
 
 TEMPLATE_FILES = {
     'birthday':       'aniversario.png',
@@ -124,10 +124,22 @@ def _get_template_image(template_name, restaurant_name):
     return Image.new('RGBA', (1920, 1280), color=(60, 60, 60, 255))
 
 
-def _get_photo(photo_filename, person_type='employee'):
+def _get_photo(photo_filename, person_type='employee', sso_avatar=None):
     """Return a PIL Image of the person's photo or a placeholder."""
     from PIL import Image, ImageDraw
 
+    # 1. Tentar avatar SSO (caminho direto no disco do SSO portal)
+    if sso_avatar:
+        sso_root = Path(getattr(settings, 'SSO_MEDIA_ROOT',
+                                r'I:\server_apps\Thecarv_django\media'))
+        path = sso_root / sso_avatar
+        if path.exists():
+            try:
+                return Image.open(str(path)).convert('RGBA')
+            except Exception:
+                pass
+
+    # 2. Tentar foto local (Mac Calendar media)
     if photo_filename:
         subfolder = 'employees' if person_type == 'employee' else 'workers'
         path = settings.MEDIA_ROOT / 'photos' / subfolder / photo_filename
@@ -137,7 +149,7 @@ def _get_photo(photo_filename, person_type='employee'):
             except Exception:
                 pass
 
-    # Placeholder silhouette
+    # 3. Placeholder silhouette
     ph = Image.new('RGBA', (400, 400), (160, 160, 160, 255))
     draw = ImageDraw.Draw(ph)
     draw.ellipse([100, 40, 300, 240], fill=(120, 120, 120, 255))
@@ -195,6 +207,7 @@ class DocumentGenerator:
         # ── Resolve person ───────────────────────────────────────────
         person_name = _safe_text(data.get('name', ''))
         photo_filename = None
+        sso_avatar = None
         person_type = data.get('person_type', 'employee')
         birth_date = None
         hire_date = None
@@ -204,6 +217,7 @@ class DocumentGenerator:
 
         if employee_id:
             from apps.accounts.models import Employee
+            from apps.workers.models import Worker
             try:
                 emp = Employee.objects.get(pk=employee_id)
                 if not person_name:
@@ -212,6 +226,12 @@ class DocumentGenerator:
                 birth_date = emp.birth_date
                 hire_date = emp.hire_date
                 person_type = 'employee'
+                # Resolver avatar SSO pelo email — tem prioridade sobre foto local
+                # (mesma lógica de Employee.photo_url; _get_photo tenta SSO antes do local)
+                if emp.email:
+                    w = Worker.objects.filter(email__iexact=emp.email).only('avatar').first()
+                    if w and w.avatar:
+                        sso_avatar = w.avatar
             except Employee.DoesNotExist:
                 pass
         elif worker_id:
@@ -221,6 +241,7 @@ class DocumentGenerator:
                 if not person_name:
                     person_name = _safe_text(wkr.name)
                 photo_filename = wkr.photo_filename
+                sso_avatar = wkr.avatar or None  # avatar SSO (ex: 'avatars/abel.png')
                 birth_date = wkr.birth_date
                 hire_date = wkr.hire_date
                 person_type = 'worker'
@@ -247,7 +268,7 @@ class DocumentGenerator:
         draw = ImageDraw.Draw(fundo)
 
         # ── Paste photo ───────────────────────────────────────────────
-        photo = _get_photo(photo_filename, person_type)
+        photo = _get_photo(photo_filename, person_type, sso_avatar=sso_avatar)
         photo_offset = 50 if template_name == 'employee_month' else -50
         _paste_photo(fundo, photo, cx, cy, offset_y=photo_offset)
 

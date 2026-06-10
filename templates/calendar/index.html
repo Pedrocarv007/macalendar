@@ -96,6 +96,14 @@
         <label class="form-label">Link (opcional)</label>
         <input x-model="form.link" type="url" placeholder="https://..." class="form-input">
       </div>
+      <div class="form-group">
+        <label class="form-label">Foto</label>
+        <input type="file" accept="image/jpeg,image/png,image/gif"
+          @change="form.photoFile=$event.target.files[0]; form.photoPreview=form.photoFile ? URL.createObjectURL(form.photoFile) : form.photoPreview"
+          class="form-input" style="height:auto;padding:8px 12px">
+        <img x-show="form.photoPreview" :src="form.photoPreview"
+          style="margin-top:8px;max-height:120px;border-radius:8px;object-fit:cover;width:100%">
+      </div>
       <div style="display:flex;align-items:center;gap:16px">
         <div style="display:flex;align-items:center;gap:8px">
           <label class="form-label" style="margin:0">Cor</label>
@@ -120,5 +128,5 @@
 
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-<script src="/static/js/modules/calendar.js"></script>
+<script src="/static/js/modules/calendar.js?v=3"></script>
 {% endblock %}

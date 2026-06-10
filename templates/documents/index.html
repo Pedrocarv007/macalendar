@@ -5,11 +5,12 @@
 {% block content %}
 <div x-data="documentsPage()" x-init="init()">
 
+  <div class="docs-shell">
   <!-- Toolbar -->
-  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:20px">
+  <div class="docs-toolbar" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:20px">
     <input x-model="search" @input.debounce.300ms="load()" type="text"
       placeholder="Pesquisar..." class="form-input" style="width:200px">
-    <select x-model="typeFilter" @change="load()" class="form-input" style="width:170px">
+    <select x-model="typeFilter" @change="onTypeFilterChange()" class="form-input" style="width:170px">
       <option value="">Todos os tipos</option>
       <option value="birthday">Aniversário</option>
       <option value="welcome">Boas-Vindas</option>
@@ -23,9 +24,33 @@
     </div>
   </div>
 
+    <div class="docs-folder-grid">
+      <template x-for="folder in folders" :key="folder.key">
+        <button type="button" class="docs-folder-card" @click="selectFolder(folder.key)"
+          :class="activeFolder === folder.key ? 'is-active' : ''">
+          <div class="docs-folder-top">
+            <div class="docs-folder-icon" :class="folder.accentClass" x-html="folder.icon"></div>
+            <span class="badge" :class="folder.badgeClass" x-text="folderCount(folder.key) + ' itens'"></span>
+          </div>
+          <div>
+            <h3 class="docs-folder-title" x-text="folder.label"></h3>
+            <p class="docs-folder-text" x-text="folder.description"></p>
+          </div>
+        </button>
+      </template>
+    </div>
+
+  <div class="docs-section-head">
+    <div>
+      <p class="docs-section-kicker">Conteúdo</p>
+      <h3 class="docs-section-title" x-text="activeCategoryLabel()"></h3>
+    </div>
+    <p class="docs-section-count" x-text="filteredDocuments().length + ' resultado(s)'"></p>
+  </div>
+
   <!-- Grid -->
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">
-    <template x-for="doc in documents" :key="doc.id">
+    <template x-for="doc in filteredDocuments()" :key="doc.id">
       <div class="card" style="transition:box-shadow 150ms">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
           <div style="width:38px;height:38px;border-radius:9px;background:var(--gold-light);display:flex;align-items:center;justify-content:center">
@@ -43,7 +68,9 @@
         </div>
       </div>
     </template>
-    <div x-show="documents.length === 0" class="empty-state" style="grid-column:1/-1">Sem documentos.</div>
+    <div x-show="filteredDocuments().length === 0" class="empty-state" style="grid-column:1/-1">Sem documentos nesta categoria.</div>
+  </div>
+
   </div>
 
   <!-- Upload Modal -->
@@ -95,33 +122,31 @@
       <div class="form-group">
         <label class="form-label">Para quem</label>
         <div style="display:flex;gap:8px">
-          <button @click="genForm.person_type='employee'; genForm.worker_id=''" class="btn btn-sm" style="flex:1"
+          <button @click="switchPersonType('employee')" class="btn btn-sm" style="flex:1"
             :class="genForm.person_type==='employee' ? 'btn-primary' : 'btn-secondary'">Funcionário</button>
-          <button @click="genForm.person_type='worker'; genForm.employee_id=''" class="btn btn-sm" style="flex:1"
+          <button @click="switchPersonType('worker')" class="btn btn-sm" style="flex:1"
             :class="genForm.person_type==='worker' ? 'btn-primary' : 'btn-secondary'">Colaborador</button>
         </div>
       </div>
 
-      <!-- Employee select -->
-      <div class="form-group" x-show="genForm.person_type === 'employee'">
-        <label class="form-label">Funcionário</label>
-        <select x-model="genForm.employee_id" class="form-input">
-          <option value="">Seleccionar funcionário...</option>
-          <template x-for="e in employees" :key="e.id">
-            <option :value="e.id" x-text="e.name"></option>
+      <!-- Person picker button -->
+      <div class="form-group">
+        <label class="form-label" x-text="genForm.person_type === 'employee' ? 'Funcionário' : 'Colaborador'"></label>
+        <button @click="openPicker()" class="btn btn-secondary"
+          style="width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:8px 12px">
+          <template x-if="selectedPerson && selectedPerson.photo_url">
+            <img :src="selectedPerson.photo_url"
+              style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0">
           </template>
-        </select>
-      </div>
-
-      <!-- Worker select -->
-      <div class="form-group" x-show="genForm.person_type === 'worker'">
-        <label class="form-label">Colaborador</label>
-        <select x-model="genForm.worker_id" class="form-input">
-          <option value="">Seleccionar colaborador...</option>
-          <template x-for="w in workers" :key="w.id">
-            <option :value="w.id" x-text="w.name"></option>
+          <template x-if="!selectedPerson || !selectedPerson.photo_url">
+            <span style="width:36px;height:36px;border-radius:50%;background:var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center">
+              <i class="fas fa-user" style="font-size:14px;color:var(--text-muted)"></i>
+            </span>
           </template>
-        </select>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+            x-text="selectedPerson ? selectedPerson.name + (selectedPerson.restaurant_name ? ' — ' + selectedPerson.restaurant_name : '') : 'Selecionar pessoa...'">
+          </span>
+        </button>
       </div>
 
       <!-- Restaurant -->
@@ -148,6 +173,38 @@
     </div>
   </div>
 
+  <!-- Person Picker Modal -->
+  <div x-show="showPicker" x-transition class="mac-modal-overlay" @click.self="showPicker=false">
+    <div class="mac-modal" style="max-width:640px;max-height:80vh;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <span style="font-size:15px;font-weight:600;color:var(--text-primary)"
+          x-text="genForm.person_type === 'employee' ? 'Selecionar Funcionário' : 'Selecionar Colaborador'"></span>
+        <button @click="showPicker=false" class="btn btn-ghost btn-sm">✕</button>
+      </div>
+      <!-- Search -->
+      <input x-model="pickerSearch" type="text" placeholder="Pesquisar por nome ou restaurante..."
+        class="form-input" style="margin-bottom:14px">
+      <!-- Grid -->
+      <div style="overflow-y:auto;flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding-right:4px">
+        <template x-for="person in peopleList()" :key="person.id">
+          <button @click="pickPerson(person)"
+            style="background:var(--card-bg);border:1.5px solid var(--border);border-radius:12px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:border-color 150ms,box-shadow 150ms"
+            :style="(selectedPerson && selectedPerson.id === person.id) ? 'border-color:var(--gold);box-shadow:0 0 0 2px rgba(0,166,81,0.2)' : ''"
+            @mouseenter="$el.style.borderColor='var(--gold)'" @mouseleave="$el.style.borderColor=(selectedPerson && selectedPerson.id===person.id)?'var(--gold)':'var(--border)'">
+            <img :src="person.photo_url" :alt="person.name"
+              style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--border)">
+            <span style="font-size:12px;font-weight:600;color:var(--text-primary);text-align:center;line-height:1.3;word-break:break-word"
+              x-text="person.name"></span>
+            <span style="font-size:11px;color:var(--text-muted);text-align:center"
+              x-text="person.restaurant_name || '—'"></span>
+          </button>
+        </template>
+        <div x-show="peopleList().length === 0" class="empty-state"
+          style="grid-column:1/-1;padding:24px">Nenhuma pessoa encontrada.</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Preview Modal -->
   <div x-show="showPreview" x-transition class="mac-modal-overlay" @click.self="showPreview=false">
     <div class="mac-modal" style="max-width:700px;padding:16px">
@@ -163,5 +220,5 @@
   </div>
 
 </div>
-<script src="/static/js/modules/documents.js"></script>
+<script src="/static/js/modules/documents.js?v=3"></script>
 {% endblock %}

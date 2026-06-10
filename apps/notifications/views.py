@@ -3,8 +3,10 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 from django.conf import settings
 
+from apps.accounts.permissions import IsServiceClient
 from .models import Notification
 from .serializers import NotificationSerializer
 
@@ -66,3 +68,51 @@ class NotificationViewSet(viewsets.ModelViewSet):
     def unread_count(self, request):
         count = self.get_queryset().filter(read_at__isnull=True).count()
         return Response({'count': count})
+
+
+class ServiceNotificationsView(APIView):
+    """
+    Endpoint sistema-para-sistema com notificações ativas de um restaurante.
+    Inclui notificações globais (restaurant=NULL). Limita por `limit` (default 10).
+
+    Autenticação: header X-Service-Key: <SERVICE_API_KEY>
+    Query params: restaurant_id (obrigatório), limit (default 10)
+    """
+    permission_classes = [IsServiceClient]
+    authentication_classes = []
+
+    def get(self, request):
+        restaurant_id = request.query_params.get('restaurant_id')
+        if not restaurant_id:
+            return Response({'detail': 'restaurant_id em falta'}, status=400)
+        try:
+            restaurant_id = int(restaurant_id)
+        except (TypeError, ValueError):
+            return Response({'detail': 'restaurant_id inválido'}, status=400)
+
+        try:
+            limit = max(1, min(int(request.query_params.get('limit', 10)), 100))
+        except (TypeError, ValueError):
+            limit = 10
+
+        qs = Notification.objects.filter(
+            audience__in=['all', 'employee'],
+        ).filter(
+            restaurant_id=restaurant_id,
+        ) | Notification.objects.filter(
+            restaurant__isnull=True,
+            audience__in=['all', 'employee'],
+        )
+
+        qs = qs.distinct().order_by('-created_at')[:limit]
+        data = [
+            {
+                'id': n.id,
+                'title': n.title,
+                'message': n.message,
+                'category': n.category,
+                'created_at': n.created_at.isoformat(),
+            }
+            for n in qs
+        ]
+        return Response({'count': len(data), 'results': data})

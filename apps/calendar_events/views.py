@@ -149,3 +149,86 @@ class ServiceCalendarEventsView(APIView):
 
         serializer = CalendarEventSerializer(qs.order_by('start_date'), many=True)
         return Response({'count': qs.count(), 'results': serializer.data})
+
+
+class ServiceBirthdaysView(APIView):
+    """
+    Aniversários do mês para um restaurante, com a imagem gerada pela template
+    'birthday'. Se ainda não existir Document para esse colaborador+mês+restaurante, gera agora.
+
+    Autenticação: header X-Service-Key: <SERVICE_API_KEY>
+    Query params: restaurant_id (obrigatório), month (1-12, default = mês corrente)
+    """
+    permission_classes = [IsServiceClient]
+    authentication_classes = []
+
+    def get(self, request):
+        from apps.workers.models import Worker
+        from apps.documents.models import Document
+        from apps.documents.generators import DocumentGenerator
+        from apps.accounts.models import Employee
+
+        restaurant_id = request.query_params.get('restaurant_id')
+        if not restaurant_id:
+            return Response({'detail': 'restaurant_id em falta'}, status=400)
+        try:
+            restaurant_id = int(restaurant_id)
+        except (TypeError, ValueError):
+            return Response({'detail': 'restaurant_id inválido'}, status=400)
+
+        now = timezone.now()
+        try:
+            month = int(request.query_params.get('month', now.month))
+        except (TypeError, ValueError):
+            month = now.month
+        year = now.year
+
+        workers = list(Worker.objects.filter(
+            is_active=True,
+            birth_date__month=month,
+            restaurant_id=restaurant_id,
+        ))
+
+        system_user = Employee.objects.filter(role='admin', is_active=True).first()
+
+        generator = DocumentGenerator()
+        results = []
+        for wkr in workers:
+            existing = (
+                Document.objects.filter(
+                    document_type='birthday',
+                    worker_id=wkr.id,
+                    restaurant_id=restaurant_id,
+                    created_at__year=year,
+                    created_at__month=month,
+                    status='generated',
+                )
+                .order_by('-created_at')
+                .first()
+            )
+            if existing and existing.filename:
+                image_url = request.build_absolute_uri(
+                    f'/media/documents/generated/{existing.filename}'
+                )
+            else:
+                gen = generator.generate(
+                    'birthday',
+                    {'worker_id': wkr.id, 'restaurant_id': restaurant_id, 'name': wkr.name},
+                    system_user,
+                )
+                if 'error' in gen:
+                    image_url = None
+                else:
+                    image_url = request.build_absolute_uri(gen['file_url'])
+
+            results.append({
+                'id': wkr.id,
+                'name': wkr.name,
+                'birth_date': str(wkr.birth_date) if wkr.birth_date else None,
+                'age': getattr(wkr, 'age', None),
+                'days_until': getattr(wkr, 'days_until_birthday', None),
+                'image_url': image_url,
+            })
+
+        results.sort(key=lambda x: x.get('days_until') or 999)
+        return Response({'count': len(results), 'birthdays': results})

@@ -170,8 +170,16 @@ class Employee(AbstractBaseUser, PermissionsMixin):
 
     @property
     def photo_url(self):
+        # 1. Avatar do SSO — fonte de verdade; tem prioridade máxima
+        # Import local para evitar import circular accounts → workers → accounts
+        from apps.workers.utils import sso_avatar_url_for_email
+        sso_url = sso_avatar_url_for_email(self.email)
+        if sso_url:
+            return sso_url
+        # 2. Upload local no Mac Calendar — fallback quando não há avatar SSO
         if self.photo_filename:
             return f"/media/photos/employees/{self.photo_filename}"
+        # 3. Sem foto — usa o avatar genérico
         return "/static/img/default-avatar.svg"
 
     def is_super_role(self):

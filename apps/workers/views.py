@@ -1,6 +1,8 @@
 import os
 import time
+import threading
 from django.conf import settings
+from django.core.cache import cache
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -34,7 +36,9 @@ class WorkerViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user   = self.request.user
         params = self.request.query_params
-        qs     = Worker.objects.filter(is_active=True)
+        # employee_number__isnull=False filtra apenas colaboradores operacionais
+        # (Usuários é agora a tabela unificada SSO — contém também contas internas sem matrícula)
+        qs     = Worker.objects.filter(is_active=True, restaurant_id__isnull=False)
 
         # Filtro por restaurante ──────────────────────────────────────────────
         restaurant_id = params.get('restaurant_id')
@@ -111,6 +115,19 @@ class WorkerViewSet(viewsets.ReadOnlyModelViewSet):
 
         # Escreve o photo_filename diretamente no SSO DB
         Worker.objects.using('sso').filter(pk=worker.pk).update(photo_filename=filename)
+
+        # Limpar cache do avatar ao vivo (TTL 5 min em sso_avatar_url_for_email)
+        if worker.email:
+            cache.delete(f'sso_avatar:{worker.email.lower()}')
+
+        # Regenerar cartões de aniversário (mês atual + futuros) em background
+        def _regen():
+            from apps.calendar_events.birthday_service import BirthdayService
+            BirthdayService(user=request.user).regenerate_cards_for_person(
+                worker_id=worker.pk
+            )
+
+        threading.Thread(target=_regen, daemon=True).start()
 
         ActivityLog.log('worker_photo', f'Foto de "{worker.name}" atualizada', request.user)
         return Response({'photo_url': f'/media/photos/workers/{filename}'})

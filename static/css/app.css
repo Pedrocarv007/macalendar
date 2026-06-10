@@ -194,6 +194,132 @@ body {
   margin-bottom: 16px;
 }
 
+.docs-shell {
+  display: grid;
+  gap: 20px;
+}
+
+.docs-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.docs-folder-card {
+  appearance: none;
+  width: 100%;
+  border: 1px solid rgba(0, 166, 81, 0.16);
+  border-radius: 22px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(232,245,232,0.92));
+  display: grid;
+  gap: 18px;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.docs-folder-card:hover,
+.docs-folder-card.is-active {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(255, 207, 0, 0.4);
+}
+
+.docs-folder-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.docs-folder-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.docs-folder-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.docs-folder-icon.is-all {
+  background: rgba(107, 114, 128, 0.12);
+  color: #4b5563;
+}
+
+.docs-folder-icon.is-birthday {
+  background: rgba(255, 140, 0, 0.12);
+  color: #c06000;
+}
+
+.docs-folder-icon.is-employee-month {
+  background: rgba(0, 166, 81, 0.12);
+  color: var(--mc-dark-green);
+}
+
+.docs-folder-icon.is-upload {
+  background: rgba(218, 0, 24, 0.1);
+  color: var(--mc-dark-red);
+}
+
+.docs-folder-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.docs-folder-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.docs-toolbar {
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(0, 166, 81, 0.14);
+}
+
+.docs-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+}
+
+.docs-section-kicker {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.docs-section-title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.docs-section-count {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .docs-section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* Stat cards */
 .stat-card {
   background: var(--surface);
@@ -570,7 +696,7 @@ select.form-input {
   font-weight: 600 !important;
   border-radius: var(--radius-sm) !important;
   box-shadow: none !important;
-  padding: 6px 14px !important;
+  padding: 8px 18px !important;
 }
 .fc .fc-button:hover {
   background: linear-gradient(135deg, var(--mc-dark-green), var(--mc-green)) !important;

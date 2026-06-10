@@ -7,7 +7,7 @@ function calendarPage() {
     filterRestaurant: '',
     restaurants: [],
     isSuperUser: isSuperRole(),
-    form: { title: '', description: '', start_date: '', end_date: '', event_type: 'meeting', color: '#3B82F6', location: '', link: '', is_all_day: false, restaurant: '' },
+    form: { title: '', description: '', start_date: '', end_date: '', event_type: 'meeting', color: '#3B82F6', location: '', link: '', is_all_day: false, restaurant: '', photoFile: null, photoPreview: null },
 
     async init() {
       await this.$nextTick();
@@ -46,7 +46,7 @@ function calendarPage() {
 
     openCreateModal() {
       this.editId = null;
-      this.form = { title: '', description: '', start_date: '', end_date: '', event_type: 'meeting', color: '#3B82F6', location: '', link: '', is_all_day: false, restaurant: this.filterRestaurant || '' };
+      this.form = { title: '', description: '', start_date: '', end_date: '', event_type: 'meeting', color: '#3B82F6', location: '', link: '', is_all_day: false, restaurant: this.filterRestaurant || '', photoFile: null, photoPreview: null };
       this.showModal = true;
     },
 
@@ -64,6 +64,7 @@ function calendarPage() {
         start_date: p.start_date?.slice(0, 16) || '', end_date: p.end_date?.slice(0, 16) || '',
         color: event.backgroundColor, location: p.location || '', link: p.link || '',
         is_all_day: p.is_all_day, restaurant: p.restaurant || '',
+        photoFile: null, photoPreview: p.photo_url || null,
       };
       this.showModal = true;
     },
@@ -72,6 +73,9 @@ function calendarPage() {
       const url = this.editId ? `/api/calendar/events/${this.editId}` : '/api/calendar/events';
       const method = this.editId ? 'put' : 'post';
       const body = { ...this.form };
+      // Não enviar campos de foto no JSON — são tratados num upload separado
+      delete body.photoFile;
+      delete body.photoPreview;
       // Send null for global (all restaurants) when restaurant is empty string
       if (this.isSuperUser) {
         body.restaurant = body.restaurant || null;
@@ -79,8 +83,17 @@ function calendarPage() {
         delete body.restaurant;
       }
       const data = await API[method](url, body);
-      if (data) { this.showModal = false; this.reloadEvents(); toast('Evento guardado'); }
-      else toast('Erro ao guardar', 'error');
+      if (!data) { toast('Erro ao guardar', 'error'); return; }
+      // Upload de foto se foi selecionada
+      if (this.form.photoFile) {
+        const eventId = this.editId || data.id;
+        const fd = new FormData();
+        fd.append('photo', this.form.photoFile);
+        await API.upload(`/api/calendar/events/${eventId}/photo`, fd);
+      }
+      this.showModal = false;
+      this.reloadEvents();
+      toast('Evento guardado');
     },
 
     async deleteEvent() {

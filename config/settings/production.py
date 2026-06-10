@@ -4,6 +4,7 @@ Production settings for Mac Calendar.
 from .base import *  # noqa
 import dj_database_url
 import os
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -13,6 +14,12 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 DEBUG = False
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '').split(',') if h.strip()]
+
+if not SECRET_KEY:
+    raise ImproperlyConfigured('SECRET_KEY must be set in production.')
+
+if not ALLOWED_HOSTS:
+    raise ImproperlyConfigured('ALLOWED_HOSTS must be set in production.')
 
 DATABASES = {
     'default': dj_database_url.config(
@@ -28,6 +35,10 @@ DATABASES = {
 
 # HTTPS / proxy headers (nginx terminates SSL)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', True)
+SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '31536000'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', True)
+SECURE_HSTS_PRELOAD = env_bool('SECURE_HSTS_PRELOAD', True)
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = 'None'  # Cross-site SSO redirect chain requires SameSite=None
 CSRF_COOKIE_SECURE = True
@@ -38,6 +49,9 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 # SSO portal (production)
 LOGIN_URL = os.getenv('THECARV_SSO_PORTAL', 'https://carloscardoso.thecarv.com') + '/portal/sistema/mac-calendar/'
 LOGOUT_REDIRECT_URL = os.getenv('THECARV_SSO_PORTAL', 'https://carloscardoso.thecarv.com') + '/portal/'
+
+log_file = Path(os.getenv('DJANGO_LOG_FILE', str(BASE_DIR / 'logs' / 'django.log')))
+log_file.parent.mkdir(parents=True, exist_ok=True)
 
 LOGGING = {
     'version': 1,
@@ -51,7 +65,7 @@ LOGGING = {
     'handlers': {
         'file': {
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': '/app/logs/django.log',
+            'filename': str(log_file),
             'maxBytes': 10 * 1024 * 1024,
             'backupCount': 5,
             'formatter': 'verbose',

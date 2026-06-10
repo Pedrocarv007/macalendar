@@ -3,8 +3,10 @@ Employee CRUD views.
 """
 import os
 import logging
+import threading
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -289,6 +291,21 @@ class EmployeePhotoView(APIView):
 
         employee.photo_filename = filename
         employee.save(update_fields=['photo_filename'])
+
+        # Limpar cache do avatar ao vivo (TTL 5 min em sso_avatar_url_for_email)
+        if employee.email:
+            cache.delete(f'sso_avatar:{employee.email.lower()}')
+
+        # Regenerar cartões de aniversário (mês atual + futuros) em background
+        emp_id = employee.pk
+
+        def _regen():
+            from apps.calendar_events.birthday_service import BirthdayService
+            BirthdayService(user=request.user).regenerate_cards_for_person(
+                employee_id=emp_id
+            )
+
+        threading.Thread(target=_regen, daemon=True).start()
 
         return Response(success_response(
             data={'photo_url': employee.photo_url},

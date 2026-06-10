@@ -1,6 +1,7 @@
 """
 Role-based DRF permission classes for Mac Calendar.
 """
+import hmac
 from rest_framework.permissions import BasePermission
 from django.conf import settings
 
@@ -149,7 +150,9 @@ class IsServiceClient(BasePermission):
     def has_permission(self, request, view):
         key = request.META.get('HTTP_X_SERVICE_KEY', '')
         service_key = getattr(settings, 'SERVICE_API_KEY', '')
-        return bool(key and service_key and key == service_key)
+        if not key or not service_key:
+            return False
+        return hmac.compare_digest(key, service_key)
 
 
 # Aliases for convenience

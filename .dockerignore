@@ -8,6 +8,7 @@ __pycache__
 .git
 .gitignore
 .env
+.env.*
 *.log
 logs/
 collected_static/

@@ -74,21 +74,23 @@ class SSORestaurant(models.Model):
 
 class Worker(models.Model):
     """
-    Leitura do SSO — tabela Colaboradores.
+    Leitura do SSO — tabela Usuários (colaboradores/crew).
     Mac Calendar não escreve nesta tabela; toda a gestão é feita no SSO Portal.
     """
     first_name      = models.CharField(max_length=100)
     last_name       = models.CharField(max_length=100)
-    employee_number = models.CharField(max_length=20)
+    employee_number = models.CharField(max_length=20, blank=True)
     email           = models.EmailField(blank=True)
     phone           = models.CharField(max_length=20, blank=True)
     birth_date      = models.DateField(null=True, blank=True)
     hire_date       = models.DateField(null=True, blank=True)
     address         = models.TextField(blank=True)
     photo_filename  = models.CharField(max_length=255, blank=True)
+    avatar          = models.CharField(max_length=255, blank=True)
     notes           = models.TextField(blank=True)
     job_role        = models.CharField(max_length=100, blank=True)
-    restaurant_id   = models.IntegerField()        # FK para SSO Restaurants (sem constraint cross-DB)
+    role            = models.CharField(max_length=30, blank=True)
+    restaurant_id   = models.IntegerField(null=True, blank=True)
     training_status = models.CharField(max_length=20, blank=True)
     is_active       = models.BooleanField(default=True)
     created_at      = models.DateTimeField()
@@ -97,7 +99,7 @@ class Worker(models.Model):
     objects = SSOManager()
 
     class Meta:
-        db_table = 'Colaboradores'
+        db_table = 'Usuários'
         managed  = False
         ordering = ['first_name', 'last_name']
 

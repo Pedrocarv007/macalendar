@@ -2,13 +2,23 @@
 Main URL configuration for Mac Calendar.
 """
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import path, include
 from django.views.generic import RedirectView
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve as static_serve
 from rest_framework_simplejwt.views import TokenRefreshView
 
+
+def health(_request):
+    return JsonResponse({'status': 'ok'})
+
+
 urlpatterns = [
+    # Health (container / load-balancer probe)
+    path('healthz/', health, name='health'),
+
     # Django Admin
     path('admin/', admin.site.urls),
 
@@ -33,6 +43,12 @@ urlpatterns = [
     # Web / Template routes
     path('', include('apps.dashboard.web_urls')),
 ]
+
+if settings.DEBUG or getattr(settings, 'SERVE_SSO_MEDIA_LOCALLY', False):
+    urlpatterns.insert(
+        -1,
+        path('sso-media/<path:path>', static_serve, {'document_root': settings.SSO_MEDIA_ROOT}),
+    )
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

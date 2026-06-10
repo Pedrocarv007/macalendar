@@ -1,6 +1,16 @@
 from rest_framework import serializers
 from .models import Worker, SSORestaurant
 
+# Cache de restaurantes SSO carregado uma vez por request (evita N+1)
+_REST_CACHE: dict = {}
+
+
+def _get_rest_cache():
+    if not _REST_CACHE:
+        for r in SSORestaurant.objects.all():
+            _REST_CACHE[r.id] = r.name
+    return _REST_CACHE
+
 
 class SSORestaurantSerializer(serializers.ModelSerializer):
     class Meta:
@@ -27,7 +37,7 @@ class WorkerSerializer(serializers.ModelSerializer):
             'age', 'days_until_birthday',
             'created_at', 'updated_at',
         ]
-        read_only_fields = fields  # Mac Calendar é read-only sobre os workers
+        read_only_fields = fields
 
     def get_name(self, obj):
         return obj.name
@@ -42,5 +52,6 @@ class WorkerSerializer(serializers.ModelSerializer):
         return obj.days_until_birthday
 
     def get_restaurant_name(self, obj):
-        rest = SSORestaurant.objects.filter(pk=obj.restaurant_id).first()
-        return rest.name if rest else '—'
+        if not obj.restaurant_id:
+            return '—'
+        return _get_rest_cache().get(obj.restaurant_id, '—')

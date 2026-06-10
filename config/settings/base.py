@@ -6,6 +6,20 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 
+
+def env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def env_list(name, default=''):
+    value = os.getenv(name, default)
+    if not value:
+        return []
+    return [item.strip() for item in value.split(',') if item.strip()]
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -14,8 +28,8 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # SECURITY
 SECRET_KEY = os.getenv('SECRET_KEY')
-DEBUG = os.getenv('DEBUG')
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS')
+DEBUG = env_bool('DEBUG', False)
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS')
 
 APPEND_SLASH = False
 
@@ -53,6 +67,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -119,9 +134,20 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'collected_static'
 
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
+}
+
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# SSO Portal media — URL para o browser e caminho no disco para o gerador de cartões
+# Serve por uma rota local (/sso-media/) para não depender do portal SSO estar online.
+SSO_MEDIA_BASE_URL = os.getenv('SSO_MEDIA_BASE_URL', '/sso-media/')
+SSO_MEDIA_ROOT     = Path(os.getenv('SSO_MEDIA_ROOT', r'I:\server_apps\Thecarv_django\media'))
+SERVE_SSO_MEDIA_LOCALLY = env_bool('SERVE_SSO_MEDIA_LOCALLY', DEBUG)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -154,6 +180,8 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': 'HS256',
+    # JWT_SECRET_KEY env var, fallback to SECRET_KEY for backwards compat
+    'SIGNING_KEY': os.getenv('JWT_SECRET_KEY') or None,  # None → SimpleJWT uses SECRET_KEY
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
@@ -162,8 +190,8 @@ SIMPLE_JWT = {
 
 # CORS
 # --- CORS ---
-cors_hosts = os.getenv('CORS_ALLOWED_ORIGINS')
-CORS_ALLOWED_ORIGINS = [host.strip() for host in cors_hosts.split(',') if host]
+CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS')
+CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
 CORS_ALLOW_CREDENTIALS = True
 
 # Session settings
@@ -177,9 +205,9 @@ CSRF_COOKIE_HTTPONLY = False  # JS needs to read it
 CSRF_COOKIE_SAMESITE = 'Lax'
 
 # Login URL
-LOGIN_URL = 'http://localhost:8886/account/login/'
+LOGIN_URL = 'http://localhost:51/account/login/'
 LOGIN_REDIRECT_URL = '/dashboard'
-LOGOUT_REDIRECT_URL = 'http://localhost:8886/account/login/'
+LOGOUT_REDIRECT_URL = 'http://localhost:51/account/login/'
 
 # Service-to-service API key (used by external systems to call /api/service/ endpoints)
 SERVICE_API_KEY = os.getenv('SERVICE_API_KEY', '')
@@ -191,13 +219,16 @@ TEMPLATES_BASE_DIR = os.getenv('TEMPLATES_BASE_DIR', 'I:/server_apps/macalendar/
 # External services
 THECARV_SSO_URL      = os.getenv('THECARV_SSO_URL')
 THECARV_SSO_SECRET   = os.getenv('THECARV_SSO_SECRET')   # segredo JWT partilhado com o SSO Portal
-THECARV_SSO_PORTAL   = os.getenv('THECARV_SSO_PORTAL', 'http://localhost:8886')
+THECARV_SSO_PORTAL   = os.getenv('THECARV_SSO_PORTAL')
 THECARV_MAIL_URL     = os.getenv('THECARV_MAIL_URL')
 THECARV_MAIL_API_KEY = os.getenv('THECARV_MAIL_API_KEY')
 
 # OpenAI
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 OPENAI_MODEL = os.getenv('OPENAI_MODEL')
+
+# Birthday generation window
+BIRTHDAY_GENERATION_MONTHS_AHEAD = int(os.getenv('BIRTHDAY_GENERATION_MONTHS_AHEAD', '1'))
 
 # Role constants
 ROLE_ADMIN = 'admin'

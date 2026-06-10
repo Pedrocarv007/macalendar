@@ -209,6 +209,20 @@ class SSOCallbackView(View):
         if not user.is_active:
             return HttpResponseBadRequest('Conta inativa.')
 
+        # Sincronizar nome e role com o que o SSO enviou no token
+        changed = []
+        sso_name = payload.get('name', '').strip()
+        sso_role = (payload.get('role') or '').strip()
+        if sso_name and user.name != sso_name:
+            user.name = sso_name
+            changed.append('name')
+        if sso_role and user.role != sso_role:
+            user.role = sso_role
+            changed.append('role')
+        if changed:
+            user.save(update_fields=changed)
+            logger.info('Colaborador %s actualizado via SSO token: %s', email, changed)
+
         user.backend = 'django.contrib.auth.backends.ModelBackend'
         login(request, user)
 
