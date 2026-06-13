@@ -134,4 +134,12 @@ class Worker(models.Model):
     def photo_url(self):
         if self.photo_filename:
             return f'/media/photos/workers/{self.photo_filename}'
+        if self.avatar:
+            # Avatar já é URL completo (ex: Google) → usar como está;
+            # caso contrário é caminho relativo no SSO → servir por /sso-media/.
+            if self.avatar.lower().startswith(('http://', 'https://')):
+                return self.avatar
+            from django.conf import settings
+            base = settings.SSO_MEDIA_BASE_URL.rstrip('/')
+            return f"{base}/{self.avatar.lstrip('/')}"
         return '/static/img/default-avatar.svg'

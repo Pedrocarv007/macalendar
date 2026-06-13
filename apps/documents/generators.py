@@ -144,16 +144,29 @@ def _get_photo(photo_filename, person_type='employee', sso_avatar=None):
     """Return a PIL Image of the person's photo or a placeholder."""
     from PIL import Image, ImageDraw
 
-    # 1. Tentar avatar SSO (caminho direto no disco do SSO portal)
+    # 1. Tentar avatar SSO
     if sso_avatar:
-        sso_root = Path(getattr(settings, 'SSO_MEDIA_ROOT',
-                                r'I:\server_apps\Thecarv_django\media'))
-        path = sso_root / sso_avatar
-        if path.exists():
+        avatar = str(sso_avatar)
+        # 1a. Avatar guardado como URL completo (ex: avatar Google) — descarregar
+        if avatar.lower().startswith(('http://', 'https://')):
             try:
-                return Image.open(str(path)).convert('RGBA')
+                import io
+                import requests
+                resp = requests.get(avatar, timeout=5)
+                resp.raise_for_status()
+                return Image.open(io.BytesIO(resp.content)).convert('RGBA')
             except Exception:
                 pass
+        else:
+            # 1b. Caminho relativo no disco do SSO portal (ex: 'avatars/abel.png')
+            sso_root = Path(getattr(settings, 'SSO_MEDIA_ROOT',
+                                    r'I:\server_apps\Thecarv_django\media'))
+            path = sso_root / avatar
+            if path.exists():
+                try:
+                    return Image.open(str(path)).convert('RGBA')
+                except Exception:
+                    pass
 
     # 2. Tentar foto local (Mac Calendar media)
     if photo_filename:
