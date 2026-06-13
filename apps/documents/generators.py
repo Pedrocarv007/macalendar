@@ -60,9 +60,13 @@ def _safe_text(text):
 
 
 def _load_font(size=40):
-    """Load system font or fall back to PIL default."""
+    """Load a light system font (falls back to regular, then PIL default)."""
     from PIL import ImageFont
     candidates = [
+        'C:/Windows/Fonts/segoeuil.ttf',   # Segoe UI Light
+        'C:/Windows/Fonts/seguisli.ttf',   # Segoe UI Semilight
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-ExtraLight.ttf',
+        '/System/Library/Fonts/HelveticaNeue.ttc',
         'C:/Windows/Fonts/arial.ttf',
         'C:/Windows/Fonts/Arial.ttf',
         '/Windows/Fonts/arial.ttf',
@@ -76,6 +80,18 @@ def _load_font(size=40):
             except Exception:
                 continue
     return ImageFont.load_default()
+
+
+def _fit_font(text, img_width, preferred_size, min_size=60, max_width_fraction=0.82):
+    max_px = int(img_width * max_width_fraction)
+    size = preferred_size
+    while size >= min_size:
+        font = _load_font(size)
+        bbox = font.getbbox(text)
+        if (bbox[2] - bbox[0]) <= max_px:
+            return font
+        size -= 6
+    return _load_font(min_size)
 
 
 def _apply_rounded_corners(image, radius=50):
@@ -182,6 +198,31 @@ def _draw_centered(draw, text, font, y, img_width, fill=(255, 255, 255, 255)):
     draw.text((x, y), text, font=font, fill=fill)
 
 
+def _match_sso_worker(emp):
+    """
+    Encontra o Worker (crew do SSO) correspondente a um Employee, para que os
+    cartões gerados a partir de Funcionários vão buscar o avatar à mesma fonte
+    que o aniversário (worker.avatar).
+
+    Só usa chaves fiáveis — email e employee_number — para não arriscar match
+    errado por homónimos. Devolve o Worker ou None.
+    """
+    from apps.workers.models import Worker
+
+    if getattr(emp, 'email', ''):
+        w = Worker.objects.filter(email__iexact=emp.email).first()
+        if w:
+            return w
+
+    emp_number = getattr(emp, 'employee_number', '') or ''
+    if emp_number:
+        w = Worker.objects.filter(employee_number=emp_number).first()
+        if w:
+            return w
+
+    return None
+
+
 class DocumentGenerator:
 
     def generate(self, template_name, data, user):
@@ -217,7 +258,6 @@ class DocumentGenerator:
 
         if employee_id:
             from apps.accounts.models import Employee
-            from apps.workers.models import Worker
             try:
                 emp = Employee.objects.get(pk=employee_id)
                 if not person_name:
@@ -226,12 +266,16 @@ class DocumentGenerator:
                 birth_date = emp.birth_date
                 hire_date = emp.hire_date
                 person_type = 'employee'
-                # Resolver avatar SSO pelo email — tem prioridade sobre foto local
-                # (mesma lógica de Employee.photo_url; _get_photo tenta SSO antes do local)
-                if emp.email:
-                    w = Worker.objects.filter(email__iexact=emp.email).only('avatar').first()
-                    if w and w.avatar:
-                        sso_avatar = w.avatar
+                # Ir buscar o avatar ao Worker do SSO — exatamente como o aniversário.
+                # _get_photo tenta o avatar SSO antes da foto local.
+                w = _match_sso_worker(emp)
+                if w:
+                    sso_avatar = w.avatar or None
+                    # Fallback: se o Employee não tem foto local, usar a do Worker
+                    # (que vive na pasta 'workers' → ajustar person_type em conformidade).
+                    if not photo_filename and w.photo_filename:
+                        photo_filename = w.photo_filename
+                        person_type = 'worker'
             except Employee.DoesNotExist:
                 pass
         elif worker_id:
@@ -266,6 +310,8 @@ class DocumentGenerator:
         cy = img_h // 2
 
         draw = ImageDraw.Draw(fundo)
+        name_size = max(90, img_w // 12)
+        date_size = max(60, img_w // 18)
 
         # ── Paste photo ───────────────────────────────────────────────
         photo = _get_photo(photo_filename, person_type, sso_avatar=sso_avatar)
@@ -274,24 +320,25 @@ class DocumentGenerator:
 
         # ── Draw text ─────────────────────────────────────────────────
         if template_name == 'birthday':
-            _draw_centered(draw, person_name, _load_font(100), cy + 400, img_w)
-            # Date of birth or today
+            _draw_centered(draw, person_name, _fit_font(person_name, img_w, name_size), cy + 400, img_w)
+            # Birthday day/month with the event year (never the birth year)
+            current_year = data.get('event_year') or datetime.now().year
             if birth_date:
                 if isinstance(birth_date, str):
                     try:
                         from datetime import date
                         bd = date.fromisoformat(birth_date)
-                        date_str = bd.strftime('%d/%m/%Y')
+                        date_str = f"{bd.strftime('%d/%m')}/{current_year}"
                     except Exception:
                         date_str = birth_date
                 else:
-                    date_str = birth_date.strftime('%d/%m/%Y')
+                    date_str = f"{birth_date.strftime('%d/%m')}/{current_year}"
             else:
                 date_str = datetime.now().strftime('%d/%m/%Y')
-            _draw_centered(draw, date_str, _load_font(90), cy + 530, img_w)
+            _draw_centered(draw, date_str, _load_font(date_size), cy + 530, img_w)
 
         elif template_name == 'welcome':
-            _draw_centered(draw, person_name, _load_font(100), cy + 400, img_w)
+            _draw_centered(draw, person_name, _fit_font(person_name, img_w, name_size), cy + 400, img_w)
             if hire_date:
                 if isinstance(hire_date, str):
                     try:
@@ -304,14 +351,14 @@ class DocumentGenerator:
                     date_str = hire_date.strftime('%d/%m/%Y')
             else:
                 date_str = datetime.now().strftime('%d/%m/%Y')
-            _draw_centered(draw, date_str, _load_font(90), cy + 505, img_w)
+            _draw_centered(draw, date_str, _load_font(date_size), cy + 505, img_w)
 
         elif template_name == 'employee_month':
             month_year = _safe_text(data.get('message', '') or datetime.now().strftime('%B %Y'))
             # Month/year at top
-            _draw_centered(draw, month_year, _load_font(100), cy - 450, img_w)
+            _draw_centered(draw, month_year, _fit_font(month_year, img_w, name_size), cy - 450, img_w)
             # Name below photo
-            _draw_centered(draw, person_name, _load_font(100), cy + 540, img_w)
+            _draw_centered(draw, person_name, _fit_font(person_name, img_w, name_size), cy + 540, img_w)
 
         # ── Save ──────────────────────────────────────────────────────
         ts = int(time.time() * 1000)

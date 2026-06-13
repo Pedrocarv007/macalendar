@@ -77,7 +77,8 @@ class BirthdayService:
             # Gerar cartão com a template do restaurante
             card = generator.generate(
                 'birthday',
-                {'worker_id': w.id, 'restaurant_id': restaurant.id, 'person_type': 'worker'},
+                {'worker_id': w.id, 'restaurant_id': restaurant.id, 'person_type': 'worker',
+                 'event_year': year},
                 self.user,
             )
             photo_path = card.get('file_url', '') if isinstance(card, dict) and 'file_url' in card else ''
@@ -170,7 +171,8 @@ class BirthdayService:
                     # Regenerar cartão
                     card = generator.generate(
                         'birthday',
-                        {'worker_id': wkr.id, 'restaurant_id': restaurant.id, 'person_type': 'worker'},
+                        {'worker_id': wkr.id, 'restaurant_id': restaurant.id, 'person_type': 'worker',
+                         'event_year': year},
                         self.user,
                     )
                     if isinstance(card, dict) and 'file_url' in card:

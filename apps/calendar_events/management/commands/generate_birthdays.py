@@ -158,7 +158,7 @@ class Command(BaseCommand):
 
         service = BirthdayService(user=None)
         for event in events.iterator():
-            service._delete_event_card(event, delete_event=True)
+            service._delete_event_and_card(event, delete_event=True)
 
         orphan_docs = Document.objects.filter(id__in=orphan_doc_ids)
         for doc in orphan_docs.iterator():

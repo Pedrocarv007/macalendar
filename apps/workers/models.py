@@ -24,7 +24,6 @@ class SSOUser(models.Model):
     phone          = models.CharField(max_length=30, blank=True)
     department     = models.CharField(max_length=100, blank=True)
     job_title      = models.CharField(max_length=100, blank=True)
-    employee_type  = models.CharField(max_length=30, blank=True)
     birth_date     = models.DateField(null=True, blank=True)
     hire_date      = models.DateField(null=True, blank=True)
     address        = models.TextField(blank=True)

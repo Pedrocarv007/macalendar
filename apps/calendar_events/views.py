@@ -234,7 +234,8 @@ class ServiceBirthdaysView(APIView):
             else:
                 gen = generator.generate(
                     'birthday',
-                    {'worker_id': wkr.id, 'restaurant_id': restaurant_id, 'name': wkr.name},
+                    {'worker_id': wkr.id, 'restaurant_id': restaurant_id, 'name': wkr.name,
+                     'event_year': year},
                     system_user,
                 )
                 if 'error' in gen:
