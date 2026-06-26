@@ -7,6 +7,7 @@ from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.conf import settings
 from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -18,6 +19,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import (
     LoginSerializer, EmployeeDetailSerializer, ProfileUpdateSerializer,
 )
+from .roles import map_sso_role
 from apps.core.models import ActivityLog
 from apps.core.utils import get_client_ip, success_response
 
@@ -195,11 +197,10 @@ class SSOCallbackView(View):
         except Employee.DoesNotExist:
             # Cria o colaborador automaticamente se vier do SSO
             name = payload.get('name', email.split('@')[0])
-            parts = name.split()
             user = Employee(
                 email=email,
                 name=name,
-                role=payload.get('role', 'employee') or 'employee',
+                role=map_sso_role(payload.get('role')),
                 is_active=True,
             )
             user.set_unusable_password()
@@ -212,13 +213,15 @@ class SSOCallbackView(View):
         # Sincronizar nome e role com o que o SSO enviou no token
         changed = []
         sso_name = payload.get('name', '').strip()
-        sso_role = (payload.get('role') or '').strip()
+        raw_role = (payload.get('role') or '').strip()
         if sso_name and user.name != sso_name:
             user.name = sso_name
             changed.append('name')
-        if sso_role and user.role != sso_role:
-            user.role = sso_role
-            changed.append('role')
+        if raw_role:
+            mapped_role = map_sso_role(raw_role)
+            if user.role != mapped_role:
+                user.role = mapped_role
+                changed.append('role')
         if changed:
             user.save(update_fields=changed)
             logger.info('Colaborador %s actualizado via SSO token: %s', email, changed)
@@ -235,5 +238,13 @@ class SSOCallbackView(View):
             user_agent=request.META.get('HTTP_USER_AGENT', ''),
         )
 
+        # Validar o parametro `next` para evitar open redirect:
+        # so aceitamos caminhos internos / o proprio host da aplicacao.
         next_url = request.GET.get('next') or '/dashboard'
+        if not url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            next_url = '/dashboard'
         return redirect(next_url)

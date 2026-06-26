@@ -6,6 +6,8 @@ import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from .roles import map_sso_role
+
 logger = logging.getLogger(__name__)
 
 Employee = get_user_model()
@@ -57,7 +59,7 @@ class TheCarVSSOBackend:
         except Employee.DoesNotExist:
             # Primeira autenticação via SSO — cria o registo local automaticamente
             name = data.get('name') or sso_email.split('@')[0]
-            role = data.get('role') or 'employee'
+            role = map_sso_role(data.get('role'))
             user = Employee(
                 email=sso_email,
                 name=name,
@@ -74,13 +76,15 @@ class TheCarVSSOBackend:
         # Actualiza nome e role se o SSO devolver dados diferentes
         changed = []
         sso_name = data.get('name')
-        sso_role = data.get('role')
+        raw_role = data.get('role')
         if sso_name and user.name != sso_name:
             user.name = sso_name
             changed.append('name')
-        if sso_role and user.role != sso_role:
-            user.role = sso_role
-            changed.append('role')
+        if raw_role:
+            mapped_role = map_sso_role(raw_role)
+            if user.role != mapped_role:
+                user.role = mapped_role
+                changed.append('role')
         if changed:
             user.save(update_fields=changed)
 
