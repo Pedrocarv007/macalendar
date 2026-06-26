@@ -40,11 +40,6 @@ def tickets_page(request):
     return render(request, 'tickets/index.html')
 
 
-@login_required
-def profile_page(request):
-    return render(request, 'auth/profile.html')
-
-
 urlpatterns = [
     path('', lambda req: redirect('/dashboard'), name='index'),
     path('splash', splash, name='splash'),
@@ -54,7 +49,6 @@ urlpatterns = [
     path('documents', documents_page, name='documents'),
     path('notifications', notifications_page, name='notifications'),
     path('tickets', tickets_page, name='tickets'),
-    path('profile', profile_page, name='profile'),
     path('auth/login', auth_views.LoginView.as_view(template_name='auth/login.html'), name='login'),
     path('auth/logout', auth_views.LogoutView.as_view(next_page=settings.LOGOUT_REDIRECT_URL), name='logout'),
     path('auth/sso/callback', SSOCallbackView.as_view(), name='sso-callback'),
