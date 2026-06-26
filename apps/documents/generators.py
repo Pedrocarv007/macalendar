@@ -2,6 +2,7 @@
 Document generation using PIL/Pillow with real PNG templates.
 Templates are loaded from the shared templates_generate/ folder.
 """
+import logging
 import os
 import time
 import uuid
@@ -10,6 +11,7 @@ from pathlib import Path
 
 from django.conf import settings
 
+logger = logging.getLogger(__name__)
 
 TEMPLATES_BASE = Path(getattr(settings, 'TEMPLATES_BASE_DIR'))
 
@@ -82,15 +84,19 @@ def _load_font(size=40):
     return ImageFont.load_default()
 
 
-def _fit_font(text, img_width, preferred_size, min_size=60, max_width_fraction=0.82):
-    max_px = int(img_width * max_width_fraction)
+def _fit_font(text, max_w, preferred_size, min_size=34, max_h=None):
+    """Maior fonte (<= preferred_size) cujo texto cabe em max_w píxeis (e, se
+    indicado, em max_h). Encolhe até min_size para o texto ficar sempre dentro
+    do seu container (caixa verde)."""
     size = preferred_size
     while size >= min_size:
         font = _load_font(size)
         bbox = font.getbbox(text)
-        if (bbox[2] - bbox[0]) <= max_px:
+        w = bbox[2] - bbox[0]
+        h = bbox[3] - bbox[1]
+        if w <= max_w and (max_h is None or h <= max_h):
             return font
-        size -= 6
+        size -= 4
     return _load_font(min_size)
 
 
@@ -140,6 +146,87 @@ def _get_template_image(template_name, restaurant_name):
     return Image.new('RGBA', (1920, 1280), color=(60, 60, 60, 255))
 
 
+# Limites/segurança para descarregar avatares remotos (defesa contra SSRF).
+_REMOTE_IMAGE_MAX_BYTES = 8 * 1024 * 1024  # 8 MB
+_REMOTE_IMAGE_TIMEOUT = 5                   # segundos
+
+
+def _host_is_public(hostname):
+    """True só se TODOS os IPs resolvidos do host forem públicos. Bloqueia
+    loopback, redes privadas, link-local (ex.: 169.254.169.254 metadata),
+    reservados e multicast — mitiga SSRF contra infraestrutura interna."""
+    import ipaddress
+    import socket
+
+    if not hostname:
+        return False
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return False
+    for info in infos:
+        try:
+            addr = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return False
+        if (addr.is_private or addr.is_loopback or addr.is_link_local
+                or addr.is_reserved or addr.is_multicast or addr.is_unspecified):
+            return False
+    return True
+
+
+def _fetch_remote_image(url):
+    """Descarrega uma imagem de um URL http(s) de forma segura.
+
+    Mitigações SSRF: valida o esquema, exige host público, NÃO segue redirects
+    (impede salto público→interno), limita o tamanho e exige content-type de
+    imagem. Devolve um PIL.Image (RGBA) ou None se falhar/for recusado.
+    """
+    import io
+    from urllib.parse import urlparse
+
+    import requests
+    from PIL import Image
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ('http', 'https') or not parsed.hostname:
+        return None
+    if not _host_is_public(parsed.hostname):
+        logger.warning('Avatar remoto recusado (host nao publico): %s', parsed.hostname)
+        return None
+
+    try:
+        resp = requests.get(
+            url,
+            timeout=_REMOTE_IMAGE_TIMEOUT,
+            allow_redirects=False,
+            stream=True,
+            headers={'Accept': 'image/*'},
+        )
+    except requests.RequestException:
+        return None
+
+    try:
+        if resp.status_code != 200:
+            return None
+        if not resp.headers.get('Content-Type', '').lower().startswith('image/'):
+            return None
+        data = bytearray()
+        for chunk in resp.iter_content(8192):
+            data.extend(chunk)
+            if len(data) > _REMOTE_IMAGE_MAX_BYTES:
+                logger.warning('Avatar remoto excede %s bytes: %s',
+                               _REMOTE_IMAGE_MAX_BYTES, parsed.hostname)
+                return None
+    finally:
+        resp.close()
+
+    try:
+        return Image.open(io.BytesIO(bytes(data))).convert('RGBA')
+    except Exception:
+        return None
+
+
 def _get_photo(photo_filename, person_type='employee', sso_avatar=None):
     """Return a PIL Image of the person's photo or a placeholder."""
     from PIL import Image, ImageDraw
@@ -148,15 +235,11 @@ def _get_photo(photo_filename, person_type='employee', sso_avatar=None):
     if sso_avatar:
         avatar = str(sso_avatar)
         # 1a. Avatar guardado como URL completo (ex: avatar Google) — descarregar
+        #     de forma segura (ver _fetch_remote_image: bloqueia hosts internos/SSRF).
         if avatar.lower().startswith(('http://', 'https://')):
-            try:
-                import io
-                import requests
-                resp = requests.get(avatar, timeout=5)
-                resp.raise_for_status()
-                return Image.open(io.BytesIO(resp.content)).convert('RGBA')
-            except Exception:
-                pass
+            img = _fetch_remote_image(avatar)
+            if img is not None:
+                return img
         else:
             # 1b. Caminho relativo no disco do SSO portal (ex: 'avatars/abel.png')
             sso_root = Path(getattr(settings, 'SSO_MEDIA_ROOT',
@@ -203,12 +286,38 @@ def _paste_photo(fundo, photo_img, cx, cy, offset_y=-50):
     fundo.paste(photo, (x, y), mask=photo)
 
 
-def _draw_centered(draw, text, font, y, img_width, fill=(255, 255, 255, 255)):
-    """Draw text centred horizontally at the given y position."""
-    bbox = font.getbbox(text)
-    w = bbox[2] - bbox[0]
-    x = (img_width - w) // 2
-    draw.text((x, y), text, font=font, fill=fill)
+def _draw_centered(draw, text, font, cy, img_width, fill=(255, 255, 255, 255)):
+    """Centra o texto horizontalmente na imagem e verticalmente em cy (centro
+    da caixa). cy é o CENTRO vertical, não o topo."""
+    try:
+        draw.text((img_width // 2, cy), text, font=font, anchor='mm', fill=fill)
+    except (TypeError, ValueError):
+        # Fonte bitmap (load_default) não suporta anchor — centrar manualmente.
+        bbox = font.getbbox(text)
+        w = bbox[2] - bbox[0]
+        h = bbox[3] - bbox[1]
+        draw.text(((img_width - w) // 2, cy - h // 2), text, font=font, fill=fill)
+
+
+def _norm_name(name):
+    """Normaliza um nome para comparação: sem acentos, sem espaços extra, minúsculas."""
+    return ' '.join(_safe_text(name or '').split()).lower()
+
+
+def _sso_restaurant_id(restaurant):
+    """Resolve o id do restaurante na BD do SSO (mesma lógica do BirthdayService)."""
+    if not restaurant:
+        return None
+    sso_id = getattr(restaurant, 'sso_id', None)
+    if sso_id:
+        return sso_id
+    from apps.workers.models import SSORestaurant
+    sso_rest = SSORestaurant.objects.filter(name__iexact=restaurant.name).first()
+    if not sso_rest and restaurant.name:
+        sso_rest = SSORestaurant.objects.filter(
+            name__icontains=restaurant.name.split()[0]
+        ).first()
+    return sso_rest.id if sso_rest else None
 
 
 def _match_sso_worker(emp):
@@ -217,8 +326,9 @@ def _match_sso_worker(emp):
     cartões gerados a partir de Funcionários vão buscar o avatar à mesma fonte
     que o aniversário (worker.avatar).
 
-    Só usa chaves fiáveis — email e employee_number — para não arriscar match
-    errado por homónimos. Devolve o Worker ou None.
+    Ordem de match (da chave mais fiável para a menos): email → nº funcionário →
+    nome, este último só dentro do mesmo restaurante e só se houver um único
+    Worker com esse nome (evita match errado por homónimos). Devolve o Worker ou None.
     """
     from apps.workers.models import Worker
 
@@ -232,6 +342,19 @@ def _match_sso_worker(emp):
         w = Worker.objects.filter(employee_number=emp_number).first()
         if w:
             return w
+
+    # Fallback por nome — restrito ao mesmo restaurante e só se for único.
+    # (Worker.name é uma property, não coluna → comparar em Python sobre a crew
+    # do restaurante, que é um conjunto pequeno.)
+    target = _norm_name(getattr(emp, 'name', ''))
+    sso_id = _sso_restaurant_id(getattr(emp, 'restaurant', None))
+    if target and sso_id:
+        candidates = [
+            w for w in Worker.objects.filter(restaurant_id=sso_id, is_active=True)
+            if _norm_name(w.name) == target
+        ]
+        if len(candidates) == 1:
+            return candidates[0]
 
     return None
 
@@ -326,6 +449,17 @@ class DocumentGenerator:
         name_size = max(90, img_w // 12)
         date_size = max(60, img_w // 18)
 
+        # Geometria das caixas verdes (medida nos templates 1000x1500, em frações
+        # para escalar). Caixa de texto: x 0.228–0.772 (largura ~544px).
+        box_w = int(img_w * 0.46)    # largura útil dentro da caixa verde (~460px)
+        name_w = int(img_w * 0.62)   # nome na área aberta acima da caixa (~620px)
+        box_h = int(img_h * 0.042)   # altura útil dentro de uma caixa (~63px)
+        y_name_open = int(img_h * 0.797)      # nome (aniversário/boas-vindas), área aberta
+        y_box_bottom = int(img_h * 0.872)     # caixa inferior: data (aniversário)
+        y_box_welcome = int(img_h * 0.857)    # boas-vindas: caixa inferior fica ~22px mais acima
+        y_box_fm_top = int(img_h * 0.219)     # funcionário do mês: caixa do topo (mês/ano)
+        y_box_fm_bottom = int(img_h * 0.885)  # funcionário do mês: caixa inferior (nome)
+
         # ── Paste photo ───────────────────────────────────────────────
         photo = _get_photo(photo_filename, person_type, sso_avatar=sso_avatar)
         photo_offset = 50 if template_name == 'employee_month' else -50
@@ -333,7 +467,9 @@ class DocumentGenerator:
 
         # ── Draw text ─────────────────────────────────────────────────
         if template_name == 'birthday':
-            _draw_centered(draw, person_name, _fit_font(person_name, img_w, name_size), cy + 400, img_w)
+            # Nome na área aberta acima da caixa; data centrada dentro da caixa verde.
+            _draw_centered(draw, person_name, _fit_font(person_name, name_w, name_size),
+                           y_name_open, img_w)
             # Birthday day/month with the event year (never the birth year)
             current_year = data.get('event_year') or datetime.now().year
             if birth_date:
@@ -348,10 +484,12 @@ class DocumentGenerator:
                     date_str = f"{birth_date.strftime('%d/%m')}/{current_year}"
             else:
                 date_str = datetime.now().strftime('%d/%m/%Y')
-            _draw_centered(draw, date_str, _load_font(date_size), cy + 530, img_w)
+            _draw_centered(draw, date_str, _fit_font(date_str, box_w, date_size, max_h=box_h),
+                           y_box_bottom, img_w)
 
         elif template_name == 'welcome':
-            _draw_centered(draw, person_name, _fit_font(person_name, img_w, name_size), cy + 400, img_w)
+            _draw_centered(draw, person_name, _fit_font(person_name, name_w, name_size),
+                           y_name_open, img_w)
             if hire_date:
                 if isinstance(hire_date, str):
                     try:
@@ -364,14 +502,16 @@ class DocumentGenerator:
                     date_str = hire_date.strftime('%d/%m/%Y')
             else:
                 date_str = datetime.now().strftime('%d/%m/%Y')
-            _draw_centered(draw, date_str, _load_font(date_size), cy + 505, img_w)
+            _draw_centered(draw, date_str, _fit_font(date_str, box_w, date_size, max_h=box_h),
+                           y_box_bottom, img_w)
 
         elif template_name == 'employee_month':
             month_year = _safe_text(data.get('message', '') or datetime.now().strftime('%B %Y'))
-            # Month/year at top
-            _draw_centered(draw, month_year, _fit_font(month_year, img_w, name_size), cy - 450, img_w)
-            # Name below photo
-            _draw_centered(draw, person_name, _fit_font(person_name, img_w, name_size), cy + 540, img_w)
+            # Mês/ano na caixa do topo, nome na caixa inferior — ambos dentro da caixa.
+            _draw_centered(draw, month_year, _fit_font(month_year, box_w, name_size, max_h=box_h),
+                           y_box_fm_top, img_w)
+            _draw_centered(draw, person_name, _fit_font(person_name, box_w, name_size, max_h=box_h),
+                           y_box_fm_bottom, img_w)
 
         # ── Save ──────────────────────────────────────────────────────
         ts = int(time.time() * 1000)
