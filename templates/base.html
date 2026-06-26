@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="/static/css/app.css?v=2">
+  <link rel="stylesheet" href="/static/css/app.css?v=3">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -66,28 +66,31 @@
 
         <!-- Notifications -->
         <li class="nav-item me-1">
-          <a class="nav-link position-relative" href="/notifications">
-            <i class="fas fa-bell fa-lg"></i>
+          <a class="nav-link position-relative" href="/notifications" aria-label="Notificações">
+            <i class="fas fa-bell fa-lg" aria-hidden="true"></i>
             <span x-show="unreadCount > 0" x-text="unreadCount"
               class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-              style="font-size:0.6rem"></span>
+              style="font-size:0.6rem" :aria-label="unreadCount + ' notificações por ler'"></span>
           </a>
         </li>
 
         <!-- Dark Mode Toggle -->
         <li class="nav-item me-2">
-          <button @click="toggleDark()" class="btn btn-ghost btn-sm" title="Alternar tema" style="height:34px">
-            <i x-show="!darkMode" class="fas fa-moon"></i>
-            <i x-show="darkMode" class="fas fa-sun"></i>
+          <button @click="toggleDark()" type="button" class="btn btn-ghost btn-sm" style="height:34px"
+            :title="darkMode ? 'Ativar tema claro' : 'Ativar tema escuro'"
+            :aria-label="darkMode ? 'Ativar tema claro' : 'Ativar tema escuro'">
+            <i x-show="!darkMode" class="fas fa-moon" aria-hidden="true"></i>
+            <i x-show="darkMode" class="fas fa-sun" aria-hidden="true"></i>
           </button>
         </li>
 
         <!-- User Dropdown -->
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#"
-            id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"
+            aria-label="Menu do utilizador">
             <img src="{{ user.photo_url }}" alt="{{ user.name }}"
-              class="rounded-circle" style="width:34px;height:34px;object-fit:cover;border:2px solid rgba(0,166,81,0.3)">
+              class="rounded-circle" style="width:34px;height:34px;object-fit:cover;border:2px solid var(--gold-glow)">
             <span class="d-none d-lg-block" style="font-weight:600;font-size:0.9rem">{{ user.name }}</span>
           </a>
           <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
@@ -97,19 +100,19 @@
             </li>
             <li><hr class="dropdown-divider"></li>
             <li>
-              <a class="dropdown-item" href="/profile">
-                <i class="fas fa-user me-2"></i>Meu Perfil
+              <a class="dropdown-item" href="{{ sso_profile_url }}">
+                <i class="fas fa-user me-2" aria-hidden="true"></i>Meu Perfil
               </a>
             </li>
             <li>
               <a class="dropdown-item" href="/tickets">
-                <i class="fas fa-ticket-alt me-2"></i>Suporte
+                <i class="fas fa-ticket-alt me-2" aria-hidden="true"></i>Suporte
               </a>
             </li>
             <li><hr class="dropdown-divider"></li>
             <li>
-              <a class="dropdown-item text-danger" href="/auth/logout">
-                <i class="fas fa-sign-out-alt me-2"></i>Sair
+              <a class="dropdown-item" href="{{ sso_home_url }}" title="Voltar ao portal TheCarV">
+                <i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Sair
               </a>
             </li>
           </ul>

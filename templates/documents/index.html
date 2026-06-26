@@ -54,7 +54,7 @@
       <div class="card" style="transition:box-shadow 150ms">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
           <div style="width:38px;height:38px;border-radius:9px;background:var(--gold-light);display:flex;align-items:center;justify-content:center">
-            <svg style="width:18px;height:18px;color:var(--gold)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg style="width:18px;height:18px;color:var(--gold-dark)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
             </svg>
           </div>
@@ -63,7 +63,7 @@
         <p style="font-size:13px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="doc.title"></p>
         <p class="text-xs text-muted" style="margin-top:3px" x-text="doc.file_size_display || '—'"></p>
         <div style="display:flex;gap:10px;margin-top:12px">
-          <a :href="`/api/documents/${doc.id}/download`" class="btn btn-ghost btn-sm" style="color:var(--gold);padding:0">Download</a>
+          <a :href="`/api/documents/${doc.id}/download`" class="btn btn-ghost btn-sm" style="color:var(--gold-dark);padding:0">Download</a>
           <button @click="deleteDoc(doc.id)" class="btn btn-ghost btn-sm" style="color:#ef4444;padding:0;margin-left:auto">Apagar</button>
         </div>
       </div>
