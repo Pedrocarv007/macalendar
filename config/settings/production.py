@@ -43,7 +43,8 @@ SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = 'None'  # Cross-site SSO redirect chain requires SameSite=None
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = 'None'
-SECURE_BROWSER_XSS_FILTER = True
+# X-XSS-Protection esta deprecated (recomendacao OWASP/Django moderno): nao emitir.
+SECURE_BROWSER_XSS_FILTER = False
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # SSO portal (production)

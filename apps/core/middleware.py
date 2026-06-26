@@ -20,12 +20,13 @@ class SecurityHeadersMiddleware:
 
         response['X-Content-Type-Options'] = 'nosniff'
         response['X-Frame-Options'] = 'SAMEORIGIN'
-        response['X-XSS-Protection'] = '1; mode=block'
         response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
-
-        if not settings.DEBUG:
-            response['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        # Nota: X-XSS-Protection foi deliberadamente removido — esta deprecated e
+        # pode introduzir vulnerabilidades em browsers antigos (recomendacao OWASP).
+        # HSTS (Strict-Transport-Security) e tratado pelo SecurityMiddleware do Django
+        # via SECURE_HSTS_* nas settings de producao (inclui preload + includeSubDomains),
+        # para evitar headers duplicados/conflituosos.
 
         return response
 
