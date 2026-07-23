@@ -10,6 +10,8 @@ from django.conf.urls.static import static
 from django.views.static import serve as static_serve
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from apps.core.service_views import ServiceEmployeeOfMonthView
+
 
 def health(_request):
     return JsonResponse({'status': 'ok'})
@@ -37,6 +39,11 @@ urlpatterns = [
     path('api/documents/', include('apps.documents.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
     path('api/workers/', include('apps.workers.urls')),
+    path(
+        'api/dashboard/service/employee-of-month',
+        ServiceEmployeeOfMonthView.as_view(),
+        name='service-employee-of-month',
+    ),
 
     # Web / Template routes
     path('', include('apps.core.web_urls')),
