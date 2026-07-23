@@ -1,5 +1,5 @@
 x-calendar-service: &calendar-service
-  image: pedrocarv06/macalendar:2026.07.23-mc
+  image: pedrocarv06/macalendar:2026.07.23-mc2
   env_file:
     - .env
   environment:

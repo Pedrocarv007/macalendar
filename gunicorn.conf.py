@@ -8,3 +8,4 @@ keepalive = int(os.getenv('GUNICORN_KEEPALIVE', '5'))
 accesslog = '-'
 errorlog = '-'
 loglevel = os.getenv('GUNICORN_LOG_LEVEL', 'info')
+control_socket_disable = True
