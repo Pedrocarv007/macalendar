@@ -1,147 +1,140 @@
 <!DOCTYPE html>
-<html lang="pt" x-data="appState()" :class="{ 'dark': darkMode }">
+<html lang="pt-PT" x-data="appState()" :class="{ 'dark': darkMode }">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="csrftoken" content="{{ csrf_token }}">
   <meta name="user-role" content="{{ user.role }}">
   <meta name="user-restaurant-id" content="{{ user.restaurant_id|default:'' }}">
-  <title>{% block title %}Mac Calendar{% endblock %} — TheCarv</title>
-  <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+  <title>{% block title %}{{ current_module.label }}{% endblock %} — {{ interface_config.produto }}</title>
+  <link rel="icon" type="image/png" href="/static/img/thecarv-logo.png">
 
-  <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Font Awesome -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Custom CSS -->
-  <link rel="stylesheet" href="/static/css/app.css?v=3">
+  <link rel="stylesheet" href="/static/css/app.css?v={{ interface_config.versao_estatica }}">
+  {% if current_module.stylesheet %}
+  <link rel="stylesheet" href="{{ current_module.stylesheet }}?v={{ interface_config.versao_estatica }}">
+  {% endif %}
   {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="module-{{ current_module.key }}"
+  style="--module-accent:{{ current_module.accent }};--module-accent-soft:{{ current_module.accent_soft }};--module-accent-text:{{ current_module.accent_text }}">
 
-<!-- ═══ NAVBAR ═══ -->
-<nav class="navbar navbar-expand-lg navbar-light sticky-top">
-  <div class="container-fluid">
-
-    <!-- Brand -->
-    <a class="navbar-brand" href="/dashboard">
-      <i class="fas fa-calendar-alt"></i>
-      Mac Calendar
+<nav class="navbar navbar-expand-lg sticky-top app-navbar" aria-label="Navegação principal">
+  <div class="container-fluid app-navbar-inner">
+    <a class="navbar-brand app-brand" href="/calendar" aria-label="Abrir o calendário">
+      <span class="app-brand-mark" aria-hidden="true">
+        <img src="/static/img/thecarv-logo.png" alt="">
+      </span>
+      <span>
+        <strong>{{ interface_config.produto }}</strong>
+        <small>{{ interface_config.organizacao }}</small>
+      </span>
     </a>
 
-    <!-- Mobile Toggle -->
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-      aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      aria-controls="navbarNav" aria-expanded="false" aria-label="Abrir ou fechar a navegação">
       <span class="navbar-toggler-icon"></span>
     </button>
 
-    <!-- Nav Links -->
     <div class="collapse navbar-collapse" id="navbarNav">
-      {% with request.resolver_match.url_name as url %}
-
-      <ul class="navbar-nav me-auto">
+      <ul class="navbar-nav app-primary-nav">
+        {% for module in primary_modules %}
         <li class="nav-item">
-          <a class="nav-link {% if url == 'dashboard' %}active{% endif %}" href="/dashboard">
-            <i class="fas fa-home me-1"></i>Dashboard
+          <a class="nav-link {% if current_module.key == module.key %}active{% endif %}"
+            href="{{ module.route }}"
+            {% if current_module.key == module.key %}aria-current="page"{% endif %}>
+            <i class="fa-solid {{ module.icon }}" aria-hidden="true"></i>
+            <span>{{ module.short_label }}</span>
           </a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link {% if url == 'calendar' %}active{% endif %}" href="/calendar">
-            <i class="fas fa-calendar me-1"></i>Calendário
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if url == 'documents' %}active{% endif %}" href="/documents">
-            <i class="fas fa-file-alt me-1"></i>Documentos
-          </a>
-        </li>
+        {% endfor %}
       </ul>
 
-      <!-- Right Side -->
-      <ul class="navbar-nav ms-auto align-items-center">
-
-        <!-- Notifications -->
-        <li class="nav-item me-1">
-          <a class="nav-link position-relative" href="/notifications" aria-label="Notificações">
-            <i class="fas fa-bell fa-lg" aria-hidden="true"></i>
-            <span x-show="unreadCount > 0" x-text="unreadCount"
-              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-              style="font-size:0.6rem" :aria-label="unreadCount + ' notificações por ler'"></span>
+      <ul class="navbar-nav app-utility-nav">
+        <li class="nav-item">
+          <a class="nav-link support-link" href="{{ support_link.route }}">
+            <i class="fa-solid {{ support_link.icon }}" aria-hidden="true"></i>
+            <span>{{ support_link.label }}</span>
           </a>
         </li>
-
-        <!-- Dark Mode Toggle -->
-        <li class="nav-item me-2">
-          <button @click="toggleDark()" type="button" class="btn btn-ghost btn-sm" style="height:34px"
-            :title="darkMode ? 'Ativar tema claro' : 'Ativar tema escuro'"
-            :aria-label="darkMode ? 'Ativar tema claro' : 'Ativar tema escuro'">
-            <i x-show="!darkMode" class="fas fa-moon" aria-hidden="true"></i>
-            <i x-show="darkMode" class="fas fa-sun" aria-hidden="true"></i>
+        <li class="nav-item">
+          <a class="nav-link notification-link {% if current_module.key == 'notifications' %}active{% endif %}"
+            href="{{ notifications_module.route }}" title="Notificações" aria-label="Abrir notificações">
+            <i class="fa-solid {{ notifications_module.icon }}" aria-hidden="true"></i>
+            <span x-show="unreadCount > 0" x-text="unreadCount"
+              class="notification-count" aria-label="Notificações por ler"></span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <button @click="toggleDark()" class="nav-link theme-toggle"
+            :title="darkMode ? 'Usar tema claro' : 'Usar tema escuro'"
+            :aria-label="darkMode ? 'Usar tema claro' : 'Usar tema escuro'">
+            <i x-show="!darkMode" class="fa-solid fa-moon" aria-hidden="true"></i>
+            <i x-show="darkMode" class="fa-solid fa-sun" aria-hidden="true"></i>
           </button>
         </li>
-
-        <!-- User Dropdown -->
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#"
-            id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"
-            aria-label="Menu do utilizador">
-            <img src="{{ user.photo_url }}" alt="{{ user.name }}"
-              class="rounded-circle" style="width:34px;height:34px;object-fit:cover;border:2px solid var(--gold-glow)">
-            <span class="d-none d-lg-block" style="font-weight:600;font-size:0.9rem">{{ user.name }}</span>
+        <li class="nav-item dropdown user-menu">
+          <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+            data-bs-toggle="dropdown" aria-expanded="false">
+            <img src="{{ user.photo_url }}" alt="Fotografia de {{ user.name }}" class="user-avatar">
+            <span class="user-name">{{ user.name }}</span>
           </a>
           <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
             <li class="dropdown-header">
-              <strong>{{ user.name }}</strong><br>
-              <small class="text-muted">{{ user.get_role_display }}</small>
+              <strong>{{ user.name }}</strong>
+              <small>{{ user.get_role_display }}</small>
             </li>
             <li><hr class="dropdown-divider"></li>
             <li>
               <a class="dropdown-item" href="{{ sso_profile_url }}">
-                <i class="fas fa-user me-2" aria-hidden="true"></i>Meu Perfil
+                <i class="fa-solid fa-user"></i> O meu perfil
               </a>
             </li>
             <li>
-              <a class="dropdown-item" href="/tickets">
-                <i class="fas fa-ticket-alt me-2" aria-hidden="true"></i>Suporte
+              <a class="dropdown-item" href="{{ support_link.route }}">
+                <i class="fa-solid fa-headset"></i> Suporte
               </a>
             </li>
             <li><hr class="dropdown-divider"></li>
             <li>
-              <a class="dropdown-item" href="{{ sso_home_url }}" title="Voltar ao portal TheCarV">
-                <i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Sair
+              <a class="dropdown-item text-danger" href="/auth/logout">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> Sair
               </a>
             </li>
           </ul>
         </li>
-
       </ul>
-      {% endwith %}
     </div>
   </div>
 </nav>
 
-<!-- ═══ MAIN CONTENT ═══ -->
-<main class="container-fluid py-4">
-
-  <!-- Page Title -->
-  <div class="mb-3">
-    <h4 class="text-gradient mb-0">{% block page_title %}{% endblock %}</h4>
-  </div>
+<main class="app-main">
+  <header class="page-header">
+    <div class="page-heading">
+      <span class="page-heading-icon">
+        <i class="fa-solid {{ current_module.icon }}" aria-hidden="true"></i>
+      </span>
+      <div>
+        <p class="page-eyebrow">{{ interface_config.produto }}</p>
+        <h1>{% block page_title %}{{ current_module.label }}{% endblock %}</h1>
+        {% if current_module.description %}
+        <p class="page-description">{{ current_module.description }}</p>
+        {% endif %}
+      </div>
+    </div>
+    {% block page_actions %}{% endblock %}
+  </header>
 
   {% block content %}{% endblock %}
 </main>
 
-<!-- Bootstrap Bundle (Popper included) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<!-- Alpine.js -->
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<script src="/static/js/app.js"></script>
-<script src="/static/js/splash.js"></script>
+<script src="/static/js/app.js?v={{ interface_config.versao_estatica }}"></script>
 {% block extra_scripts %}{% endblock %}
-
+{% if current_module.script %}
+<script src="{{ current_module.script }}?v={{ interface_config.versao_estatica }}"></script>
+{% endif %}
 </body>
 </html>

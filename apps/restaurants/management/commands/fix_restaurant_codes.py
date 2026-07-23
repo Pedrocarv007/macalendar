@@ -54,7 +54,6 @@ FK_TABLES = [
     'documents_document',
     'calendar_events_calendarevent',
     'notifications_notification',
-    'tickets_ticket',
 ]
 
 # Ids locais a apagar depois do remap (sem referências ou duplicados)

@@ -1,5 +1,5 @@
 """
-WSGI config for Mac Calendar project.
+Configuração WSGI do projeto MC.
 """
 import os
 from django.core.wsgi import get_wsgi_application

@@ -10,19 +10,19 @@ class ActivityLog(models.Model):
     Audit log for all significant actions in the system.
     """
     ACTIVITY_TYPES = [
-        ('login', 'Login'),
-        ('logout', 'Logout'),
-        ('create', 'Create'),
-        ('update', 'Update'),
-        ('delete', 'Delete'),
-        ('view', 'View'),
-        ('upload', 'Upload'),
-        ('download', 'Download'),
-        ('generate', 'Generate'),
-        ('send', 'Send'),
-        ('reset_password', 'Reset Password'),
-        ('status_change', 'Status Change'),
-        ('error', 'Error'),
+        ('login', 'Entrada'),
+        ('logout', 'Saída'),
+        ('create', 'Criação'),
+        ('update', 'Atualização'),
+        ('delete', 'Eliminação'),
+        ('view', 'Consulta'),
+        ('upload', 'Carregamento'),
+        ('download', 'Transferência'),
+        ('generate', 'Geração'),
+        ('send', 'Envio'),
+        ('reset_password', 'Reposição da palavra-passe'),
+        ('status_change', 'Alteração de estado'),
+        ('error', 'Erro'),
     ]
 
     activity_type = models.CharField(max_length=50, choices=ACTIVITY_TYPES)
@@ -49,8 +49,8 @@ class ActivityLog(models.Model):
 
     class Meta:
         ordering = ['-created_at']
-        verbose_name = 'Activity Log'
-        verbose_name_plural = 'Activity Logs'
+        verbose_name = 'Registo de atividade'
+        verbose_name_plural = 'Registos de atividade'
         indexes = [
             models.Index(fields=['user', 'created_at']),
             models.Index(fields=['activity_type', 'created_at']),
@@ -58,7 +58,7 @@ class ActivityLog(models.Model):
         ]
 
     def __str__(self):
-        user_str = self.user.name if self.user else 'Anonymous'
+        user_str = self.user.name if self.user else 'Anónimo'
         return f"[{self.activity_type}] {user_str} — {self.description[:60]}"
 
     @staticmethod

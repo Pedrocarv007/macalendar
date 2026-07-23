@@ -13,7 +13,7 @@ class EmployeeManager(BaseUserManager):
 
     def create_user(self, email, password=None, **extra_fields):
         if not email:
-            raise ValueError('Email address is required.')
+            raise ValueError('O endereço de email é obrigatório.')
         email = self.normalize_email(email)
         extra_fields.setdefault('is_active', True)
         extra_fields.setdefault('role', 'employee')
@@ -32,9 +32,9 @@ class EmployeeManager(BaseUserManager):
         extra_fields.setdefault('is_active', True)
 
         if extra_fields.get('is_staff') is not True:
-            raise ValueError('Superuser must have is_staff=True.')
+            raise ValueError('O administrador principal tem de pertencer à equipa.')
         if extra_fields.get('is_superuser') is not True:
-            raise ValueError('Superuser must have is_superuser=True.')
+            raise ValueError('O administrador principal tem de ter privilégios totais.')
 
         return self.create_user(email, password, **extra_fields)
 
@@ -47,17 +47,21 @@ class EmployeeManager(BaseUserManager):
 
 class Employee(AbstractBaseUser, PermissionsMixin):
     """
-    Custom user model for Mac Calendar.
+    Modelo de utilizador do MC.
     Uses email for authentication instead of username.
     """
 
     ROLE_CHOICES = [
-        ('admin', 'Admin'),
+        ('admin', 'Administrador'),
         ('rh', 'RH'),
         ('marketing', 'Marketing'),
-        ('gerente_loja', 'Gerente de Loja'),
-        ('sub_gerente', 'Sub-Gerente'),
-        ('gerente_turno', 'Gerente de Turno'),
+        ('administrativa', 'Administrativa'),
+        ('manager', 'Gerente'),
+        ('sub_manager', 'Sub-Gerente'),
+        ('shift_manager', 'Gerente de Turno'),
+        ('treinador', 'Treinador'),
+        ('coucher', 'Coucher'),
+        ('rp', 'Relações Públicas'),
         ('employee', 'Colaborador'),
     ]
 
@@ -116,8 +120,8 @@ class Employee(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = ['name']
 
     class Meta:
-        verbose_name = 'Employee'
-        verbose_name_plural = 'Employees'
+        verbose_name = 'Utilizador'
+        verbose_name_plural = 'Utilizadores'
         ordering = ['name']
         indexes = [
             models.Index(fields=['email']),
@@ -176,7 +180,7 @@ class Employee(AbstractBaseUser, PermissionsMixin):
         sso_url = sso_avatar_url_for_email(self.email)
         if sso_url:
             return sso_url
-        # 2. Upload local no Mac Calendar — fallback quando não há avatar SSO
+        # 2. Carregamento local no MC — alternativa quando não há avatar SSO
         if self.photo_filename:
             return f"/media/photos/employees/{self.photo_filename}"
         # 3. Sem foto — usa o avatar genérico
@@ -186,10 +190,12 @@ class Employee(AbstractBaseUser, PermissionsMixin):
         return self.role in settings.SUPER_ROLES
 
     def can_manage_employees(self):
-        return self.role != 'employee'
+        from .permissions import can_manage_employees
+        return can_manage_employees(self)
 
     def can_manage_restaurant(self):
-        return self.role in ['admin', 'rh', 'gerente_loja']
+        from .permissions import can_manage_restaurant
+        return can_manage_restaurant(self)
 
     def can_create_posts(self):
         return True  # all authenticated users can create posts
@@ -216,8 +222,8 @@ class UserSettings(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'User Settings'
-        verbose_name_plural = 'User Settings'
+        verbose_name = 'Preferências do utilizador'
+        verbose_name_plural = 'Preferências dos utilizadores'
 
     def __str__(self):
-        return f"Settings for {self.user.name}"
+        return f"Preferências de {self.user.name}"

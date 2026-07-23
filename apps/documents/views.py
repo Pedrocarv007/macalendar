@@ -15,6 +15,7 @@ from apps.core.models import ActivityLog
 from .models import Document
 from .serializers import DocumentSerializer
 from .generators import DocumentGenerator
+from .generation.config import get_template_definition, public_template_catalog
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
@@ -82,6 +83,37 @@ class DocumentViewSet(viewsets.ModelViewSet):
         )
         ActivityLog.log('document_created', f'Documento "{doc.title}" criado', user, restaurant=doc.restaurant)
 
+    def perform_destroy(self, instance):
+        """Remove também o ficheiro local, mas apenas dentro da pasta MEDIA_ROOT."""
+        file_path = None
+        if instance.file_path:
+            candidate = Path(instance.file_path).resolve()
+            media_root = Path(settings.MEDIA_ROOT).resolve()
+            try:
+                candidate.relative_to(media_root)
+            except ValueError:
+                pass
+            else:
+                file_path = candidate
+
+        document_id = instance.pk
+        title = instance.title
+        restaurant = instance.restaurant
+
+        if file_path and file_path.is_file():
+            file_path.unlink()
+
+        instance.delete()
+
+        ActivityLog.log(
+            'delete',
+            f'Documento "{title}" eliminado',
+            self.request.user,
+            restaurant=restaurant,
+            target_id=document_id,
+            target_type='document',
+        )
+
     @action(detail=True, methods=['get'], url_path='download')
     def download(self, request, pk=None):
         doc = self.get_object()
@@ -109,14 +141,47 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def generate(self, request):
         data = request.data
         template = data.get('template')
-        if template not in ['birthday', 'praise', 'certificate', 'welcome', 'employee_month']:
-            return Response({'error': 'Template inválido.'}, status=status.HTTP_400_BAD_REQUEST)
+        if get_template_definition(template) is None:
+            return Response({'error': 'O modelo selecionado não existe.'}, status=status.HTTP_400_BAD_REQUEST)
 
         generator = DocumentGenerator()
         result = generator.generate(template, data, request.user)
         if 'error' in result:
-            return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            user_error_codes = {
+                'invalid_template',
+                'person_required',
+                'person_not_found',
+                'restaurant_required',
+                'template_file_missing',
+                'photo_unavailable',
+            }
+            response_status = (
+                status.HTTP_422_UNPROCESSABLE_ENTITY
+                if result.get('code') in user_error_codes
+                else status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+            return Response(result, status=response_status)
         return Response(result, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], url_path='templates')
+    def templates(self, request):
+        """Catálogo central dos modelos disponíveis na interface."""
+        return Response({
+            'idioma': 'pt-PT',
+            'modelos': public_template_catalog(),
+        })
+
+    @action(detail=False, methods=['get'], url_path='photo-status')
+    def photo_status(self, request):
+        """Informa se a fotografia selecionada existe no ambiente local."""
+        data = {
+            'employee_id': request.query_params.get('employee_id'),
+            'worker_id': request.query_params.get('worker_id'),
+        }
+        result = DocumentGenerator().photo_status(data)
+        if result.get('error'):
+            return Response(result, status=status.HTTP_404_NOT_FOUND)
+        return Response(result)
 
     @action(detail=True, methods=['get'], url_path='view')
     def view_file(self, request, pk=None):

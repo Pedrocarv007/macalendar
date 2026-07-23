@@ -99,7 +99,6 @@ class Command(BaseCommand):
                 self._import_calendar_events(cur)
                 self._import_documents(cur)
                 self._import_notifications(cur)
-                self._import_tickets(cur)
                 self._import_activity_logs(cur)
         finally:
             conn.close()
@@ -365,48 +364,6 @@ class Command(BaseCommand):
                 created_by=created_by,
                 created_at=r['created_at'],
                 read_at=r['read_at'],
-            )
-            created += 1
-
-        self.stdout.write(self.style.SUCCESS(f' {created} imported'))
-
-    # ── Tickets ────────────────────────────────────────────────────────────
-
-    def _import_tickets(self, cur):
-        from apps.tickets.models import Ticket
-        from apps.restaurants.models import Restaurant
-        from apps.accounts.models import Employee
-
-        self.stdout.write('  -> Tickets...', ending='')
-        cur.execute("""
-            SELECT id, subject, message, category, priority, status,
-                   screenshot_filename, employee_id, restaurant_id,
-                   created_at, updated_at, resolved_at
-            FROM tickets ORDER BY id
-        """)
-        rows = cur.fetchall()
-
-        Ticket.objects.all().delete()
-        created = 0
-        for r in rows:
-            employee   = Employee.objects.filter(id=r['employee_id']).first() if r['employee_id'] else None
-            restaurant = Restaurant.objects.filter(id=r['restaurant_id']).first() if r['restaurant_id'] else None
-            if not employee:
-                continue
-
-            Ticket.objects.create(
-                id=r['id'],
-                subject=r['subject'] or '',
-                message=r['message'] or '',
-                category=r['category'] or 'other',
-                priority=r['priority'] or 'medium',
-                status=r['status'] or 'open',
-                screenshot_filename=r['screenshot_filename'] or '',
-                employee=employee,
-                restaurant=restaurant,
-                created_at=r['created_at'],
-                updated_at=r['updated_at'],
-                resolved_at=r['resolved_at'],
             )
             created += 1
 

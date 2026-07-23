@@ -11,8 +11,8 @@ class SSOManager(models.Manager):
 class SSOUser(models.Model):
     """
     Leitura do SSO — tabela Usuários.
-    Fonte de verdade para funcionários com acesso ao Mac Calendar.
-    Mac Calendar não escreve nesta tabela.
+    Fonte de verdade para utilizadores com acesso ao MC.
+    O MC não escreve nesta tabela.
     """
     username       = models.CharField(max_length=150)
     first_name     = models.CharField(max_length=150, blank=True)
@@ -74,7 +74,7 @@ class SSORestaurant(models.Model):
 class Worker(models.Model):
     """
     Leitura do SSO — tabela Usuários (colaboradores/crew).
-    Mac Calendar não escreve nesta tabela; toda a gestão é feita no SSO Portal.
+    O MC não escreve nesta tabela; toda a gestão é feita no Portal SSO.
     """
     first_name      = models.CharField(max_length=100)
     last_name       = models.CharField(max_length=100)

@@ -1,4 +1,4 @@
-# Security Audit — Mac Calendar (Django REST + server-rendered)
+# Security Audit — MC (Django REST + server-rendered)
 
 Branch: `v2-django`  ·  Scope: conservative, behavior-preserving hardening
 Auth model: TheCarV SSO (password POST backend + signed-JWT callback), custom user `accounts.Employee`.

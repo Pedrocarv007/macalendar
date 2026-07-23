@@ -10,10 +10,10 @@ Uso:
   python manage.py generate_birthdays --user-email admin@empresa.com
 
 Agendamento sugerido (cron Linux — dia 1 de cada mês às 06:00):
-  0 6 1 * * docker exec <container> python manage.py generate_birthdays >> /var/log/macalendar_birthdays.log 2>&1
+  0 6 1 * * docker exec <container> python manage.py generate_birthdays >> /var/log/mc_birthdays.log 2>&1
 
 Pré-gerar mês atual + próximo mês:
-    0 6 1 * * docker exec <container> python manage.py generate_birthdays --months-ahead 1 >> /var/log/macalendar_birthdays.log 2>&1
+    0 6 1 * * docker exec <container> python manage.py generate_birthdays --months-ahead 1 >> /var/log/mc_birthdays.log 2>&1
 """
 from django.core.management.base import BaseCommand
 from django.core.cache import cache
@@ -24,6 +24,7 @@ from apps.calendar_events.models import CalendarEvent
 from apps.core.models import ActivityLog
 from apps.documents.models import Document
 from apps.restaurants.models import Restaurant
+from apps.restaurants.services import active_canonical_restaurants
 
 
 class Command(BaseCommand):
@@ -58,7 +59,7 @@ class Command(BaseCommand):
         system_user = self._resolve_user(user_email)
         months = self._build_month_window(month, year, months_ahead)
 
-        restaurants = Restaurant.objects.filter(is_active=True)
+        restaurants = active_canonical_restaurants(sync=not dry_run)
         if restaurant_id:
             restaurants = restaurants.filter(id=restaurant_id)
 
@@ -75,10 +76,7 @@ class Command(BaseCommand):
             ))
 
         if dry_run:
-            total_targets = restaurants.count() * len(months)
-            self.stdout.write(self.style.WARNING(
-                f'[DRY-RUN] Seriam processados {total_targets} par(es) restaurante/mês para regeneração.'
-            ))
+            self._preview_generation(restaurants, months)
             return
 
         self.stdout.write(self.style.MIGRATE_HEADING(
@@ -88,14 +86,17 @@ class Command(BaseCommand):
 
         service = BirthdayService(user=system_user)
         total_created = 0
+        total_repaired = 0
         total_skipped = 0
 
         for restaurant in restaurants:
             for target_month, target_year in months:
                 result = service.generate_for_month(restaurant, target_month, target_year)
                 n_created = len(result.get('created', []))
+                n_repaired = len(result.get('repaired', []))
                 n_skipped = result.get('skipped', 0)
                 total_created += n_created
+                total_repaired += n_repaired
                 total_skipped += n_skipped
 
                 if result.get('error'):
@@ -105,20 +106,24 @@ class Command(BaseCommand):
                 else:
                     self.stdout.write(
                         f'  {restaurant.name} {target_month:02d}/{target_year}: '
-                        f'{n_created} criado(s), {n_skipped} ignorado(s)'
+                        f'{n_created} criado(s), {n_repaired} reparado(s), '
+                        f'{n_skipped} ignorado(s)'
                     )
 
-                if n_created > 0:
+                if n_created > 0 or n_repaired > 0:
                     ActivityLog.log(
                         'birthdays_generated',
-                        f'{n_created} evento(s) de aniversário gerados para {restaurant.name} '
+                        f'{n_created} evento(s) gerado(s) e {n_repaired} cartão(ões) reparado(s) '
+                        f'para {restaurant.name} '
                         f'({target_month:02d}/{target_year})',
                         system_user,
                         restaurant=restaurant,
                     )
 
         self.stdout.write(self.style.SUCCESS(
-            f'Concluído: {total_created} evento(s) criado(s), {total_skipped} já existia(m).'
+            f'Concluído: {total_created} evento(s) criado(s), '
+            f'{total_repaired} cartão(ões) reparado(s), '
+            f'{total_skipped} já existia(m).'
         ))
 
     def _build_month_window(self, month, year, months_ahead):
@@ -192,3 +197,48 @@ class Command(BaseCommand):
                 return user
 
         return None
+
+    def _preview_generation(self, restaurants, months):
+        service = BirthdayService(user=None)
+        total_candidates = 0
+        total_ready = 0
+        total_missing_photos = 0
+
+        self.stdout.write(self.style.MIGRATE_HEADING(
+            '[SIMULAÇÃO] A validar aniversários, restaurantes, templates e fotografias...'
+        ))
+        for restaurant in restaurants:
+            for target_month, target_year in months:
+                result = service.preview_for_month(
+                    restaurant,
+                    target_month,
+                    target_year,
+                )
+                candidates = result.get('candidates', 0)
+                ready = result.get('ready', 0)
+                missing = result.get('missing_photos', [])
+                total_candidates += candidates
+                total_ready += ready
+                total_missing_photos += len(missing)
+
+                template_status = (
+                    result.get('template_file')
+                    if result.get('template_available')
+                    else 'EM FALTA'
+                )
+                self.stdout.write(
+                    f'  {restaurant.name} {target_month:02d}/{target_year}: '
+                    f'{candidates} aniversário(s), {ready} pronto(s), '
+                    f'{len(missing)} sem fotografia, template={template_status}'
+                )
+                for person in missing:
+                    self.stdout.write(self.style.WARNING(
+                        f'    fotografia em falta: {person["name"]} '
+                        f'(SSO #{person["worker_id"]})'
+                    ))
+
+        self.stdout.write(self.style.SUCCESS(
+            f'[SIMULAÇÃO] Total: {total_candidates} aniversário(s), '
+            f'{total_ready} pronto(s) para gerar, '
+            f'{total_missing_photos} fotografia(s) em falta.'
+        ))

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mac Calendar</title>
+  <title>MC</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -12,7 +12,7 @@
 
     html, body {
       height: 100%;
-      background: #f0fdf4;
+      background: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -29,12 +29,12 @@
       width: 72px;
       height: 72px;
       border-radius: 20px;
-      background: linear-gradient(135deg, #00A651, #008A43);
+      background: #FFBC0D;
       display: flex;
       align-items: center;
       justify-content: center;
       margin: 0 auto 20px;
-      box-shadow: 0 8px 32px rgba(0, 166, 81, 0.3);
+      box-shadow: 0 8px 32px rgba(45, 45, 45, 0.16);
       animation: fadeUp 0.7s ease 0.1s both;
     }
 
@@ -42,7 +42,7 @@
       width: 36px;
       height: 36px;
       fill: none;
-      stroke: #fff;
+      stroke: #2D2D2D;
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
@@ -52,19 +52,19 @@
       font-size: clamp(1.6rem, 4vw, 2.2rem);
       font-weight: 700;
       letter-spacing: -0.02em;
-      color: #1a3d1f;
+      color: #2D2D2D;
       animation: fadeUp 0.7s ease 0.2s both;
     }
 
     .brand-name span {
-      color: #00A651;
+      color: #2D2D2D;
     }
 
     .sub-name {
       font-size: 0.78rem;
       font-weight: 400;
       letter-spacing: 0.15em;
-      color: #6b9e7a;
+      color: #737373;
       text-transform: uppercase;
       margin-top: 6px;
       animation: fadeUp 0.7s ease 0.3s both;
@@ -73,7 +73,7 @@
     .divider {
       width: 36px;
       height: 2px;
-      background: linear-gradient(90deg, #00A651, #FFCF00);
+      background: #FFBC0D;
       border-radius: 2px;
       margin: 20px auto;
       animation: fadeUp 0.7s ease 0.4s both;
@@ -91,12 +91,12 @@
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: #00A651;
+      background: #2D2D2D;
       animation: pulse 1.4s ease-in-out infinite;
     }
 
-    .loader span:nth-child(2) { animation-delay: 0.2s; background: #008A43; }
-    .loader span:nth-child(3) { animation-delay: 0.4s; background: #FFCF00; }
+    .loader span:nth-child(2) { animation-delay: 0.2s; background: #FFBC0D; }
+    .loader span:nth-child(3) { animation-delay: 0.4s; background: #2D2D2D; }
 
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(12px); }
@@ -120,7 +120,7 @@
         <path d="M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2"/>
       </svg>
     </div>
-    <h1 class="brand-name">Mac <span>Calendar</span></h1>
+    <h1 class="brand-name"><span>MC</span></h1>
     <p class="sub-name">TheCarv · Portal de Gestão</p>
     <div class="divider"></div>
     <div class="loader">
@@ -129,7 +129,7 @@
   </div>
 
   <script>
-    setTimeout(() => { window.location.href = '/dashboard'; }, 2500);
+    setTimeout(() => { window.location.href = '/calendar'; }, 2500);
   </script>
 </body>
 </html>

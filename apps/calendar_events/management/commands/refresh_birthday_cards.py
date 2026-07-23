@@ -2,7 +2,7 @@
 Management command: regenera cartões de aniversário (mês atual + futuros)
 com a foto atual de uma ou mais pessoas.
 
-Útil quando a foto foi trocada no portal SSO (o Mac Calendar não consegue
+Útil quando a fotografia foi trocada no Portal SSO (o MC não consegue
 interceptar essa alteração automaticamente).
 
 Uso:
@@ -63,8 +63,8 @@ class Command(BaseCommand):
         elif options['restaurant_id']:
             self._by_restaurant(options['restaurant_id'], service, cutoff, dry_run, mode)
         elif options['all']:
-            from apps.restaurants.models import Restaurant
-            for rest in Restaurant.objects.filter(is_active=True):
+            from apps.restaurants.services import active_canonical_restaurants
+            for rest in active_canonical_restaurants():
                 self._by_restaurant(rest.id, service, cutoff, dry_run, mode)
 
     # ── helpers ──────────────────────────────────────────────────────────────

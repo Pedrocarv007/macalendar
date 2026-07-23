@@ -1,18 +1,18 @@
 """
-Tradução de roles vindos do TheCarV SSO para os roles internos do Mac Calendar.
+Tradução de perfis do TheCarV SSO para os perfis internos do MC.
 
 O SSO (CustomUser.Role em Thecarv_django) usa nomes próprios — ex.: 'manager',
-'sub_manager', 'shift_manager' — que diferem dos Employee.ROLE_CHOICES do Mac
-Calendar — ex.: 'gerente_loja', 'sub_gerente', 'gerente_turno'. Sem esta
+'sub_manager', 'shift_manager' — que diferem dos Employee.ROLE_CHOICES do MC
+MC — ex.: 'gerente_loja', 'sub_gerente', 'gerente_turno'. Sem esta
 tradução, um gerente vindo do SSO ficava guardado como 'manager' e falhava
 silenciosamente as verificações de permissão (que procuram 'gerente_loja').
 
-Roles do SSO sem equivalente no Mac Calendar (operacionais / sem acesso a este
+Perfis do SSO sem equivalente no MC (operacionais / sem acesso a este
 sistema, ex.: 'rp', 'treinador', 'administrativa') e quaisquer valores
 desconhecidos são despromovidos para 'employee' — menor privilégio.
 """
 
-# SSO role value  ->  Mac Calendar Employee.role value
+# Valor do perfil SSO -> valor Employee.role do MC
 SSO_ROLE_MAP = {
     'admin':          'admin',
     'rh':             'rh',

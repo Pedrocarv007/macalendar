@@ -68,7 +68,7 @@ class EmployeeDetailSerializer(serializers.ModelSerializer):
         if request and request.method in ('PUT', 'PATCH') and self.instance:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
-            raise serializers.ValidationError('An employee with this email already exists.')
+            raise serializers.ValidationError('Já existe um utilizador com este endereço de email.')
         return value.lower()
 
 
@@ -85,7 +85,7 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         if Employee.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError('An employee with this email already exists.')
+            raise serializers.ValidationError('Já existe um utilizador com este endereço de email.')
         return value.lower()
 
     def create(self, validated_data):

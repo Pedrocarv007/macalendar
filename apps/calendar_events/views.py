@@ -2,6 +2,7 @@ import os
 import time
 import uuid
 from django.conf import settings
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -29,9 +30,12 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
         start = params.get('start')
         end = params.get('end')
         if start:
-            qs = qs.filter(start_date__gte=start)
+            qs = qs.filter(
+                Q(end_date__gte=start)
+                | Q(end_date__isnull=True, start_date__gte=start)
+            )
         if end:
-            qs = qs.filter(start_date__lte=end)
+            qs = qs.filter(start_date__lt=end)
 
         # Event type filter
         event_type = params.get('event_type')
@@ -47,6 +51,10 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
             qs = qs.filter(
                 restaurant_id__in=[user.restaurant_id] if user.restaurant_id else []
             ) | qs.filter(restaurant__isnull=True)
+            if getattr(self, 'action', '') in {
+                'update', 'partial_update', 'destroy', 'upload_photo', 'mark_posted'
+            }:
+                qs = qs.filter(restaurant_id=user.restaurant_id)
 
         return qs.order_by('start_date')
 
@@ -74,7 +82,11 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
         event.is_posted = True
         event.posted_at = timezone.now()
         event.save(update_fields=['is_posted', 'posted_at'])
-        return Response({'status': 'posted', 'posted_at': event.posted_at})
+        return Response({
+            'status': 'posted',
+            'posted_at': event.posted_at,
+            'message': 'Evento marcado como publicado.',
+        })
 
     @action(detail=False, methods=['get'], url_path='birthdays')
     def birthdays(self, request):
@@ -131,9 +143,11 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
         month = data.get('month')
         year = data.get('year')
         if not month or not year:
-            return Response({'error': 'month e year são obrigatórios.'}, status=400)
+            return Response({'error': 'O mês e o ano são obrigatórios.'}, status=400)
         if not restaurant_id:
-            return Response({'error': 'restaurant_id é obrigatório (ou associe o utilizador a um restaurante).'}, status=400)
+            return Response({
+                'error': 'Selecione o restaurante ou associe o utilizador a um restaurante.'
+            }, status=400)
 
         service = MysteryService(request.user)
         result = service.generate_for_month(restaurant_id, int(month), int(year))
@@ -153,9 +167,13 @@ class ServiceCalendarEventsView(APIView):
         params = request.query_params
         qs = CalendarEvent.objects.select_related('restaurant', 'created_by')
 
-        restaurant_id = params.get('restaurant_id')
-        if restaurant_id:
-            qs = qs.filter(restaurant_id=restaurant_id)
+        sso_restaurant_id = params.get('restaurant_id')
+        if sso_restaurant_id:
+            try:
+                sso_restaurant_id = int(sso_restaurant_id)
+            except (TypeError, ValueError):
+                return Response({'detail': 'restaurant_id inválido'}, status=400)
+            qs = qs.filter(restaurant__sso_id=sso_restaurant_id)
 
         start = params.get('start')
         end = params.get('end')
@@ -188,14 +206,19 @@ class ServiceBirthdaysView(APIView):
         from apps.documents.models import Document
         from apps.documents.generators import DocumentGenerator
         from apps.accounts.models import Employee
+        from apps.restaurants.services import get_local_restaurant_for_sso_id
 
-        restaurant_id = request.query_params.get('restaurant_id')
-        if not restaurant_id:
+        sso_restaurant_id = request.query_params.get('restaurant_id')
+        if not sso_restaurant_id:
             return Response({'detail': 'restaurant_id em falta'}, status=400)
         try:
-            restaurant_id = int(restaurant_id)
+            sso_restaurant_id = int(sso_restaurant_id)
         except (TypeError, ValueError):
             return Response({'detail': 'restaurant_id inválido'}, status=400)
+
+        restaurant = get_local_restaurant_for_sso_id(sso_restaurant_id)
+        if restaurant is None:
+            return Response({'detail': 'Restaurante SSO não encontrado'}, status=404)
 
         now = timezone.now()
         try:
@@ -207,7 +230,7 @@ class ServiceBirthdaysView(APIView):
         workers = list(Worker.objects.filter(
             is_active=True,
             birth_date__month=month,
-            restaurant_id=restaurant_id,
+            restaurant_id=sso_restaurant_id,
         ))
 
         system_user = Employee.objects.filter(role='admin', is_active=True).first()
@@ -215,11 +238,15 @@ class ServiceBirthdaysView(APIView):
         generator = DocumentGenerator()
         results = []
         for wkr in workers:
+            document_key = (
+                f'birthday:worker:{wkr.id}:restaurant:{sso_restaurant_id}:'
+                f'year:{year}:month:{month}'
+            )
             existing = (
                 Document.objects.filter(
                     document_type='birthday',
-                    worker_id=wkr.id,
-                    restaurant_id=restaurant_id,
+                    tags=document_key,
+                    restaurant_id=restaurant.id,
                     created_at__year=year,
                     created_at__month=month,
                     status='generated',
@@ -231,17 +258,20 @@ class ServiceBirthdaysView(APIView):
                 image_url = request.build_absolute_uri(
                     f'/media/documents/generated/{existing.filename}'
                 )
+                image_error = None
             else:
                 gen = generator.generate(
                     'birthday',
-                    {'worker_id': wkr.id, 'restaurant_id': restaurant_id, 'name': wkr.name,
-                     'event_year': year},
+                    {'worker_id': wkr.id, 'restaurant_id': restaurant.id, 'name': wkr.name,
+                     'event_year': year, 'document_key': document_key},
                     system_user,
                 )
                 if 'error' in gen:
                     image_url = None
+                    image_error = gen['error']
                 else:
                     image_url = request.build_absolute_uri(gen['file_url'])
+                    image_error = None
 
             results.append({
                 'id': wkr.id,
@@ -250,6 +280,8 @@ class ServiceBirthdaysView(APIView):
                 'age': getattr(wkr, 'age', None),
                 'days_until': getattr(wkr, 'days_until_birthday', None),
                 'image_url': image_url,
+                'image_status': 'disponivel' if image_url else 'indisponivel',
+                'image_error': image_error,
             })
 
         results.sort(key=lambda x: x.get('days_until') or 999)

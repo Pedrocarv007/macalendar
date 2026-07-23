@@ -56,7 +56,7 @@ class SessionTimeoutMiddleware:
                         logout(request)
                         if request.path.startswith('/api/'):
                             return JsonResponse(
-                                {'error': 'Session expired. Please log in again.'},
+                                {'error': 'A sessão terminou. Inicie sessão novamente.'},
                                 status=401
                             )
                 except (ValueError, TypeError):

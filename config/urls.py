@@ -1,5 +1,5 @@
 """
-Main URL configuration for Mac Calendar.
+Configuração principal de endereços do MC.
 """
 from django.contrib import admin
 from django.http import JsonResponse
@@ -36,12 +36,10 @@ urlpatterns = [
     path('api/calendar/', include('apps.calendar_events.urls')),
     path('api/documents/', include('apps.documents.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
-    path('api/tickets/', include('apps.tickets.urls')),
-    path('api/dashboard/', include('apps.dashboard.urls')),
     path('api/workers/', include('apps.workers.urls')),
 
     # Web / Template routes
-    path('', include('apps.dashboard.web_urls')),
+    path('', include('apps.core.web_urls')),
 ]
 
 if settings.DEBUG or getattr(settings, 'SERVE_SSO_MEDIA_LOCALLY', False):

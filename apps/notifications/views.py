@@ -6,7 +6,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from django.conf import settings
 
-from apps.accounts.permissions import IsServiceClient
+from apps.accounts.permissions import (
+    IsServiceClient,
+    LOCAL_MANAGEMENT_ROLES,
+    canonical_role,
+    is_super_role,
+)
 from .models import Notification
 from .serializers import NotificationSerializer
 
@@ -21,13 +26,13 @@ class NotificationViewSet(viewsets.ModelViewSet):
         params = self.request.query_params
 
         # Build audience filter
-        if user.role in settings.SUPER_ROLES:
+        if is_super_role(user):
             qs = Notification.objects.all()
         else:
             # Employee sees notifications for their restaurant + their role
-            manager_roles = ['gerente_loja', 'sub_gerente', 'gerente_turno']
+            manager_roles = LOCAL_MANAGEMENT_ROLES
             audience_filter = ['all']
-            if user.role in manager_roles:
+            if canonical_role(user) in manager_roles:
                 audience_filter.append('manager')
             else:
                 audience_filter.append('employee')
@@ -51,7 +56,23 @@ class NotificationViewSet(viewsets.ModelViewSet):
         return qs.order_by('-created_at').distinct()
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        user = self.request.user
+        role = canonical_role(user)
+        allowed = {'admin', 'rh', 'marketing'} | LOCAL_MANAGEMENT_ROLES
+        if role not in allowed:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Sem permissão para criar notificações.')
+
+        restaurant = serializer.validated_data.get('restaurant')
+        if role not in {'admin', 'rh', 'marketing'}:
+            if not user.restaurant_id or (
+                restaurant and restaurant.id != user.restaurant_id
+            ):
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied('Sem permissão para este restaurante.')
+            serializer.save(created_by=user, restaurant=user.restaurant)
+            return
+        serializer.save(created_by=user)
 
     @action(detail=False, methods=['post'], url_path='mark-read')
     def mark_read(self, request):

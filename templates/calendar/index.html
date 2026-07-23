@@ -9,49 +9,51 @@
 {% block content %}
 <div x-data="calendarPage()">
 
-  <!-- Toolbar -->
-  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:20px">
-    <select x-model="filterType" @change="reloadEvents()" class="form-input" style="width:180px">
+  <div class="calendar-toolbar">
+    <label class="visually-hidden" for="calendar-type-filter">Filtrar por tipo de evento</label>
+    <select id="calendar-type-filter" x-model="filterType" @change="reloadEvents()" class="form-input" style="width:190px">
       <option value="">Todos os tipos</option>
       <option value="meeting">Reunião</option>
       <option value="birthday">Aniversário</option>
+      <option value="holiday">Feriado</option>
+      <option value="shift">Turno</option>
       <option value="training">Formação</option>
-      <option value="post">Post</option>
+      <option value="post">Publicação</option>
       <option value="mystery_challenge">Desafio Mistério</option>
+      <option value="other">Outro</option>
     </select>
 
-    <!-- Restaurant filter — only for marketing+ -->
     <template x-if="isSuperUser">
-      <div style="display:flex;align-items:center;gap:6px">
-        <select x-model="filterRestaurant" @change="reloadEvents()" class="form-input" style="width:200px">
+      <div class="calendar-filter-group" style="display:flex;align-items:center;gap:6px">
+        <label class="visually-hidden" for="calendar-restaurant-filter">Filtrar por restaurante</label>
+        <select id="calendar-restaurant-filter" x-model="filterRestaurant" @change="reloadEvents()" class="form-input" style="width:210px">
           <option value="">Todos os restaurantes</option>
           <template x-for="r in restaurants" :key="r.id">
             <option :value="r.id" x-text="r.name"></option>
           </template>
         </select>
-        <!-- Remove restaurant tag -->
         <button x-show="filterRestaurant" @click="filterRestaurant=''; reloadEvents()"
           class="btn btn-ghost btn-sm" title="Remover filtro de restaurante"
-          style="padding:4px 8px;line-height:1">✕</button>
+          style="padding:4px 8px;line-height:1" aria-label="Remover filtro de restaurante">×</button>
       </div>
     </template>
 
-    <button @click="openCreateModal()" class="btn btn-primary" style="margin-left:auto">+ Novo Evento</button>
+    <button @click="openCreateModal()" class="btn btn-primary calendar-create-button" style="margin-left:auto">
+      <i class="fa-solid fa-plus" aria-hidden="true"></i> Novo evento
+    </button>
   </div>
 
-  <!-- Calendar -->
-  <div class="card" style="padding:16px">
+  <div class="card calendar-shell">
     <div id="calendar"></div>
   </div>
 
-  <!-- Modal -->
-  <div x-show="showModal" x-transition class="mac-modal-overlay">
-    <div class="mac-modal" style="max-width:520px">
-      <div class="mac-modal-title" x-text="editId ? 'Editar Evento' : 'Novo Evento'"></div>
+  <div x-cloak x-show="showModal" x-transition class="mc-modal-overlay" @click.self="showModal=false">
+    <div class="mc-modal" style="max-width:520px">
+      <div class="mc-modal-title" x-text="editId ? 'Editar evento' : 'Novo evento'"></div>
 
       <div class="form-group">
         <label class="form-label">Título</label>
-        <input x-model="form.title" type="text" placeholder="Título do evento" class="form-input">
+        <input x-model="form.title" type="text" placeholder="Título do evento" class="form-input" maxlength="200" required>
       </div>
       <div class="form-group">
         <label class="form-label">Descrição</label>
@@ -74,7 +76,7 @@
           <option value="birthday">Aniversário</option>
           <option value="holiday">Feriado</option>
           <option value="training">Formação</option>
-          <option value="post">Post</option>
+          <option value="post">Publicação</option>
           <option value="other">Outro</option>
         </select>
       </div>
@@ -98,11 +100,14 @@
       </div>
       <div class="form-group">
         <label class="form-label">Foto</label>
-        <input type="file" accept="image/jpeg,image/png,image/gif"
-          @change="form.photoFile=$event.target.files[0]; form.photoPreview=form.photoFile ? URL.createObjectURL(form.photoFile) : form.photoPreview"
-          class="form-input" style="height:auto;padding:8px 12px">
+        <label class="file-picker">
+          <input type="file" accept="image/jpeg,image/png,image/gif"
+            @change="form.photoFile=$event.target.files[0]; form.photoPreview=form.photoFile ? URL.createObjectURL(form.photoFile) : form.photoPreview">
+          <strong><i class="fa-solid fa-camera" aria-hidden="true"></i> Escolher fotografia</strong>
+          <small x-text="form.photoFile ? form.photoFile.name : 'JPG, PNG ou GIF'"></small>
+        </label>
         <img x-show="form.photoPreview" :src="form.photoPreview"
-          style="margin-top:8px;max-height:120px;border-radius:8px;object-fit:cover;width:100%">
+          class="event-photo-preview" alt="Pré-visualização da fotografia do evento">
       </div>
       <div style="display:flex;align-items:center;gap:16px">
         <div style="display:flex;align-items:center;gap:8px">
@@ -115,8 +120,10 @@
         </label>
       </div>
 
-      <div class="mac-modal-footer">
-        <button @click="saveEvent()" class="btn btn-primary" style="flex:1">Guardar</button>
+      <div class="mc-modal-footer">
+        <button @click="saveEvent()" class="btn btn-primary" style="flex:1" :disabled="saving">
+          <span x-text="saving ? 'A guardar…' : 'Guardar'"></span>
+        </button>
         <button @click="showModal=false" class="btn btn-secondary" style="flex:1">Cancelar</button>
         <button x-show="editId" @click="deleteEvent()" class="btn btn-danger">Apagar</button>
       </div>
@@ -128,5 +135,5 @@
 
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-<script src="/static/js/modules/calendar.js?v=3"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/locales-all.global.min.js"></script>
 {% endblock %}

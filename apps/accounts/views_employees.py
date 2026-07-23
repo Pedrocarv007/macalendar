@@ -4,6 +4,7 @@ Employee CRUD views.
 import os
 import logging
 import threading
+from PIL import Image, UnidentifiedImageError
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.cache import cache
@@ -15,7 +16,9 @@ from rest_framework.views import APIView
 
 from .serializers import EmployeeListSerializer, EmployeeDetailSerializer, EmployeeCreateSerializer
 from .permissions import (
-    IsRH, CanManageEmployees, SameRestaurantOrAbove, is_super_role
+    IsRH, CanManageEmployees, SameRestaurantOrAbove, is_super_role,
+    can_manage_employee, can_manage_employees, can_manage_role, canonical_role,
+    GLOBAL_MANAGEMENT_ROLES,
 )
 from apps.core.models import ActivityLog
 from apps.core.utils import get_client_ip, success_response
@@ -23,14 +26,45 @@ from apps.core.utils import get_client_ip, success_response
 logger = logging.getLogger(__name__)
 Employee = get_user_model()
 
-# Mapeamento de roles do SSO para roles do Mac Calendar
+PHOTO_MAX_BYTES = 5 * 1024 * 1024
+PHOTO_FORMAT_EXTENSIONS = {
+    'JPEG': '.jpg',
+    'PNG': '.png',
+    'WEBP': '.webp',
+}
+
+
+def _validated_photo_extension(upload):
+    if getattr(upload, 'size', 0) > PHOTO_MAX_BYTES:
+        return None, 'A fotografia não pode exceder 5 MB.'
+    try:
+        image = Image.open(upload)
+        image_format = (image.format or '').upper()
+        image.verify()
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+        return None, 'O ficheiro não é uma imagem válida.'
+    finally:
+        upload.seek(0)
+    extension = PHOTO_FORMAT_EXTENSIONS.get(image_format)
+    if not extension:
+        return None, 'Formato não suportado. Use JPG, PNG ou WebP.'
+    return extension, None
+
+# Mapeamento de perfis do SSO para perfis do MC
 _SSO_ROLE_MAP = {
     'admin':          'admin',
     'rh':             'rh',
     'marketing':      'marketing',
-    'gerente_loja':   'gerente_loja',
-    'sub_gerente':    'sub_gerente',
-    'gerente_turno':  'gerente_turno',
+    'administrativa': 'administrativa',
+    'manager':         'manager',
+    'sub_manager':     'sub_manager',
+    'shift_manager':   'shift_manager',
+    'treinador':       'treinador',
+    'coucher':         'coucher',
+    'rp':              'rp',
+    'gerente_loja':    'manager',
+    'sub_gerente':     'sub_manager',
+    'gerente_turno':   'shift_manager',
     'funcionario':    'employee',
     'employee':       'employee',
     'colaborador':    'employee',
@@ -69,7 +103,12 @@ def _sync_employee_from_sso(sso_user):
     if emp.is_active != sso_user.is_active:
         emp.is_active = sso_user.is_active
         changed.append('is_active')
-    if local_restaurant and emp.restaurant_id != local_restaurant.id:
+    # Também limpa uma associação antiga quando o SSO já não tem restaurante.
+    # Se o SSO aponta para um ID desconhecido, mantém o valor local até o
+    # catálogo de restaurantes ser corrigido, evitando uma perda acidental.
+    restaurant_was_resolved = not sso_user.restaurant_id or local_restaurant is not None
+    expected_restaurant_id = local_restaurant.id if local_restaurant else None
+    if restaurant_was_resolved and emp.restaurant_id != expected_restaurant_id:
         emp.restaurant = local_restaurant
         changed.append('restaurant')
     if sso_user.phone and emp.phone != sso_user.phone:
@@ -150,9 +189,9 @@ class EmployeeListCreateView(APIView):
         ))
 
     def post(self, request):
-        if not request.user.role in ['admin', 'rh', 'gerente_loja']:
+        if not can_manage_employees(request.user):
             return Response(
-                {'success': False, 'error': 'Permission denied.'},
+                {'success': False, 'error': 'Sem permissão.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -163,10 +202,23 @@ class EmployeeListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        employee = serializer.save()
+        target_role = serializer.validated_data.get('role', 'employee')
+        target_restaurant = serializer.validated_data.get('restaurant')
+        actor_role = canonical_role(request.user)
+        save_kwargs = {}
+        if actor_role not in GLOBAL_MANAGEMENT_ROLES:
+            if not can_manage_role(request.user, target_role):
+                return Response({'success': False, 'error': 'Sem permissão.'}, status=403)
+            if not request.user.restaurant_id:
+                return Response({'success': False, 'error': 'O restaurante é obrigatório.'}, status=403)
+            if target_restaurant and target_restaurant.id != request.user.restaurant_id:
+                return Response({'success': False, 'error': 'Sem permissão.'}, status=403)
+            save_kwargs['restaurant'] = request.user.restaurant
+
+        employee = serializer.save(**save_kwargs)
         ActivityLog.log(
             activity_type='create',
-            description=f"{request.user.name} created employee {employee.name}.",
+            description=f'{request.user.name} criou o utilizador {employee.name}.',
             user=request.user,
             restaurant=employee.restaurant,
             target_id=employee.id,
@@ -175,7 +227,7 @@ class EmployeeListCreateView(APIView):
         return Response(
             success_response(
                 data=EmployeeDetailSerializer(employee, context={'request': request}).data,
-                message='Employee created.',
+                message='Utilizador criado.',
             ),
             status=status.HTTP_201_CREATED,
         )
@@ -198,19 +250,18 @@ class EmployeeDetailView(APIView):
     def get(self, request, pk):
         employee = self._get_employee(pk)
         if not employee:
-            return Response({'success': False, 'error': 'Not found.'}, status=404)
+            return Response({'success': False, 'error': 'Utilizador não encontrado.'}, status=404)
         self.check_object_permissions(request, employee)
         serializer = EmployeeDetailSerializer(employee, context={'request': request})
         return Response(success_response(data=serializer.data))
 
     def put(self, request, pk):
-        if not request.user.role in ['admin', 'rh', 'marketing', 'gerente_loja', 'sub_gerente', 'gerente_turno']:
-            return Response({'success': False, 'error': 'Permission denied.'}, status=403)
-
         employee = self._get_employee(pk)
         if not employee:
-            return Response({'success': False, 'error': 'Not found.'}, status=404)
+            return Response({'success': False, 'error': 'Utilizador não encontrado.'}, status=404)
         self.check_object_permissions(request, employee)
+        if not can_manage_employee(request.user, employee):
+            return Response({'success': False, 'error': 'Sem permissão.'}, status=403)
 
         serializer = EmployeeDetailSerializer(
             employee, data=request.data, partial=True, context={'request': request}
@@ -218,17 +269,25 @@ class EmployeeDetailView(APIView):
         if not serializer.is_valid():
             return Response({'success': False, 'errors': serializer.errors}, status=400)
 
+        if canonical_role(request.user) not in GLOBAL_MANAGEMENT_ROLES:
+            target_role = serializer.validated_data.get('role', employee.role)
+            target_restaurant = serializer.validated_data.get('restaurant', employee.restaurant)
+            if not can_manage_role(request.user, target_role):
+                return Response({'success': False, 'error': 'Sem permissão.'}, status=403)
+            if not target_restaurant or target_restaurant.id != request.user.restaurant_id:
+                return Response({'success': False, 'error': 'Sem permissão.'}, status=403)
+
         serializer.save()
         ActivityLog.log(
             activity_type='update',
-            description=f"{request.user.name} updated employee {employee.name}.",
+            description=f'{request.user.name} atualizou o utilizador {employee.name}.',
             user=request.user,
             target_id=employee.id,
             target_type='Employee',
         )
         return Response(success_response(
             data=EmployeeDetailSerializer(employee, context={'request': request}).data,
-            message='Employee updated.',
+            message='Utilizador atualizado.',
         ))
 
     def patch(self, request, pk):
@@ -236,11 +295,11 @@ class EmployeeDetailView(APIView):
 
     def delete(self, request, pk):
         if request.user.role not in ['admin', 'rh']:
-            return Response({'success': False, 'error': 'Permission denied.'}, status=403)
+            return Response({'success': False, 'error': 'Sem permissão.'}, status=403)
 
         employee = self._get_employee(pk)
         if not employee:
-            return Response({'success': False, 'error': 'Not found.'}, status=404)
+            return Response({'success': False, 'error': 'Utilizador não encontrado.'}, status=404)
 
         employee.is_active = False
         employee.save(update_fields=['is_active'])
@@ -251,7 +310,7 @@ class EmployeeDetailView(APIView):
             target_id=employee.id,
             target_type='Employee',
         )
-        return Response(success_response(message='Employee deactivated.'))
+        return Response(success_response(message='Utilizador desativado.'))
 
 
 class EmployeePhotoView(APIView):
@@ -264,21 +323,19 @@ class EmployeePhotoView(APIView):
         try:
             employee = Employee.objects.get(pk=pk)
         except Employee.DoesNotExist:
-            return Response({'success': False, 'error': 'Not found.'}, status=404)
+            return Response({'success': False, 'error': 'Utilizador não encontrado.'}, status=404)
 
         # Only the employee themselves or a manager (gerente+) can upload
-        if request.user.pk != employee.pk and not request.user.role in [
-            'admin', 'rh', 'marketing', 'gerente_loja', 'sub_gerente', 'gerente_turno'
-        ]:
-            return Response({'success': False, 'error': 'Permission denied.'}, status=403)
+        if request.user.pk != employee.pk and not can_manage_employee(request.user, employee):
+            return Response({'success': False, 'error': 'Sem permissão.'}, status=403)
 
         photo_file = request.FILES.get('photo')
         if not photo_file:
-            return Response({'success': False, 'error': 'No photo file provided.'}, status=400)
+            return Response({'success': False, 'error': 'Selecione uma fotografia.'}, status=400)
 
-        ext = os.path.splitext(photo_file.name)[1].lower()
-        if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-            return Response({'success': False, 'error': 'Invalid file type.'}, status=400)
+        ext, photo_error = _validated_photo_extension(photo_file)
+        if photo_error:
+            return Response({'success': False, 'error': photo_error}, status=400)
 
         filename = f"employee_{employee.pk}{ext}"
         upload_dir = os.path.join(settings.MEDIA_ROOT, 'photos', 'employees')
@@ -309,5 +366,5 @@ class EmployeePhotoView(APIView):
 
         return Response(success_response(
             data={'photo_url': employee.photo_url},
-            message='Photo uploaded.',
+            message='Fotografia atualizada.',
         ))

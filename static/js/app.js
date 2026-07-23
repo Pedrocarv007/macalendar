@@ -1,8 +1,6 @@
-/**
- * Mac Calendar — Global App State & API Client
- */
+/** Estado global e cliente da API do MC. */
 
-// ─── CSRF Token ────────────────────────────────────────────────────────────
+// Token de proteção dos formulários
 function getCsrfToken() {
   const meta = document.querySelector('meta[name="csrftoken"]');
   if (meta) return meta.getAttribute('content');
@@ -10,7 +8,7 @@ function getCsrfToken() {
   return match ? match[1] : '';
 }
 
-// ─── User role helpers ─────────────────────────────────────────────────────
+// Perfis de acesso
 const USER_ROLE = document.querySelector('meta[name="user-role"]')?.getAttribute('content') || '';
 const USER_RESTAURANT_ID = document.querySelector('meta[name="user-restaurant-id"]')?.getAttribute('content') || '';
 const _SUPER_ROLES = ['admin', 'rh', 'marketing'];
@@ -18,7 +16,7 @@ const _MANAGER_ROLES = ['admin', 'rh', 'marketing', 'gerente_loja', 'sub_gerente
 function isSuperRole() { return _SUPER_ROLES.includes(USER_ROLE); }
 function isManagerOrAbove() { return _MANAGER_ROLES.includes(USER_ROLE); }
 
-// ─── API Client ────────────────────────────────────────────────────────────
+// Cliente da API
 const API = {
   _headers() {
     return {
@@ -47,12 +45,24 @@ const API = {
         return null;
       }
       const data = await res.json().catch(() => ({}));
+      if (data && typeof data === 'object') {
+        Object.defineProperty(data, '_httpOk', {
+          value: res.ok,
+          enumerable: false,
+          configurable: true,
+        });
+        Object.defineProperty(data, '_httpStatus', {
+          value: res.status,
+          enumerable: false,
+          configurable: true,
+        });
+      }
       if (!res.ok) {
-        console.error('API error:', res.status, data);
+        console.error('Erro da API:', res.status, data);
       }
       return data;
     } catch (err) {
-      console.error('Network error:', err);
+      console.error('Erro de rede:', err);
       return null;
     }
   },
@@ -65,7 +75,7 @@ const API = {
   upload(url, formData) { return this.request('POST', url, formData, true); },
 };
 
-// ─── Alpine.js Global State ────────────────────────────────────────────────
+// Estado global da interface
 function appState() {
   return {
     darkMode: localStorage.getItem('darkMode') === 'true',
@@ -89,7 +99,34 @@ function appState() {
   };
 }
 
-// ─── Global helpers ────────────────────────────────────────────────────────
+// Funções auxiliares
+function firstErrorDetail(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return firstErrorDetail(value[0]);
+  if (typeof value === 'object') {
+    for (const detail of Object.values(value)) {
+      const message = firstErrorDetail(detail);
+      if (message) return message;
+    }
+  }
+  return '';
+}
+
+function apiError(data) {
+  if (data === null || data === undefined) {
+    return 'Não foi possível comunicar com o sistema. Tente novamente.';
+  }
+  if (data?._httpOk !== false && !data?.error && !data?.erro) return '';
+  return (
+    firstErrorDetail(data?.error) ||
+    firstErrorDetail(data?.erro) ||
+    firstErrorDetail(data?.detail) ||
+    firstErrorDetail(data?.details) ||
+    'Não foi possível concluir a operação.'
+  );
+}
+
 function toast(msg, type = 'success') {
   const el = document.createElement('div');
   el.className = `toast toast-${type}`;

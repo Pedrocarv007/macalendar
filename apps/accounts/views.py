@@ -152,7 +152,7 @@ class ProfileView(APIView):
         )
         return Response(success_response(
             data=EmployeeDetailSerializer(request.user, context={'request': request}).data,
-            message='Profile updated.',
+            message='Perfil atualizado.',
         ))
 
     def patch(self, request):
@@ -164,7 +164,7 @@ class SSOCallbackView(View):
     GET /auth/sso/callback?sso_token=<jwt>
 
     Recebe o token JWT do TheCarv SSO, valida-o, faz login do utilizador
-    e redireciona para o dashboard.
+    e redireciona para o calendário.
 
     O segredo de verificação é lido de THECARV_SSO_SECRET no .env.
     """
@@ -240,11 +240,11 @@ class SSOCallbackView(View):
 
         # Validar o parametro `next` para evitar open redirect:
         # so aceitamos caminhos internos / o proprio host da aplicacao.
-        next_url = request.GET.get('next') or '/dashboard'
+        next_url = request.GET.get('next') or '/calendar'
         if not url_has_allowed_host_and_scheme(
             next_url,
             allowed_hosts={request.get_host()},
             require_https=request.is_secure(),
         ):
-            next_url = '/dashboard'
+            next_url = '/calendar'
         return redirect(next_url)

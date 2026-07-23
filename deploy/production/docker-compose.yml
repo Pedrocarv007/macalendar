@@ -1,0 +1,56 @@
+x-calendar-service: &calendar-service
+  image: pedrocarv06/macalendar:2026.07.23-mc
+  env_file:
+    - .env
+  environment:
+    THECARV_SSO_PORTAL: https://carloscardoso.thecarv.com
+    SSO_MEDIA_ROOT: /app/sso_media
+    TEMPLATES_BASE_DIR: /app/templates_generate
+    BIRTHDAY_GENERATION_MONTHS_AHEAD: "1"
+    ALLOW_REMOTE_AVATAR_FETCH: "False"
+  restart: unless-stopped
+  networks:
+    - thecarv_net
+    - thecarv_django_default
+
+services:
+  web:
+    <<: *calendar-service
+    container_name: thecarv_calendar
+    ports:
+      - "8002:8001"
+    volumes:
+      - ./collected_static:/app/collected_static
+      - ./media:/app/media
+      - ./logs:/app/logs
+      - ./templates_generate:/app/templates_generate:ro
+      - ../carloscardoso.thecarv.com/media:/app/sso_media:ro
+
+  calendar_birthdays:
+    <<: *calendar-service
+    container_name: thecarv_mc_birthdays
+    command:
+      - python
+      - manage.py
+      - schedule_birthdays
+      - --interval-seconds
+      - "21600"
+    volumes:
+      - ./media:/app/media
+      - ./logs:/app/logs
+      - ./templates_generate:/app/templates_generate:ro
+      - ../carloscardoso.thecarv.com/media:/app/sso_media:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os; os.kill(1, 0)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  thecarv_django_default:
+    external: true
+  thecarv_net:
+    external: true

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Documentos{% endblock %}
-{% block page_title %}Documentos{% endblock %}
+{% block title %}Templates{% endblock %}
+{% block page_title %}Templates{% endblock %}
 
 {% block content %}
 <div x-data="documentsPage()" x-init="init()">
@@ -13,14 +13,18 @@
     <select x-model="typeFilter" @change="onTypeFilterChange()" class="form-input" style="width:170px">
       <option value="">Todos os tipos</option>
       <option value="birthday">Aniversário</option>
-      <option value="welcome">Boas-Vindas</option>
-      <option value="employee_month">Func. do Mês</option>
+      <option value="welcome">Boas-vindas</option>
+      <option value="employee_month">Funcionário do Mês</option>
       <option value="memo">Memorando</option>
-      <option value="photo">Foto</option>
+      <option value="photo">Fotografia</option>
     </select>
     <div style="display:flex;gap:8px;margin-left:auto">
-      <button @click="openGenerator()" class="btn btn-secondary">Gerar Cartão</button>
-      <button @click="openUpload()" class="btn btn-primary">+ Upload</button>
+      <button @click="openGenerator()" class="btn btn-secondary">
+        <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Gerar template
+      </button>
+      <button @click="openUpload()" class="btn btn-primary">
+        <i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i> Carregar
+      </button>
     </div>
   </div>
 
@@ -45,7 +49,7 @@
       <p class="docs-section-kicker">Conteúdo</p>
       <h3 class="docs-section-title" x-text="activeCategoryLabel()"></h3>
     </div>
-    <p class="docs-section-count" x-text="filteredDocuments().length + ' resultado(s)'"></p>
+    <p class="docs-section-count" x-text="resultsLabel()"></p>
   </div>
 
   <!-- Grid -->
@@ -58,13 +62,17 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
             </svg>
           </div>
-          <span class="badge badge-gray text-xs" x-text="doc.document_type"></span>
+          <span class="badge badge-gray text-xs" x-text="templateLabel(doc.document_type)"></span>
         </div>
         <p style="font-size:13px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="doc.title"></p>
         <p class="text-xs text-muted" style="margin-top:3px" x-text="doc.file_size_display || '—'"></p>
         <div style="display:flex;gap:10px;margin-top:12px">
-          <a :href="`/api/documents/${doc.id}/download`" class="btn btn-ghost btn-sm" style="color:var(--gold-dark);padding:0">Download</a>
-          <button @click="deleteDoc(doc.id)" class="btn btn-ghost btn-sm" style="color:#ef4444;padding:0;margin-left:auto">Apagar</button>
+          <button x-show="canPreview(doc)" @click="openDocumentPreview(doc)"
+            class="btn btn-ghost btn-sm" style="color:var(--text-primary);padding:0">
+            <i class="fa-solid fa-eye" aria-hidden="true"></i> Ver
+          </button>
+          <a :href="`/api/documents/${doc.id}/download`" class="btn btn-ghost btn-sm" style="color:var(--module-accent);padding:0">Descarregar</a>
+          <button @click="deleteDoc(doc.id)" class="btn btn-ghost btn-sm" style="color:var(--danger);padding:0;margin-left:auto">Apagar</button>
         </div>
       </div>
     </template>
@@ -73,10 +81,9 @@
 
   </div>
 
-  <!-- Upload Modal -->
-  <div x-show="showUpload" x-transition class="mac-modal-overlay">
-    <div class="mac-modal">
-      <div class="mac-modal-title">Carregar Documento</div>
+  <div x-cloak x-show="showUpload" x-transition class="mc-modal-overlay" @click.self="showUpload=false">
+    <div class="mc-modal">
+      <div class="mc-modal-title">Carregar documento</div>
       <div class="form-group">
         <label class="form-label">Título</label>
         <input x-model="uploadForm.title" type="text" placeholder="Título" class="form-input">
@@ -92,61 +99,95 @@
       </div>
       <div class="form-group">
         <label class="form-label">Ficheiro</label>
-        <input type="file" @change="uploadForm.file = $event.target.files[0]" class="form-input" style="height:auto;padding:8px 12px">
+        <label class="file-picker">
+          <input type="file" @change="uploadForm.file = $event.target.files[0]">
+          <strong><i class="fa-solid fa-paperclip" aria-hidden="true"></i> Escolher ficheiro</strong>
+          <small x-text="uploadForm.file ? uploadForm.file.name : 'Nenhum ficheiro selecionado'"></small>
+        </label>
       </div>
-      <div class="mac-modal-footer">
-        <button @click="upload()" class="btn btn-primary" style="flex:1">Carregar</button>
+      <div class="form-group">
+        <label class="form-label">Restaurante</label>
+        <select x-model="uploadForm.restaurant" class="form-input">
+          <option value="">Selecionar restaurante</option>
+          <template x-for="restaurant in restaurants" :key="restaurant.id">
+            <option :value="restaurant.id" x-text="restaurant.name"></option>
+          </template>
+        </select>
+      </div>
+      <div class="mc-modal-footer">
+        <button @click="upload()" class="btn btn-primary" style="flex:1" :disabled="uploading"
+          x-text="uploading ? 'A carregar…' : 'Carregar'"></button>
         <button @click="showUpload=false" class="btn btn-secondary" style="flex:1">Cancelar</button>
       </div>
     </div>
   </div>
 
-  <!-- Generator Modal -->
-  <div x-show="showGenerator" x-transition class="mac-modal-overlay">
-    <div class="mac-modal" style="max-width:520px">
-      <div class="mac-modal-title">Gerar Cartão</div>
+  <div x-cloak x-show="showGenerator" x-transition class="mc-modal-overlay" @click.self="showGenerator=false">
+    <div class="mc-modal" style="max-width:520px">
+      <div class="mc-modal-title">Gerar template</div>
 
-      <!-- Template type -->
       <div class="form-group">
-        <label class="form-label">Tipo de Cartão</label>
-        <div style="display:flex;gap:8px">
-          <template x-for="t in ['birthday','welcome','employee_month']" :key="t">
-            <button @click="genForm.template = t" class="btn btn-sm" style="flex:1"
-              :class="genForm.template === t ? 'btn-primary' : 'btn-secondary'"
-              x-text="templateLabel(t)"></button>
+        <label class="form-label">Modelo</label>
+        <div class="template-choice-grid">
+          <template x-for="template in templateCatalog" :key="template.key">
+            <button @click="genForm.template = template.key" class="btn btn-sm"
+              :class="genForm.template === template.key ? 'btn-primary' : 'btn-secondary'"
+              x-text="template.label" :title="template.description"></button>
           </template>
         </div>
       </div>
 
-      <!-- Person type -->
       <div class="form-group">
-        <label class="form-label">Para quem</label>
-        <div style="display:flex;gap:8px">
-          <button @click="switchPersonType('employee')" class="btn btn-sm" style="flex:1"
-            :class="genForm.person_type==='employee' ? 'btn-primary' : 'btn-secondary'">Funcionário</button>
-          <button @click="switchPersonType('worker')" class="btn btn-sm" style="flex:1"
-            :class="genForm.person_type==='worker' ? 'btn-primary' : 'btn-secondary'">Colaborador</button>
-        </div>
-      </div>
-
-      <!-- Person picker button -->
-      <div class="form-group">
-        <label class="form-label" x-text="genForm.person_type === 'employee' ? 'Funcionário' : 'Colaborador'"></label>
-        <button @click="openPicker()" class="btn btn-secondary"
-          style="width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:8px 12px">
-          <template x-if="selectedPerson && selectedPerson.photo_url">
-            <img :src="selectedPerson.photo_url"
-              style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0">
+        <label class="form-label">Colaborador</label>
+        <button @click="openPicker()" class="btn btn-secondary person-select">
+          <template x-if="selectedPerson && selectedPhotoUrl() && !selectedPhotoBroken">
+            <img :src="selectedPhotoUrl()" class="person-photo" alt=""
+              @error="selectedPhotoBroken=true">
           </template>
-          <template x-if="!selectedPerson || !selectedPerson.photo_url">
-            <span style="width:36px;height:36px;border-radius:50%;background:var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center">
+          <template x-if="!selectedPerson || !selectedPhotoUrl() || selectedPhotoBroken">
+            <span class="person-placeholder">
               <i class="fas fa-user" style="font-size:14px;color:var(--text-muted)"></i>
             </span>
           </template>
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-            x-text="selectedPerson ? selectedPerson.name + (selectedPerson.restaurant_name ? ' — ' + selectedPerson.restaurant_name : '') : 'Selecionar pessoa...'">
+            x-text="selectedPerson ? selectedPerson.name + (selectedPerson.restaurant_name ? ' — ' + selectedPerson.restaurant_name : '') : 'Selecionar pessoa…'">
           </span>
         </button>
+      </div>
+
+      <div class="form-group" x-show="selectedPerson">
+        <label class="form-label">Fotografia usada no modelo</label>
+        <div class="generator-photo-preview">
+          <template x-if="selectedPhotoUrl() && !selectedPhotoBroken">
+            <img :src="selectedPhotoUrl()"
+              :alt="selectedPerson ? 'Fotografia de ' + selectedPerson.name : 'Fotografia selecionada'"
+              @load="selectedPhotoAvailable=true"
+              @error="selectedPhotoBroken=true; selectedPhotoAvailable=false">
+          </template>
+          <template x-if="!selectedPhotoUrl() || selectedPhotoBroken">
+            <div class="generator-photo-placeholder">
+              <i class="fa-solid fa-user" aria-hidden="true"></i>
+              <span>Sem fotografia disponível</span>
+            </div>
+          </template>
+          <div class="generator-photo-copy">
+            <strong x-text="selectedPerson ? selectedPerson.name : ''"></strong>
+            <span x-text="selectedPhotoAvailable === true ? 'Fotografia pronta para o template' : 'Selecione uma fotografia antes de gerar'"></span>
+          </div>
+        </div>
+        <label class="file-picker">
+          <input type="file" accept="image/jpeg,image/png,image/webp"
+            @change="handlePhotoChange($event)">
+          <strong><i class="fa-solid fa-camera" aria-hidden="true"></i> Escolher fotografia</strong>
+          <small x-text="genForm.photoFile ? genForm.photoFile.name : 'JPG, PNG ou WebP'"></small>
+        </label>
+        <div x-show="selectedPhotoBroken || selectedPhotoAvailable === false || (selectedPerson && !selectedPhotoUrl())" class="photo-warning">
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          <span>A fotografia não está disponível neste ambiente local. Selecione uma nova fotografia antes de gerar.</span>
+        </div>
+        <p x-show="genForm.photoFile" class="text-xs text-muted" style="margin-top:7px">
+          A nova fotografia será guardada localmente e usada neste material.
+        </p>
       </div>
 
       <!-- Restaurant -->
@@ -160,39 +201,34 @@
         </select>
       </div>
 
-      <!-- Month/year for employee_month -->
       <div class="form-group" x-show="genForm.template === 'employee_month'">
         <label class="form-label">Mês / Ano</label>
         <input x-model="genForm.message" type="text" placeholder="Ex: Março 2026" class="form-input">
       </div>
 
-      <div class="mac-modal-footer">
-        <button @click="generate()" class="btn btn-primary" style="flex:1">Gerar</button>
+      <div class="mc-modal-footer">
+        <button @click="generate()" class="btn btn-primary" style="flex:1" :disabled="generating"
+          x-text="generating ? 'A gerar…' : 'Gerar'"></button>
         <button @click="showGenerator=false" class="btn btn-secondary" style="flex:1">Cancelar</button>
       </div>
     </div>
   </div>
 
-  <!-- Person Picker Modal -->
-  <div x-show="showPicker" x-transition class="mac-modal-overlay" @click.self="showPicker=false">
-    <div class="mac-modal" style="max-width:640px;max-height:80vh;display:flex;flex-direction:column">
+  <div x-cloak x-show="showPicker" x-transition class="mc-modal-overlay" @click.self="showPicker=false">
+    <div class="mc-modal" style="max-width:640px;max-height:80vh;display:flex;flex-direction:column">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <span style="font-size:15px;font-weight:600;color:var(--text-primary)"
-          x-text="genForm.person_type === 'employee' ? 'Selecionar Funcionário' : 'Selecionar Colaborador'"></span>
-        <button @click="showPicker=false" class="btn btn-ghost btn-sm">✕</button>
+        <span style="font-size:15px;font-weight:600;color:var(--text-primary)">Selecionar colaborador</span>
+        <button @click="showPicker=false" class="btn btn-ghost btn-sm" aria-label="Fechar">×</button>
       </div>
       <!-- Search -->
       <input x-model="pickerSearch" type="text" placeholder="Pesquisar por nome ou restaurante..."
         class="form-input" style="margin-bottom:14px">
-      <!-- Grid -->
-      <div style="overflow-y:auto;flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding-right:4px">
+      <div class="person-picker-grid">
         <template x-for="person in peopleList()" :key="person.id">
-          <button @click="pickPerson(person)"
-            style="background:var(--card-bg);border:1.5px solid var(--border);border-radius:12px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:border-color 150ms,box-shadow 150ms"
-            :style="(selectedPerson && selectedPerson.id === person.id) ? 'border-color:var(--gold);box-shadow:0 0 0 2px rgba(0,166,81,0.2)' : ''"
-            @mouseenter="$el.style.borderColor='var(--gold)'" @mouseleave="$el.style.borderColor=(selectedPerson && selectedPerson.id===person.id)?'var(--gold)':'var(--border)'">
+          <button @click="pickPerson(person)" class="person-picker-card"
+            :class="selectedPerson && selectedPerson.id === person.id ? 'is-selected' : ''">
             <img :src="person.photo_url" :alt="person.name"
-              style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--border)">
+              @error="$el.src='/static/img/default-avatar.svg'">
             <span style="font-size:12px;font-weight:600;color:var(--text-primary);text-align:center;line-height:1.3;word-break:break-word"
               x-text="person.name"></span>
             <span style="font-size:11px;color:var(--text-muted);text-align:center"
@@ -205,20 +241,42 @@
     </div>
   </div>
 
-  <!-- Preview Modal -->
-  <div x-show="showPreview" x-transition class="mac-modal-overlay" @click.self="showPreview=false">
-    <div class="mac-modal" style="max-width:700px;padding:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <span style="font-size:14px;font-weight:600;color:var(--text-primary)">Pré-visualização</span>
-        <button @click="showPreview=false" class="btn btn-ghost btn-sm">✕</button>
+  <div x-cloak x-show="showPreview" x-transition class="mc-modal-overlay" @click.self="closePreview()">
+    <div class="mc-modal template-preview-modal">
+      <div class="template-preview-header">
+        <div>
+          <span class="template-preview-eyebrow">Pré-visualização</span>
+          <strong x-text="previewTitle || 'Template gerado'"></strong>
+        </div>
+        <button @click="closePreview()" class="btn btn-ghost btn-sm" aria-label="Fechar">×</button>
       </div>
-      <img :src="previewUrl" style="width:100%;border-radius:10px;object-fit:contain;max-height:70vh">
-      <div style="margin-top:12px;text-align:right">
-        <a :href="previewUrl" download class="btn btn-primary">Download</a>
+      <div class="template-preview-stage">
+        <div x-show="previewLoading" class="template-preview-status">
+          <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+          <span>A carregar o Template…</span>
+        </div>
+        <div x-show="previewError" class="template-preview-status is-error">
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          <span>Não foi possível apresentar a imagem. Pode descarregar o ficheiro abaixo.</span>
+        </div>
+        <img x-show="previewUrl && !previewError"
+          :src="previewUrl"
+          :alt="previewTitle ? 'Pré-visualização de ' + previewTitle : 'Pré-visualização do Template gerado'"
+          @load="previewLoading=false; previewError=false"
+          @error="previewLoading=false; previewError=true">
+      </div>
+      <div class="template-preview-footer">
+        <span x-show="!previewLoading && !previewError" class="template-preview-ready">
+          <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+          Fotografia e composição carregadas
+        </span>
+        <a :href="previewDownloadUrl || previewUrl" download class="btn btn-primary">
+          <i class="fa-solid fa-download" aria-hidden="true"></i>
+          Descarregar
+        </a>
       </div>
     </div>
   </div>
 
 </div>
-<script src="/static/js/modules/documents.js?v=3"></script>
 {% endblock %}

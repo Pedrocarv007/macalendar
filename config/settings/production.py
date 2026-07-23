@@ -1,5 +1,5 @@
 """
-Production settings for Mac Calendar.
+Configuração de produção do MC.
 """
 from .base import *  # noqa
 import dj_database_url

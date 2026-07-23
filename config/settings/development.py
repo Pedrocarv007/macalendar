@@ -1,5 +1,5 @@
 """
-Development settings for Mac Calendar.
+Configuração de desenvolvimento do MC.
 """
 from .base import *  # noqa
 import dj_database_url

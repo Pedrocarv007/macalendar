@@ -1,5 +1,5 @@
 """
-Base Django settings for Mac Calendar project.
+Configuração base do projeto MC.
 """
 import os
 from pathlib import Path
@@ -57,8 +57,6 @@ LOCAL_APPS = [
     'apps.calendar_events',
     'apps.documents',
     'apps.notifications',
-    'apps.tickets',
-    'apps.dashboard',
     'apps.workers',
 ]
 
@@ -92,6 +90,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.core.context_processors.sso_urls',
+                'apps.core.context_processors.interface_config',
             ],
         },
     },
@@ -207,7 +206,7 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 
 # Login URL
 LOGIN_URL = 'http://localhost:51/account/login/'
-LOGIN_REDIRECT_URL = '/dashboard'
+LOGIN_REDIRECT_URL = '/calendar'
 LOGOUT_REDIRECT_URL = 'http://localhost:51/account/login/'
 
 # Service-to-service API key (used by external systems to call /api/service/ endpoints)

@@ -1,0 +1,375 @@
+.module-documents .docs-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.module-documents .docs-toolbar {
+  margin-bottom: 0 !important;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.module-documents .docs-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.module-documents .docs-folder-card {
+  display: flex;
+  min-height: 155px;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  outline: none;
+  background: var(--surface);
+  color: var(--text-primary);
+  text-align: left;
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.module-documents .docs-folder-card:hover,
+.module-documents .docs-folder-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--module-accent) 35%, var(--border));
+  box-shadow: var(--shadow-sm);
+}
+
+.module-documents .docs-folder-card.is-active {
+  border-color: var(--module-accent);
+  box-shadow: 0 0 0 2px var(--module-accent-soft);
+}
+
+.module-documents .docs-folder-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.module-documents .docs-folder-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--module-accent-soft);
+  color: var(--module-accent);
+}
+
+.module-documents .docs-folder-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.module-documents .docs-folder-title {
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.module-documents .docs-folder-text {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.module-documents .docs-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 4px 2px 0;
+}
+
+.module-documents .docs-section-kicker {
+  color: var(--module-accent);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.module-documents .docs-section-title {
+  margin-top: 2px;
+  font-size: 1.05rem;
+  font-weight: 760;
+}
+
+.module-documents .docs-section-count {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.module-documents .person-select {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 9px 11px;
+  text-align: left;
+}
+
+.module-documents .person-photo,
+.module-documents .person-placeholder {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.module-documents .person-placeholder {
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.module-documents .person-picker-grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+  gap: 10px;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.module-documents .person-picker-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-primary);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.module-documents .person-picker-card:hover,
+.module-documents .person-picker-card.is-selected {
+  border-color: var(--module-accent);
+  box-shadow: 0 0 0 2px var(--module-accent-soft);
+}
+
+.module-documents .person-picker-card img {
+  width: 58px;
+  height: 58px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.module-documents .template-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.module-documents .generator-photo-preview {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.module-documents .generator-photo-preview > img,
+.module-documents .generator-photo-placeholder {
+  width: 112px;
+  height: 132px;
+  border: 2px solid var(--surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  object-fit: cover;
+}
+
+.module-documents .generator-photo-placeholder {
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  background: var(--surface);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.module-documents .generator-photo-placeholder i {
+  font-size: 1.6rem;
+}
+
+.module-documents .generator-photo-placeholder span {
+  max-width: 88px;
+  font-size: 0.65rem;
+  line-height: 1.35;
+}
+
+.module-documents .generator-photo-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.module-documents .generator-photo-copy strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-documents .generator-photo-copy span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.module-documents .template-preview-modal {
+  width: min(760px, calc(100vw - 28px));
+  max-width: 760px;
+  padding: 16px;
+}
+
+.module-documents .template-preview-header,
+.module-documents .template-preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.module-documents .template-preview-header {
+  margin-bottom: 12px;
+}
+
+.module-documents .template-preview-header > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.module-documents .template-preview-eyebrow {
+  color: var(--module-accent);
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.module-documents .template-preview-header strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-documents .template-preview-stage {
+  position: relative;
+  display: grid;
+  min-height: 320px;
+  max-height: 72vh;
+  place-items: center;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background:
+    linear-gradient(45deg, var(--surface-2) 25%, transparent 25%) 0 0 / 20px 20px,
+    linear-gradient(-45deg, var(--surface-2) 25%, transparent 25%) 0 10px / 20px 20px,
+    linear-gradient(45deg, transparent 75%, var(--surface-2) 75%) 10px -10px / 20px 20px,
+    linear-gradient(-45deg, transparent 75%, var(--surface-2) 75%) -10px 0 / 20px 20px,
+    var(--surface);
+}
+
+.module-documents .template-preview-stage > img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+.module-documents .template-preview-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.module-documents .template-preview-status.is-error {
+  color: var(--danger);
+}
+
+.module-documents .template-preview-footer {
+  margin-top: 12px;
+}
+
+.module-documents .template-preview-ready {
+  color: var(--success);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+@media (max-width: 1050px) {
+  .module-documents .docs-folder-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .module-documents .docs-toolbar > * {
+    width: 100% !important;
+  }
+
+  .module-documents .docs-toolbar > div {
+    margin-left: 0 !important;
+  }
+
+  .module-documents .docs-toolbar .btn {
+    flex: 1;
+  }
+
+  .module-documents .docs-folder-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .module-documents .docs-folder-card {
+    min-height: 135px;
+  }
+
+  .module-documents .template-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .module-documents .generator-photo-preview {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .module-documents .generator-photo-preview > img,
+  .module-documents .generator-photo-placeholder {
+    width: 88px;
+    height: 108px;
+  }
+
+  .module-documents .template-preview-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .module-documents .template-preview-footer .btn {
+    width: 100%;
+  }
+}
