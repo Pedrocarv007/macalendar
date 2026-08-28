@@ -1,6 +1,7 @@
 import os
 import time
 import uuid
+import requests
 from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
@@ -9,11 +10,14 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from rest_framework.exceptions import PermissionDenied
 
 from apps.core.models import ActivityLog
 from apps.accounts.permissions import IsServiceClient
 from .models import CalendarEvent
 from .serializers import CalendarEventSerializer
+from apps.restaurants.models import Restaurant
+from apps.restaurants.scope import INVENTORY_ONLY_RESTAURANT_CODE
 
 
 class CalendarEventViewSet(viewsets.ModelViewSet):
@@ -24,7 +28,14 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
         user = self.request.user
         params = self.request.query_params
 
-        qs = CalendarEvent.objects.select_related('restaurant', 'created_by', 'employee')
+        qs = CalendarEvent.objects.select_related(
+            'restaurant', 'created_by', 'employee'
+        ).prefetch_related('affected_restaurants').exclude(
+            restaurant__code__iexact=INVENTORY_ONLY_RESTAURANT_CODE,
+        ).filter(
+            Q(event_metadata__suppressed=False)
+            | Q(event_metadata__suppressed__isnull=True)
+        )
 
         # Date filters
         start = params.get('start')
@@ -37,26 +48,62 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
         if end:
             qs = qs.filter(start_date__lt=end)
 
-        # Event type filter
-        event_type = params.get('event_type')
-        if event_type:
-            qs = qs.filter(event_type=event_type)
+        # Event type filter. Repeated params allow the legend to act as a
+        # multi-select while the old single-value API remains compatible.
+        event_types = params.getlist('event_type')
+        if len(event_types) == 1 and ',' in event_types[0]:
+            event_types = event_types[0].split(',')
+        event_types = [value.strip() for value in event_types if value.strip()]
+        if event_types:
+            valid_types = {value for value, _label in CalendarEvent.EVENT_TYPES}
+            selected_types = [value for value in event_types if value in valid_types]
+            qs = qs.filter(event_type__in=selected_types) if selected_types else qs.none()
+
+        impact_level = params.get('impact_level')
+        if impact_level:
+            if impact_level in {'low', 'medium', 'high'}:
+                qs = qs.filter(event_metadata__impact_level=impact_level)
+            else:
+                qs = qs.none()
+
+        search = params.get('search', '').strip()
+        if search:
+            qs = qs.filter(
+                Q(title__icontains=search)
+                | Q(description__icontains=search)
+                | Q(location__icontains=search)
+            )
 
         # Scope: super roles can filter by restaurant; others see only their restaurant + global
         if user.role in settings.SUPER_ROLES:
             restaurant_id = params.get('restaurant_id')
             if restaurant_id:
-                qs = qs.filter(restaurant_id=restaurant_id)
+                if not Restaurant.objects.filter(pk=restaurant_id).exists():
+                    return qs.none()
+                qs = qs.filter(
+                    Q(restaurant_id=restaurant_id)
+                    | Q(affected_restaurants__id=restaurant_id)
+                    | (Q(restaurant__isnull=True) & ~Q(event_type='local_impact'))
+                )
         else:
-            qs = qs.filter(
-                restaurant_id__in=[user.restaurant_id] if user.restaurant_id else []
-            ) | qs.filter(restaurant__isnull=True)
+            if user.restaurant_id and not Restaurant.objects.filter(
+                pk=user.restaurant_id,
+            ).exists():
+                return qs.none()
+            scope = Q(restaurant_id=user.restaurant_id) if user.restaurant_id else Q(pk__in=[])
+            scope |= Q(restaurant__isnull=True) & ~Q(event_type='local_impact')
+            if user.restaurant_id:
+                scope |= Q(
+                    event_type='local_impact',
+                    affected_restaurants__id=user.restaurant_id,
+                )
+            qs = qs.filter(scope)
             if getattr(self, 'action', '') in {
                 'update', 'partial_update', 'destroy', 'upload_photo', 'mark_posted'
             }:
                 qs = qs.filter(restaurant_id=user.restaurant_id)
 
-        return qs.order_by('start_date')
+        return qs.distinct().order_by('start_date')
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -69,12 +116,76 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
                         restaurant=event.restaurant)
 
     def perform_update(self, serializer):
+        if (
+            (serializer.instance.event_metadata or {}).get('external_source')
+            and self.request.user.role not in settings.SUPER_ROLES
+        ):
+            raise PermissionDenied('Os eventos importados são geridos automaticamente.')
         event = serializer.save()
         ActivityLog.log('event_updated', f'Evento "{event.title}" actualizado', self.request.user)
 
     def perform_destroy(self, instance):
+        metadata = dict(instance.event_metadata or {})
+        is_external = bool(metadata.get('external_source'))
+        if is_external and self.request.user.role not in settings.SUPER_ROLES:
+            raise PermissionDenied('Os eventos importados são geridos automaticamente.')
+        if is_external:
+            metadata.update({
+                'suppressed': True,
+                'suppressed_at': timezone.now().isoformat(),
+                'suppressed_by': self.request.user.pk,
+            })
+            instance.event_metadata = metadata
+            instance.save(update_fields=['event_metadata', 'updated_at'])
+            ActivityLog.log(
+                'event_deleted',
+                f'Evento externo "{instance.title}" removido da agenda',
+                self.request.user,
+            )
+            return
         ActivityLog.log('event_deleted', f'Evento "{instance.title}" eliminado', self.request.user)
         instance.delete()
+
+    @action(detail=False, methods=['get'], url_path='options')
+    def options(self, request):
+        return Response({
+            'event_types': CalendarEvent.event_type_options(),
+            'impact_levels': [
+                {'value': 'low', 'label': 'Baixo'},
+                {'value': 'medium', 'label': 'Médio'},
+                {'value': 'high', 'label': 'Alto'},
+            ],
+        })
+
+    @action(detail=False, methods=['post'], url_path='sync-external')
+    def sync_external(self, request):
+        if request.user.role not in settings.SUPER_ROLES:
+            raise PermissionDenied('Apenas a gestão pode atualizar eventos da Internet.')
+        from .external_events import sync_external_events
+
+        try:
+            result = sync_external_events()
+        except requests.RequestException:
+            return Response(
+                {'error': 'As agendas externas não responderam. Tente novamente.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        ActivityLog.log(
+            'external_events_synced',
+            (
+                f'Agenda de movimento atualizada: {result["created"]} novos, '
+                f'{result["updated"]} atualizados'
+            ),
+            request.user,
+        )
+        return Response({
+            **result,
+            'sources': result.get('sources', {}),
+            'message': (
+                f'Análise atualizada: {result["relevant"]} eventos relevantes, '
+                f'{result["created"]} novos e {result["updated"]} atualizados.'
+            ),
+        })
 
     @action(detail=True, methods=['put'], url_path='mark-posted')
     def mark_posted(self, request, pk=None):
@@ -165,7 +276,14 @@ class ServiceCalendarEventsView(APIView):
 
     def get(self, request):
         params = request.query_params
-        qs = CalendarEvent.objects.select_related('restaurant', 'created_by')
+        qs = CalendarEvent.objects.select_related(
+            'restaurant', 'created_by'
+        ).prefetch_related('affected_restaurants').exclude(
+            restaurant__code__iexact=INVENTORY_ONLY_RESTAURANT_CODE,
+        ).filter(
+            Q(event_metadata__suppressed=False)
+            | Q(event_metadata__suppressed__isnull=True)
+        )
 
         sso_restaurant_id = params.get('restaurant_id')
         if sso_restaurant_id:
@@ -173,7 +291,14 @@ class ServiceCalendarEventsView(APIView):
                 sso_restaurant_id = int(sso_restaurant_id)
             except (TypeError, ValueError):
                 return Response({'detail': 'restaurant_id inválido'}, status=400)
-            qs = qs.filter(restaurant__sso_id=sso_restaurant_id)
+            from apps.restaurants.services import get_local_restaurant_for_sso_id
+
+            if get_local_restaurant_for_sso_id(sso_restaurant_id) is None:
+                return Response({'detail': 'Restaurante SSO não encontrado'}, status=404)
+            qs = qs.filter(
+                Q(restaurant__sso_id=sso_restaurant_id)
+                | Q(affected_restaurants__sso_id=sso_restaurant_id)
+            ).distinct()
 
         start = params.get('start')
         end = params.get('end')

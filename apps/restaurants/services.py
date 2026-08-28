@@ -3,14 +3,18 @@
 from apps.workers.models import SSORestaurant
 
 from .models import Restaurant
+from .scope import is_inventory_only_code
 
 
 def get_or_sync_local_restaurant(sso_restaurant):
     """Obtém o restaurante local canónico para um restaurante do SSO."""
-    restaurant = Restaurant.objects.filter(sso_id=sso_restaurant.id).first()
+    if is_inventory_only_code(sso_restaurant.code):
+        return None
+
+    restaurant = Restaurant.all_objects.filter(sso_id=sso_restaurant.id).first()
 
     if restaurant is None and sso_restaurant.code:
-        restaurant = Restaurant.objects.filter(
+        restaurant = Restaurant.all_objects.filter(
             code=sso_restaurant.code,
             sso_id__isnull=True,
         ).first()
@@ -19,7 +23,7 @@ def get_or_sync_local_restaurant(sso_restaurant):
             restaurant.save(update_fields=["sso_id"])
 
     if restaurant is None:
-        return Restaurant.objects.create(
+        return Restaurant.all_objects.create(
             sso_id=sso_restaurant.id,
             name=sso_restaurant.name,
             code=sso_restaurant.code or None,
@@ -39,7 +43,7 @@ def get_or_sync_local_restaurant(sso_restaurant):
 
 def get_local_restaurant_for_sso_id(sso_id):
     """Resolve um ID externo do SSO para o registo local usado pelas FKs."""
-    sso_restaurant = SSORestaurant.objects.filter(
+    sso_restaurant = SSORestaurant.objects.operational().filter(
         id=sso_id,
         is_active=True,
     ).first()
@@ -50,12 +54,13 @@ def get_local_restaurant_for_sso_id(sso_id):
 
 def active_canonical_restaurants(*, sync=True):
     """Devolve apenas os restaurantes ativos publicados pelo SSO."""
-    sso_restaurants = list(SSORestaurant.objects.filter(is_active=True))
+    sso_restaurants = list(SSORestaurant.objects.operational().filter(is_active=True))
     if sync:
-        local_ids = [
-            get_or_sync_local_restaurant(sso_restaurant).id
-            for sso_restaurant in sso_restaurants
-        ]
+        local_ids = []
+        for sso_restaurant in sso_restaurants:
+            local = get_or_sync_local_restaurant(sso_restaurant)
+            if local is not None:
+                local_ids.append(local.id)
         return Restaurant.objects.filter(id__in=local_ids, is_active=True)
 
     sso_ids = [restaurant.id for restaurant in sso_restaurants]

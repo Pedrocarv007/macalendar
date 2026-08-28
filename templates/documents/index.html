@@ -190,15 +190,20 @@
         </p>
       </div>
 
-      <!-- Restaurant -->
+      <!-- Destination follows the selected person so a remote admin cannot
+           accidentally publish a card to their own restaurant. -->
       <div class="form-group">
-        <label class="form-label">Restaurante</label>
-        <select x-model="genForm.restaurant_id" class="form-input">
-          <option value="">Restaurante do utilizador</option>
+        <label class="form-label">Restaurante de destino</label>
+        <select x-model="genForm.restaurant_id" class="form-input" :disabled="selectedPerson">
+          <option value="">Selecione primeiro o colaborador</option>
           <template x-for="r in restaurants" :key="r.id">
             <option :value="r.id" x-text="r.name"></option>
           </template>
         </select>
+        <p x-show="selectedPerson" class="text-xs text-muted" style="margin-top:6px">
+          O template será enviado para
+          <strong x-text="destinationRestaurantName() || 'o restaurante associado no Portal'"></strong>.
+        </p>
       </div>
 
       <div class="form-group" x-show="genForm.template === 'employee_month'">

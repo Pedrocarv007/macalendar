@@ -2,6 +2,11 @@ from django.db import models
 
 
 class CalendarEvent(models.Model):
+    # Legacy values remain valid for historical rows and imports, but they are
+    # no longer offered as filters or creation choices in the calendar UI.
+    HIDDEN_EVENT_TYPE_OPTIONS = {
+        'shift', 'training', 'mystery_challenge', 'mystery_answer',
+    }
     EVENT_TYPES = [
         ('meeting', 'Reunião'),
         ('birthday', 'Aniversário'),
@@ -11,8 +16,25 @@ class CalendarEvent(models.Model):
         ('post', 'Post'),
         ('mystery_challenge', 'Desafio Mistério'),
         ('mystery_answer', 'Resposta Mistério'),
+        ('local_impact', 'Evento local com impacto'),
         ('other', 'Outro'),
     ]
+
+    # One stable colour per event type.  The colour is part of the calendar's
+    # visual language, not a per-event preference; keeping it here prevents
+    # the web UI, imports and scheduled jobs from drifting apart.
+    EVENT_COLORS = {
+        'meeting': '#93C5FD',
+        'birthday': '#FFBC0D',
+        'holiday': '#FCA5A5',
+        'shift': '#CBD5E1',
+        'training': '#99F6E4',
+        'post': '#F9A8D4',
+        'mystery_challenge': '#C4B5FD',
+        'mystery_answer': '#86EFAC',
+        'local_impact': '#FDBA74',
+        'other': '#D4D4D8',
+    }
 
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, default='')
@@ -26,6 +48,13 @@ class CalendarEvent(models.Model):
         on_delete=models.CASCADE,
         null=True, blank=True,
         related_name='events',
+    )
+    # Eventos externos podem afetar vários restaurantes sem serem duplicados.
+    # ``restaurant`` continua a ser o âmbito dos eventos criados manualmente.
+    affected_restaurants = models.ManyToManyField(
+        'restaurants.Restaurant',
+        blank=True,
+        related_name='traffic_impact_events',
     )
     created_by = models.ForeignKey(
         'accounts.Employee',
@@ -42,7 +71,7 @@ class CalendarEvent(models.Model):
     )
 
     is_all_day = models.BooleanField(default=False)
-    color = models.CharField(max_length=7, default='#3B82F6')
+    color = models.CharField(max_length=7, default=EVENT_COLORS['meeting'])
     location = models.CharField(max_length=200, blank=True, default='')
     photo_path = models.CharField(max_length=300, blank=True, default='')
     link = models.URLField(blank=True, default='')
@@ -71,3 +100,26 @@ class CalendarEvent(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.start_date.date()})"
+
+    @classmethod
+    def color_for_type(cls, event_type):
+        return cls.EVENT_COLORS.get(event_type, cls.EVENT_COLORS['other'])
+
+    @classmethod
+    def event_type_options(cls):
+        return [
+            {
+                'value': value,
+                'label': label,
+                'color': cls.color_for_type(value),
+            }
+            for value, label in cls.EVENT_TYPES
+            if value not in cls.HIDDEN_EVENT_TYPE_OPTIONS
+        ]
+
+    def save(self, *args, **kwargs):
+        self.color = self.color_for_type(self.event_type)
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None:
+            kwargs['update_fields'] = set(update_fields) | {'color'}
+        return super().save(*args, **kwargs)

@@ -27,7 +27,7 @@ class RestaurantSerializer(serializers.ModelSerializer):
     def get_workers_count(self, obj):
         # Workers agora geridos pelo SSO — conta via SSO DB por código de restaurante
         from apps.workers.models import Worker, SSORestaurant
-        sso_rest = SSORestaurant.objects.filter(name__iexact=obj.name).first()
+        sso_rest = SSORestaurant.objects.operational().filter(name__iexact=obj.name).first()
         if sso_rest:
             return Worker.objects.filter(restaurant_id=sso_rest.id, is_active=True).count()
         return 0

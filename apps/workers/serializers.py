@@ -7,7 +7,7 @@ _REST_CACHE: dict = {}
 
 def _get_rest_cache():
     if not _REST_CACHE:
-        for r in SSORestaurant.objects.all():
+        for r in SSORestaurant.objects.operational():
             _REST_CACHE[r.id] = r.name
     return _REST_CACHE
 

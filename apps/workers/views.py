@@ -51,7 +51,7 @@ class SSORestaurantViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class   = None
 
     def get_queryset(self):
-        return SSORestaurant.objects.filter(is_active=True)
+        return SSORestaurant.objects.operational().filter(is_active=True)
 
 
 class WorkerViewSet(viewsets.ReadOnlyModelViewSet):
@@ -83,12 +83,12 @@ class WorkerViewSet(viewsets.ReadOnlyModelViewSet):
             # Mapeia o restaurante do MC para o SSO através do nome
             mac_rest_name = user.restaurant.name if user.restaurant else None
             if mac_rest_name:
-                sso_rest = SSORestaurant.objects.filter(
+                sso_rest = SSORestaurant.objects.operational().filter(
                     name__iexact=mac_rest_name
                 ).first()
                 if not sso_rest:
                     # Fallback: procura por nome parcial
-                    sso_rest = SSORestaurant.objects.filter(
+                    sso_rest = SSORestaurant.objects.operational().filter(
                         name__icontains=mac_rest_name.split()[0]
                     ).first()
                 if sso_rest:
@@ -121,10 +121,10 @@ class WorkerViewSet(viewsets.ReadOnlyModelViewSet):
             rest_id = int(rest_id_raw)
         except (ValueError, TypeError):
             return Response({'error': 'restaurant_id inválido.'}, status=status.HTTP_400_BAD_REQUEST)
-        if not SSORestaurant.objects.filter(pk=rest_id).exists():
+        if not SSORestaurant.objects.operational().filter(pk=rest_id).exists():
             return Response({'error': 'Restaurante não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
         Worker.objects.using('sso').filter(pk=worker.pk).update(restaurant_id=rest_id)
-        rest = SSORestaurant.objects.get(pk=rest_id)
+        rest = SSORestaurant.objects.operational().get(pk=rest_id)
         ActivityLog.log('worker_restaurant', f'Restaurante de "{worker.name}" alterado para "{rest.name}"', request.user)
         return Response({'restaurant_id': rest_id, 'restaurant_name': rest.name})
 

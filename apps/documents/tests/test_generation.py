@@ -80,6 +80,41 @@ class PhotoResolutionTests(SimpleTestCase):
             self.assertGreater(len(result.attempted), 0)
 
 
+class RestaurantRoutingTests(SimpleTestCase):
+    @patch("apps.restaurants.services.get_local_restaurant_for_sso_id")
+    def test_worker_restaurant_overrides_admin_and_form_restaurants(self, resolve_local):
+        alges = SimpleNamespace(id=20, name="Algés")
+        resolve_local.return_value = alges
+        person = {
+            "worker": SimpleNamespace(restaurant_id=205),
+            "employee": None,
+        }
+        admin_a5 = SimpleNamespace(restaurant_id=10)
+
+        result = DocumentGenerator._resolve_restaurant(
+            {"restaurant_id": 10},
+            admin_a5,
+            person,
+        )
+
+        self.assertIs(result, alges)
+        resolve_local.assert_called_once_with(205)
+
+    @patch("apps.restaurants.services.get_local_restaurant_for_sso_id")
+    def test_employee_restaurant_is_used_when_no_sso_worker_exists(self, resolve_local):
+        alges = SimpleNamespace(id=20, name="Algés")
+        employee = SimpleNamespace(restaurant_id=20, restaurant=alges)
+
+        result = DocumentGenerator._resolve_restaurant(
+            {"restaurant_id": 10},
+            SimpleNamespace(restaurant_id=10),
+            {"worker": None, "employee": employee},
+        )
+
+        self.assertIs(result, alges)
+        resolve_local.assert_not_called()
+
+
 class GeneratedFileCleanupTests(SimpleTestCase):
     def test_database_failure_does_not_leave_orphan_file(self):
         with TemporaryDirectory() as temporary:

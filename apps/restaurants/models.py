@@ -1,7 +1,21 @@
 from django.db import models
 
+from .scope import INVENTORY_ONLY_RESTAURANT_CODE, is_inventory_only_code
+
+
+class OperationalRestaurantManager(models.Manager):
+    """Exclui locais que pertencem exclusivamente ao Stock do SSO."""
+
+    def get_queryset(self):
+        return super().get_queryset().exclude(
+            code__iexact=INVENTORY_ONLY_RESTAURANT_CODE,
+        )
+
 
 class Restaurant(models.Model):
+    objects = OperationalRestaurantManager()
+    all_objects = models.Manager()
+
     # Link para o restaurante no SSO (sem FK cross-DB — só o ID numérico)
     sso_id  = models.IntegerField(unique=True, null=True, blank=True, default=None)
     name    = models.CharField(max_length=100)
@@ -25,9 +39,15 @@ class Restaurant(models.Model):
 
     class Meta:
         ordering = ['name']
+        default_manager_name = 'objects'
+        base_manager_name = 'all_objects'
 
     def __str__(self):
         return self.name
+
+    @property
+    def is_inventory_only(self):
+        return is_inventory_only_code(self.code)
 
     @property
     def photo_url(self):

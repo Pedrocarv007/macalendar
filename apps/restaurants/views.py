@@ -34,7 +34,7 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         # Determina quais restaurantes SSO este utilizador pode ver
-        sso_qs = SSORestaurant.objects.filter(is_active=True)
+        sso_qs = SSORestaurant.objects.operational().filter(is_active=True)
         if not is_super_role(user):
             # Não-admin: só vê o seu próprio restaurante (via code/sso_id)
             if user.restaurant_id:
@@ -49,7 +49,11 @@ class RestaurantViewSet(viewsets.ModelViewSet):
                 return Restaurant.objects.none()
 
         # Garante registo local para cada SSO restaurant e recolhe os IDs locais
-        local_ids = [get_or_sync_local_restaurant(sso).id for sso in sso_qs]
+        local_ids = []
+        for sso in sso_qs:
+            local = get_or_sync_local_restaurant(sso)
+            if local is not None:
+                local_ids.append(local.id)
         return Restaurant.objects.filter(id__in=local_ids, is_active=True)
 
     def get_permissions(self):

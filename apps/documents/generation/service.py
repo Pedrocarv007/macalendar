@@ -60,11 +60,22 @@ class DocumentGenerator:
         if person.get("error"):
             return person
 
-        restaurant = self._resolve_restaurant(data, user)
+        restaurant = self._resolve_restaurant(data, user, person)
         if restaurant is None:
             return {
-                "error": "Selecione o restaurante antes de gerar o cartão.",
+                "error": (
+                    "A pessoa selecionada não tem um restaurante de destino "
+                    "válido. Confirme a associação no Portal."
+                ),
                 "code": "restaurant_required",
+            }
+        if (
+            getattr(user, "role", None) not in settings.SUPER_ROLES
+            and restaurant.id != getattr(user, "restaurant_id", None)
+        ):
+            return {
+                "error": "Só pode gerar templates para o seu restaurante.",
+                "code": "target_restaurant_forbidden",
             }
 
         background, template_path = load_template_image(definition, restaurant.name)
@@ -185,8 +196,20 @@ class DocumentGenerator:
         }
 
     @staticmethod
-    def _resolve_restaurant(data, user):
+    def _resolve_restaurant(data, user, person=None):
         from apps.restaurants.models import Restaurant
+        from apps.restaurants.services import get_local_restaurant_for_sso_id
+
+        person = person or {}
+        worker = person.get("worker")
+        if worker and getattr(worker, "restaurant_id", None):
+            # Worker restaurant IDs come from the SSO database, so they must be
+            # mapped to the local Restaurant row used by Document.restaurant.
+            return get_local_restaurant_for_sso_id(worker.restaurant_id)
+
+        employee = person.get("employee")
+        if employee and getattr(employee, "restaurant_id", None):
+            return employee.restaurant
 
         restaurant_id = data.get("restaurant_id") or getattr(user, "restaurant_id", None)
         if not restaurant_id:
@@ -297,6 +320,7 @@ class DocumentGenerator:
                 document_type=definition.key,
                 template_name=definition.key,
                 employee=person["employee"],
+                worker=person.get("worker"),
                 restaurant=restaurant,
                 created_by=user,
                 filename=filename,
@@ -318,6 +342,8 @@ class DocumentGenerator:
             "filename": document.filename,
             "file_url": f"/media/documents/generated/{filename}",
             "template_label": definition.label,
+            "restaurant_id": restaurant.id,
+            "restaurant_name": restaurant.name,
             "photo_status": "disponivel",
             "photo_source": photo_source,
             "template_file": template_path.name,

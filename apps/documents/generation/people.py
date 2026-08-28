@@ -11,9 +11,9 @@ def sso_restaurant_id(restaurant):
 
     from apps.workers.models import SSORestaurant
 
-    match = SSORestaurant.objects.filter(name__iexact=restaurant.name).first()
+    match = SSORestaurant.objects.operational().filter(name__iexact=restaurant.name).first()
     if not match and restaurant.name:
-        match = SSORestaurant.objects.filter(
+        match = SSORestaurant.objects.operational().filter(
             name__icontains=restaurant.name.split()[0]
         ).first()
     return match.id if match else None

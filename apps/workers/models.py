@@ -7,6 +7,13 @@ class SSOManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().using('sso')
 
+    def operational(self):
+        from apps.restaurants.scope import INVENTORY_ONLY_RESTAURANT_CODE
+
+        return self.get_queryset().exclude(
+            code__iexact=INVENTORY_ONLY_RESTAURANT_CODE,
+        )
+
 
 class SSOUser(models.Model):
     """

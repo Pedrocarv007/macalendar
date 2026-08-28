@@ -265,9 +265,24 @@ function documentsPage() {
       this.clearSelectedPhotoPreview();
       this.genForm.worker_id = person.id;
       this.genForm.employee_id = '';
+      const destination = this.destinationRestaurantFor(person);
+      this.genForm.restaurant_id = destination?.id || '';
       this.genForm.photoFile = null;
       this.showPicker = false;
       await this.validateSelectedPhoto();
+    },
+
+    destinationRestaurantFor(person = this.selectedPerson) {
+      if (!person) return null;
+      return this.restaurants.find(restaurant => (
+        String(restaurant.sso_id || '') === String(person.restaurant_id || '')
+      )) || null;
+    },
+
+    destinationRestaurantName() {
+      return this.destinationRestaurantFor()?.name
+        || this.selectedPerson?.restaurant_name
+        || '';
     },
 
     selectedPhotoUrl() {
@@ -369,8 +384,10 @@ function documentsPage() {
         toast('Selecione a pessoa do cartão.', 'error');
         return;
       }
+      const destination = this.destinationRestaurantFor();
+      this.genForm.restaurant_id = destination?.id || '';
       if (!this.genForm.restaurant_id) {
-        toast('Selecione o restaurante.', 'error');
+        toast('Não foi possível identificar o restaurante do colaborador.', 'error');
         return;
       }
 

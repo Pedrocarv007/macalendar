@@ -10,17 +10,20 @@
 <div x-data="calendarPage()">
 
   <div class="calendar-toolbar">
-    <label class="visually-hidden" for="calendar-type-filter">Filtrar por tipo de evento</label>
-    <select id="calendar-type-filter" x-model="filterType" @change="reloadEvents()" class="form-input" style="width:190px">
-      <option value="">Todos os tipos</option>
-      <option value="meeting">Reunião</option>
-      <option value="birthday">Aniversário</option>
-      <option value="holiday">Feriado</option>
-      <option value="shift">Turno</option>
-      <option value="training">Formação</option>
-      <option value="post">Publicação</option>
-      <option value="mystery_challenge">Desafio Mistério</option>
-      <option value="other">Outro</option>
+    <label class="visually-hidden" for="calendar-search-filter">Pesquisar eventos</label>
+    <div class="calendar-search-filter">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <input id="calendar-search-filter" x-model="filterSearch"
+        @input.debounce.300ms="reloadEvents()" type="search"
+        placeholder="Pesquisar eventos…" class="form-input">
+    </div>
+
+    <label class="visually-hidden" for="calendar-impact-filter">Filtrar por impacto</label>
+    <select id="calendar-impact-filter" x-model="filterImpact" @change="reloadEvents()" class="form-input calendar-impact-filter">
+      <option value="">Todos os impactos</option>
+      <option value="high">Impacto alto</option>
+      <option value="medium">Impacto médio</option>
+      <option value="low">Impacto baixo</option>
     </select>
 
     <template x-if="isSuperUser">
@@ -38,9 +41,38 @@
       </div>
     </template>
 
+    <button x-show="isSuperUser" @click="syncExternalEvents()" class="btn btn-secondary"
+      :disabled="syncingExternal" title="Importar jogos e eventos da Grande Lisboa, Cascais e Oeiras">
+      <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+      <span x-text="syncingExternal ? 'A atualizar…' : 'Atualizar eventos da Internet'"></span>
+    </button>
+
+    <button x-show="hasActiveFilters()" @click="clearFilters()" class="btn btn-ghost btn-sm">
+      <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i> Limpar filtros
+    </button>
+
     <button @click="openCreateModal()" class="btn btn-primary calendar-create-button" style="margin-left:auto">
       <i class="fa-solid fa-plus" aria-hidden="true"></i> Novo evento
     </button>
+  </div>
+
+  <div class="calendar-legend" aria-label="Legenda de cores e filtros por tipo de evento">
+    <span class="calendar-legend-title">Legenda e tipos</span>
+    <button type="button" class="calendar-type-chip is-all"
+      :class="filterTypes.length === 0 ? 'is-active' : ''"
+      :aria-pressed="filterTypes.length === 0" @click="filterTypes=[]; reloadEvents()">
+      Todos
+    </button>
+    <template x-for="type in eventTypes" :key="type.value">
+      <button type="button" class="calendar-type-chip"
+        :class="isTypeSelected(type.value) ? 'is-active' : ''"
+        :aria-pressed="isTypeSelected(type.value)"
+        :style="`--event-color:${type.color}`"
+        @click="toggleTypeFilter(type.value)">
+        <span class="calendar-color-swatch" aria-hidden="true"></span>
+        <span x-text="type.label"></span>
+      </button>
+    </template>
   </div>
 
   <div class="card calendar-shell">
@@ -48,7 +80,7 @@
   </div>
 
   <div x-cloak x-show="showModal" x-transition class="mc-modal-overlay" @click.self="showModal=false">
-    <div class="mc-modal" style="max-width:520px">
+    <div class="mc-modal" style="max-width:900px">
       <div class="mc-modal-title" x-text="editId ? 'Editar evento' : 'Novo evento'"></div>
 
       <div class="form-group">
@@ -71,14 +103,65 @@
       </div>
       <div class="form-group">
         <label class="form-label">Tipo</label>
-        <select x-model="form.event_type" class="form-input">
-          <option value="meeting">Reunião</option>
-          <option value="birthday">Aniversário</option>
-          <option value="holiday">Feriado</option>
-          <option value="training">Formação</option>
-          <option value="post">Publicação</option>
-          <option value="other">Outro</option>
+        <select x-model="form.event_type" @change="syncFormColor()" class="form-input">
+          <template x-for="type in eventTypes" :key="type.value">
+            <option :value="type.value" x-text="type.label"></option>
+          </template>
         </select>
+      </div>
+      <div x-show="form.event_type === 'local_impact'" class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Impacto esperado</label>
+          <select x-model="form.impact_level" class="form-input">
+            <option value="low">Baixo</option>
+            <option value="medium">Médio</option>
+            <option value="high">Alto</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Categoria</label>
+          <select x-model="form.impact_category" class="form-input">
+            <option value="concert">Concerto / show</option>
+            <option value="festival">Festival</option>
+            <option value="sports">Futebol / desporto</option>
+            <option value="local_party">Festa local</option>
+            <option value="fair">Feira / mercado</option>
+            <option value="cinema">Cinema / estreia</option>
+            <option value="other">Outro</option>
+          </select>
+        </div>
+      </div>
+      <div x-show="form.is_external" class="card" style="padding:14px;margin:0 0 14px;border-left:4px solid var(--gold)">
+        <div style="font-weight:700;margin-bottom:8px">
+          Análise automática de movimento
+          <span class="text-xs text-muted" x-text="form.event_metadata?.external_source ? ` · ${form.event_metadata.external_source}` : ''"></span>
+        </div>
+        <div class="text-xs" style="display:grid;gap:7px">
+          <div>
+            <strong>Janela de pico:</strong>
+            <span x-text="form.event_metadata?.peak_window_label || 'A confirmar'"></span>
+          </div>
+          <div>
+            <strong>Restaurantes mais afetados:</strong>
+            <span x-text="(form.event_metadata?.matched_restaurant_names || []).join(', ') || 'Em análise'"></span>
+          </div>
+          <div>
+            <strong>Rota:</strong>
+            <span x-text="form.event_metadata?.route_summary || 'Em análise'"></span>
+          </div>
+          <template x-for="item in (form.event_metadata?.restaurant_impacts || [])" :key="item.restaurant_id">
+            <div style="padding-top:6px;border-top:1px solid var(--border)">
+              <strong x-text="item.restaurant_name"></strong>
+              <span x-text="` · ${item.impact_level === 'high' ? 'Alto' : item.impact_level === 'medium' ? 'Médio' : 'Baixo'}`"></span>
+              <span class="text-muted" x-text="` — ${item.reason}`"></span>
+            </div>
+          </template>
+        </div>
+        <p class="text-xs text-muted" style="margin:10px 0 0">
+          Recolhido da Internet e atualizado automaticamente.
+        </p>
+        <p x-show="form.event_metadata?.attribution" x-text="form.event_metadata?.attribution"
+          class="text-xs text-muted" style="margin:6px 0 0"></p>
       </div>
       <div class="form-group">
         <label class="form-label">Local</label>
@@ -112,7 +195,10 @@
       <div style="display:flex;align-items:center;gap:16px">
         <div style="display:flex;align-items:center;gap:8px">
           <label class="form-label" style="margin:0">Cor</label>
-          <input x-model="form.color" type="color" style="width:32px;height:32px;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:none;padding:2px">
+          <span class="calendar-form-color" :style="`--event-color:${colorForType(form.event_type)}`">
+            <span class="calendar-color-swatch" aria-hidden="true"></span>
+            <span x-text="labelForType(form.event_type)"></span>
+          </span>
         </div>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
           <input x-model="form.is_all_day" type="checkbox" style="accent-color:var(--gold)">
@@ -121,11 +207,11 @@
       </div>
 
       <div class="mc-modal-footer">
-        <button @click="saveEvent()" class="btn btn-primary" style="flex:1" :disabled="saving">
+        <button x-show="!form.is_external || isSuperUser" @click="saveEvent()" class="btn btn-primary" style="flex:1" :disabled="saving">
           <span x-text="saving ? 'A guardar…' : 'Guardar'"></span>
         </button>
         <button @click="showModal=false" class="btn btn-secondary" style="flex:1">Cancelar</button>
-        <button x-show="editId" @click="deleteEvent()" class="btn btn-danger">Apagar</button>
+        <button x-show="editId && (!form.is_external || isSuperUser)" @click="deleteEvent()" class="btn btn-danger">Apagar</button>
       </div>
     </div>
   </div>

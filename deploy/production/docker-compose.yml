@@ -18,7 +18,7 @@ services:
     <<: *calendar-service
     container_name: thecarv_calendar
     ports:
-      - "8002:8001"
+      - "127.0.0.1:8002:8001"
     volumes:
       - ./collected_static:/app/collected_static
       - ./media:/app/media
@@ -40,6 +40,27 @@ services:
       - ./logs:/app/logs
       - ./templates_generate:/app/templates_generate:ro
       - ../carloscardoso.thecarv.com/media:/app/sso_media:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os; os.kill(1, 0)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  calendar_external_events:
+    <<: *calendar-service
+    container_name: thecarv_mc_external_events
+    command:
+      - python
+      - manage.py
+      - sync_local_events
+      - --loop
+      - --interval-seconds
+      - "21600"
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       web:
         condition: service_healthy

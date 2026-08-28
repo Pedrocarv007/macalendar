@@ -14,7 +14,7 @@ INTERFACE = {
         "cor_fundo": "#F5F5F5",
         "cor_texto": "#2D2D2D",
     },
-    "versao_estatica": "20260723-mc4",
+    "versao_estatica": "20260731-events1",
 }
 
 

@@ -10,6 +10,95 @@
   background: var(--surface);
 }
 
+.module-calendar .calendar-search-filter {
+  position: relative;
+  width: min(250px, 100%);
+}
+
+.module-calendar .calendar-search-filter i {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  z-index: 1;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.module-calendar .calendar-search-filter input {
+  width: 100%;
+  padding-left: 32px;
+}
+
+.module-calendar .calendar-impact-filter {
+  width: 180px;
+}
+
+.module-calendar .calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: -3px 0 16px;
+  padding: 0 2px;
+}
+
+.module-calendar .calendar-legend-title {
+  margin-right: 2px;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 760;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.module-calendar .calendar-type-chip,
+.module-calendar .calendar-form-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 680;
+}
+
+.module-calendar .calendar-type-chip {
+  cursor: pointer;
+}
+
+.module-calendar .calendar-type-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.module-calendar .calendar-type-chip.is-active {
+  border-color: var(--module-accent);
+  box-shadow: 0 0 0 1px var(--module-accent);
+  color: var(--text-primary);
+}
+
+.module-calendar .calendar-color-swatch {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  border: 1px solid color-mix(in srgb, var(--event-color) 68%, #2d2d2d);
+  border-radius: 50%;
+  background: var(--event-color);
+}
+
+.module-calendar .calendar-form-color {
+  --event-color: var(--module-accent);
+  min-height: 32px;
+  color: var(--text-primary);
+}
+
 .module-calendar .calendar-shell {
   padding: 18px;
 }
@@ -111,6 +200,15 @@
   .module-calendar .calendar-toolbar .calendar-filter-group select {
     flex: 1;
     width: auto !important;
+  }
+
+  .module-calendar .calendar-search-filter,
+  .module-calendar .calendar-impact-filter {
+    width: 100%;
+  }
+
+  .module-calendar .calendar-legend-title {
+    width: 100%;
   }
 
   .module-calendar .calendar-toolbar .calendar-create-button {

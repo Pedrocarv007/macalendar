@@ -154,6 +154,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 'restaurant_required',
                 'template_file_missing',
                 'photo_unavailable',
+                'target_restaurant_forbidden',
             }
             response_status = (
                 status.HTTP_422_UNPROCESSABLE_ENTITY

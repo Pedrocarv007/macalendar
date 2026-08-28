@@ -78,11 +78,11 @@ class Command(BaseCommand):
             from apps.workers.models import SSORestaurant
             sso_rest_id = restaurant.sso_id
             if not sso_rest_id:
-                sso_rest = SSORestaurant.objects.filter(
+                sso_rest = SSORestaurant.objects.operational().filter(
                     name__iexact=restaurant.name
                 ).first()
                 if not sso_rest:
-                    sso_rest = SSORestaurant.objects.filter(
+                    sso_rest = SSORestaurant.objects.operational().filter(
                         name__icontains=restaurant.name.split()[0]
                     ).first()
                 sso_rest_id = sso_rest.id if sso_rest else None
