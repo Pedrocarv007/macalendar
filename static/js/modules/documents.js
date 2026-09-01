@@ -18,6 +18,8 @@ function documentsPage() {
     previewUrl: null,
     previewDownloadUrl: null,
     previewTitle: '',
+    previewPerson: '',
+    previewPrivate: false,
     previewLoading: false,
     previewError: false,
     workers: [],
@@ -136,10 +138,16 @@ function documentsPage() {
       );
     },
 
-    openPreview({ url, downloadUrl = '', title = '' }) {
+    isPersonDocument(doc) {
+      return ['birthday', 'employee_month', 'photo'].includes(doc?.document_type);
+    },
+
+    openPreview({ url, downloadUrl = '', title = '', personName = '', privateContent = false }) {
       this.previewUrl = url;
       this.previewDownloadUrl = downloadUrl || url;
       this.previewTitle = title;
+      this.previewPerson = personName;
+      this.previewPrivate = privateContent;
       this.previewLoading = true;
       this.previewError = false;
       this.showPreview = true;
@@ -151,6 +159,7 @@ function documentsPage() {
         url: `/api/documents/${doc.id}/view`,
         downloadUrl: `/api/documents/${doc.id}/download`,
         title: doc.title,
+        privateContent: this.isPersonDocument(doc),
       });
     },
 
@@ -410,6 +419,8 @@ function documentsPage() {
             url: data.file_url,
             downloadUrl: data.id ? `/api/documents/${data.id}/download` : data.file_url,
             title: data.title || 'Template gerado',
+            personName: this.selectedPerson?.name || '',
+            privateContent: true,
           });
         }
       } finally {

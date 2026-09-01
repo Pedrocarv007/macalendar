@@ -55,7 +55,7 @@
   <!-- Grid -->
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">
     <template x-for="doc in filteredDocuments()" :key="doc.id">
-      <div class="card" style="transition:box-shadow 150ms">
+      <div class="card" style="transition:box-shadow 150ms" :data-demo-person="isPersonDocument(doc) ? '' : null">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
           <div style="width:38px;height:38px;border-radius:9px;background:var(--gold-light);display:flex;align-items:center;justify-content:center">
             <svg style="width:18px;height:18px;color:var(--gold-dark)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,7 +64,7 @@
           </div>
           <span class="badge badge-gray text-xs" x-text="templateLabel(doc.document_type)"></span>
         </div>
-        <p style="font-size:13px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="doc.title"></p>
+        <p data-demo-sensitive style="font-size:13px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="doc.title"></p>
         <p class="text-xs text-muted" style="margin-top:3px" x-text="doc.file_size_display || '—'"></p>
         <div style="display:flex;gap:10px;margin-top:12px">
           <button x-show="canPreview(doc)" @click="openDocumentPreview(doc)"
@@ -238,7 +238,7 @@
               @error="$el.src='/static/img/default-avatar.svg'">
             <span data-demo-sensitive style="font-size:12px;font-weight:600;color:var(--text-primary);text-align:center;line-height:1.3;word-break:break-word"
               x-text="person.name"></span>
-            <span style="font-size:11px;color:var(--text-muted);text-align:center"
+            <span data-demo-sensitive style="font-size:11px;color:var(--text-muted);text-align:center"
               x-text="person.restaurant_name || '—'"></span>
           </button>
         </template>
@@ -249,11 +249,11 @@
   </div>
 
   <div x-cloak x-show="showPreview" x-transition class="mc-modal-overlay" @click.self="closePreview()">
-    <div class="mc-modal template-preview-modal">
+    <div class="mc-modal template-preview-modal" :data-demo-person="previewPerson || (previewPrivate ? '' : null)">
       <div class="template-preview-header">
         <div>
           <span class="template-preview-eyebrow">Pré-visualização</span>
-          <strong x-text="previewTitle || 'Template gerado'"></strong>
+          <strong data-demo-sensitive x-text="previewTitle || 'Template gerado'"></strong>
         </div>
         <button @click="closePreview()" class="btn btn-ghost btn-sm" aria-label="Fechar">×</button>
       </div>
@@ -266,7 +266,7 @@
           <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
           <span>Não foi possível apresentar a imagem. Pode descarregar o ficheiro abaixo.</span>
         </div>
-        <img x-show="previewUrl && !previewError"
+        <img x-show="previewUrl && !previewError" data-demo-sensitive
           :src="previewUrl"
           :alt="previewTitle ? 'Pré-visualização de ' + previewTitle : 'Pré-visualização do Template gerado'"
           @load="previewLoading=false; previewError=false"

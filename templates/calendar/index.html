@@ -80,16 +80,17 @@
   </div>
 
   <div x-cloak x-show="showModal" x-transition class="mc-modal-overlay" @click.self="showModal=false">
-    <div class="mc-modal" style="max-width:900px">
+    <div class="mc-modal" style="max-width:900px"
+      :data-demo-person="form.event_type === 'birthday' ? form.title.replace(/^Aniversário\s*[:·-]?\s*/i, '') : ''">
       <div class="mc-modal-title" x-text="editId ? 'Editar evento' : 'Novo evento'"></div>
 
       <div class="form-group">
         <label class="form-label">Título</label>
-        <input x-model="form.title" type="text" placeholder="Título do evento" class="form-input" maxlength="200" required>
+        <input x-model="form.title" type="text" placeholder="Título do evento" class="form-input" maxlength="200" required data-demo-sensitive>
       </div>
       <div class="form-group">
         <label class="form-label">Descrição</label>
-        <textarea x-model="form.description" placeholder="Descrição..." rows="2" class="form-input"></textarea>
+        <textarea x-model="form.description" placeholder="Descrição..." rows="2" class="form-input" data-demo-sensitive></textarea>
       </div>
       <div class="grid-2">
         <div class="form-group">
@@ -190,7 +191,7 @@
           <small x-text="form.photoFile ? form.photoFile.name : 'JPG, PNG ou GIF'"></small>
         </label>
         <img x-show="form.photoPreview" :src="form.photoPreview"
-          class="event-photo-preview" alt="Pré-visualização da fotografia do evento">
+          class="event-photo-preview" alt="Pré-visualização da fotografia do evento" data-demo-sensitive>
       </div>
       <div style="display:flex;align-items:center;gap:16px">
         <div style="display:flex;align-items:center;gap:8px">

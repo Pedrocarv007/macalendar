@@ -14,7 +14,7 @@
       <div @click="markRead(n)" class="card" style="cursor:pointer;padding:16px;transition:border-color 150ms"
         :style="!n.read_at ? 'border-left:3px solid var(--gold)' : ''">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
-          <div style="min-width:0">
+          <div style="min-width:0" data-demo-private>
             <p style="font-size:13px;font-weight:500;color:var(--text-primary)" x-text="n.title"></p>
             <p class="text-xs text-muted" style="margin-top:3px" x-text="n.message"></p>
           </div>
