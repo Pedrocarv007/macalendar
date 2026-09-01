@@ -71,6 +71,11 @@ function calendarPage() {
             low: 'impacto baixo',
           }[impact];
           const peak = info.event.extendedProps.event_metadata?.peak_window_label;
+          if (info.event.extendedProps.event_type === 'birthday') {
+            info.el.dataset.demoPerson = title.replace(/^anivers[aá]rio\s*[:·-]?\s*/i, '');
+            info.el.dataset.demoSensitive = '';
+            window.TheCarvDemo?.refresh();
+          }
           info.el.setAttribute(
             'title',
             (title.toLocaleLowerCase('pt-PT').startsWith(`${type}:`.toLocaleLowerCase('pt-PT'))

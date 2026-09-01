@@ -1,0 +1,17 @@
+.demo-toggle.is-active {
+  color: #674900;
+  background: #fff3bf;
+  border-color: #f5b800;
+}
+
+html.demo-mode .demo-person-private [data-demo-sensitive],
+html.demo-mode .demo-person-private[data-demo-sensitive],
+html.demo-mode [data-demo-private] {
+  filter: blur(8px);
+  user-select: none;
+}
+
+html.demo-mode .demo-person-private img,
+html.demo-mode img[data-demo-private] {
+  filter: blur(12px);
+}

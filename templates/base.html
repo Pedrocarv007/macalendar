@@ -53,6 +53,12 @@
 
       <ul class="navbar-nav app-utility-nav">
         <li class="nav-item">
+          <button type="button" class="nav-link demo-toggle" data-demo-toggle aria-pressed="false">
+            <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+            <span data-demo-label>Ativar demo</span>
+          </button>
+        </li>
+        <li class="nav-item">
           <a class="nav-link support-link" href="{{ support_link.route }}">
             <i class="fa-solid {{ support_link.icon }}" aria-hidden="true"></i>
             <span>{{ support_link.label }}</span>
@@ -74,14 +80,14 @@
             <i x-show="darkMode" class="fa-solid fa-sun" aria-hidden="true"></i>
           </button>
         </li>
-        <li class="nav-item dropdown user-menu">
+        <li class="nav-item dropdown user-menu" data-demo-person="{{ user.name }}">
           <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
             data-bs-toggle="dropdown" aria-expanded="false">
-            <img src="{{ user.photo_url }}" alt="Fotografia de {{ user.name }}" class="user-avatar">
-            <span class="user-name">{{ user.name }}</span>
+            <img src="{{ user.photo_url }}" alt="Fotografia de {{ user.name }}" class="user-avatar" data-demo-sensitive>
+            <span class="user-name" data-demo-sensitive>{{ user.name }}</span>
           </a>
           <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-            <li class="dropdown-header">
+            <li class="dropdown-header" data-demo-sensitive>
               <strong>{{ user.name }}</strong>
               <small>{{ user.get_role_display }}</small>
             </li>
@@ -132,6 +138,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script src="/static/js/app.js?v={{ interface_config.versao_estatica }}"></script>
+<script src="/static/js/demo-mode.js?v=20260901-demo1"></script>
 {% block extra_scripts %}{% endblock %}
 {% if current_module.script %}
 <script src="{{ current_module.script }}?v={{ interface_config.versao_estatica }}"></script>
